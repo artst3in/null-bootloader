@@ -8,6 +8,7 @@
 #include <lib/uri.h>
 #include <lib/fb.h>
 #include <lib/image.h>
+#include <lib/rand.h>
 #include <mm/pmm.h>
 #include <flanterm/flanterm.h>
 #include <flanterm/backends/fb.h>
@@ -587,8 +588,12 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         default_fg_bright = strtoui(theme_foreground_bright, NULL, 16);
     }
 
+    size_t wallpaper_count = 0;
+    while (config_get_value(config, wallpaper_count, "WALLPAPER") != NULL)
+        wallpaper_count++;
+
     background = NULL;
-    char *background_path = config_get_value(config, 0, "WALLPAPER");
+    char *background_path = config_get_value(config, rand32() % wallpaper_count, "WALLPAPER");
     if (background_path != NULL) {
         struct file_handle *bg_file;
         if ((bg_file = uri_open(background_path)) != NULL) {

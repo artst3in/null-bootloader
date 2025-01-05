@@ -71,7 +71,7 @@ Miscellaneous:
 * `default_entry` - 1-based entry index of the entry which will be automatically selected at startup. If unspecified, it is `1`.
 * `remember_last_entry` - If set to `yes`, remember last booted entry. (UEFI only)
 * `graphics` - If set to `no`, force CGA text mode for the boot menu, else use a video mode. Ignored with Limine UEFI.
-* `wallpaper` - Path where to find the file to use as wallpaper. BMP, PNG, and JPEG formats are supported.
+* `wallpaper` - Path to a file to use as a wallpaper. BMP, PNG, and JPEG formats are supported. There can be multiple of this option, in which case the wallpaper will be randomly selected from the provided options.
 * `wallpaper_style` - The style which will be used to display the wallpaper image: `tiled`, `centered`, or `stretched`. Default is `stretched`.
 * `backdrop` - When the background style is `centered`, this specifies the colour of the backdrop for parts of the screen not covered by the background image, in RRGGBB format.
 * `verbose` - If set to `yes`, print additional information during boot. Defaults to not verbose.
