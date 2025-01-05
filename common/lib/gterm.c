@@ -593,12 +593,14 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         wallpaper_count++;
 
     background = NULL;
-    char *background_path = config_get_value(config, rand32() % wallpaper_count, "WALLPAPER");
-    if (background_path != NULL) {
-        struct file_handle *bg_file;
-        if ((bg_file = uri_open(background_path)) != NULL) {
-            background = image_open(bg_file);
-            fclose(bg_file);
+    if (wallpaper_count > 0) {
+        char *background_path = config_get_value(config, rand32() % wallpaper_count, "WALLPAPER");
+        if (background_path != NULL) {
+            struct file_handle *bg_file;
+            if ((bg_file = uri_open(background_path)) != NULL) {
+                background = image_open(bg_file);
+                fclose(bg_file);
+            }
         }
     }
 
