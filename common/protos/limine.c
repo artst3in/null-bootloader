@@ -8,6 +8,7 @@
 #include <lib/acpi.h>
 #include <lib/config.h>
 #include <lib/time.h>
+#include <lib/pe.h>
 #include <lib/print.h>
 #include <lib/real.h>
 #include <lib/libc.h>
@@ -33,6 +34,21 @@
 #define LIMINE_NO_POINTERS
 #include <protos/limine.h>
 #include <limine.h>
+
+enum executable_format {
+    EXECUTABLE_FORMAT_ELF,
+    EXECUTABLE_FORMAT_PE,
+};
+
+static enum executable_format detect_kernel_format(uint8_t *kernel) {
+    if (elf_bits(kernel) != -1) {
+        return EXECUTABLE_FORMAT_ELF;
+    } else if (pe_bits(kernel) != -1) {
+        return EXECUTABLE_FORMAT_PE;
+    } else {
+        panic(true, "limine: Unknown kernel executable format");
+    }
+}
 
 #define SUPPORTED_BASE_REVISION 3
 
@@ -142,7 +158,7 @@ static void limine_memcpy_to_64(uint64_t dst, void *src, size_t count) {
 #endif
 
 static pagemap_t build_pagemap(int base_revision,
-                               bool nx, struct elf_range *ranges, size_t ranges_count,
+                               bool nx, struct mem_range *ranges, size_t ranges_count,
                                uint64_t physical_base, uint64_t virtual_base,
                                uint64_t direct_map_offset) {
     pagemap_t pagemap = new_pagemap(paging_mode);
@@ -162,8 +178,8 @@ static pagemap_t build_pagemap(int base_revision,
         }
 
         uint64_t pf =
-            (ranges[i].permissions & ELF_PF_X ? 0 : (nx ? VMM_FLAG_NOEXEC : 0)) |
-            (ranges[i].permissions & ELF_PF_W ? VMM_FLAG_WRITE : 0);
+            (ranges[i].permissions & MEM_RANGE_X ? 0 : (nx ? VMM_FLAG_NOEXEC : 0)) |
+            (ranges[i].permissions & MEM_RANGE_W ? VMM_FLAG_WRITE : 0);
 
         map_pages(pagemap, virt, phys, pf, ranges[i].length);
     }
@@ -448,19 +464,34 @@ noreturn void limine_load(char *config, char *cmdline) {
 
     // ELF loading
     uint64_t entry_point = 0;
-    struct elf_range *ranges;
+    struct mem_range *ranges;
     uint64_t ranges_count;
 
     uint64_t image_size_before_bss;
     bool is_reloc;
 
-    if (!elf64_load(kernel, &entry_point, &slide,
-                   MEMMAP_KERNEL_AND_MODULES, kaslr,
-                   &ranges, &ranges_count,
-                   &physical_base, &virtual_base, NULL,
-                   &image_size_before_bss,
-                   &is_reloc)) {
-        panic(true, "limine: ELF64 load failure");
+    enum executable_format kernel_format = detect_kernel_format(kernel);
+    switch (kernel_format) {
+        case EXECUTABLE_FORMAT_ELF:
+            if (!elf64_load(kernel, &entry_point, &slide,
+                            MEMMAP_KERNEL_AND_MODULES, kaslr,
+                            &ranges, &ranges_count,
+                            &physical_base, &virtual_base, NULL,
+                            &image_size_before_bss,
+                            &is_reloc)) {
+                panic(true, "limine: ELF64 load failure");
+            }
+            break;
+        case EXECUTABLE_FORMAT_PE:
+            if (!pe64_load(kernel, &entry_point, &slide,
+                            MEMMAP_KERNEL_AND_MODULES, kaslr,
+                            &ranges, &ranges_count,
+                            &physical_base, &virtual_base, NULL,
+                            &image_size_before_bss,
+                            &is_reloc)) {
+                panic(true, "limine: PE64 load failure");
+            }
+            break;
     }
 
     kaslr = kaslr && is_reloc;
@@ -515,7 +546,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint64_t *limine_reqs = NULL;
     requests = ext_mem_alloc(MAX_REQUESTS * sizeof(void *));
     requests_count = 0;
-    if (base_revision == 0 && elf64_load_section(kernel, &limine_reqs, ".limine_reqs", 0, slide)) {
+    if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
             if (limine_reqs[i] == 0) {
                 break;
