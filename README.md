@@ -142,8 +142,17 @@ make install    # (or gmake where applicable)
 See [USAGE.md](USAGE.md).
 
 ## Acknowledgments
-Limine uses a stripped-down version of [tinf](https://github.com/jibsen/tinf) for GZIP decompression in early x86 BIOS stages.
 
-Limine uses [stb_image](https://github.com/nothings/stb/blob/master/stb_image.h) for wallpaper image loading.
+[cc-runtime](https://github.com/osdev0/cc-runtime) (Apache License v2.0 with LLVM Exceptions) is used to provide runtime libgcc-like routines.
 
-Limine uses [libfdt](https://git.kernel.org/pub/scm/utils/dtc/dtc.git) for manipulating FDTs.
+[0BSD Freestanding C Headers](https://github.com/osdev0/freestnd-c-hdrs-0bsd) (0BSD License) provide GCC and Clang compatible freestanding C headers.
+
+[Nyu-EFI](https://github.com/osdev0/nyu-efi) (Intel Open Source License/BSD-2-Clause License/HP License) provides headers and build-time support for UEFI.
+
+[tinf](https://github.com/jibsen/tinf) (zlib License) is used in early x86 BIOS stages for GZIP decompression of stage2.
+
+[Flanterm](https://github.com/mintsuki/flanterm) (BSD-2-Clause License) is used for text related screen drawing.
+
+[stb_image](https://github.com/nothings/stb/blob/master/stb_image.h) (MIT License/Public Domain) is used for wallpaper image loading.
+
+[libfdt](https://git.kernel.org/pub/scm/utils/dtc/dtc.git) (BSD-2-Clause License) is used for manipulating Flat Device Trees.
