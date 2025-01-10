@@ -201,9 +201,12 @@ void bios_chainload_volume(struct volume *p) {
 #elif defined (UEFI)
 
 noreturn void chainload(char *config, char *cmdline) {
-    char *image_path = config_get_value(config, 0, "IMAGE_PATH");
-    if (image_path == NULL)
-        panic(true, "chainload: IMAGE_PATH not specified");
+    char *image_path = config_get_value(config, 0, "PATH");
+    if (image_path == NULL) {
+        image_path = config_get_value(config, 0, "IMAGE_PATH");
+    } else {
+        panic(true, "chainload: Image path not specified");
+    }
 
     struct file_handle *image;
     if ((image = uri_open(image_path)) == NULL)

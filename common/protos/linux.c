@@ -288,9 +288,13 @@ struct boot_params {
 noreturn void linux_load(char *config, char *cmdline) {
     struct file_handle *kernel_file;
 
-    char *kernel_path = config_get_value(config, 0, "KERNEL_PATH");
-    if (kernel_path == NULL)
-        panic(true, "linux: KERNEL_PATH not specified");
+    char *kernel_path = config_get_value(config, 0, "PATH");
+    if (kernel_path == NULL) {
+        kernel_path = config_get_value(config, 0, "KERNEL_PATH");
+    }
+    if (kernel_path == NULL) {
+        panic(true, "linux: Kernel path not specified");
+    }
 
     print("linux: Loading kernel `%#`...\n", kernel_path);
 

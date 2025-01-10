@@ -120,7 +120,8 @@ Editor control options:
 *Locally assignable (protocol specific) options* are:
 
 * Linux protocol:
-  * `kernel_path` - The path of the kernel.
+  * `path` - The path of the kernel.
+  * `kernel_path` - Alias of `path`.
   * `module_path` - The path to a module (such as initramfs). This option can be specified multiple times to specify multiple modules.
   * `resolution` - The resolution to be used. This setting takes the form of `<width>x<height>x<bpp>`. If the resolution is not available, Limine will pick another one automatically. Omitting `<bpp>` will default to 32.
   * `textmode` - If set to `yes`, prefer text mode. (BIOS only)
@@ -151,7 +152,8 @@ Editor control options:
   * `textmode` - If set to `yes`, prefer text mode. (BIOS only)
 
 * EFI Chainload protocol:
-  * `image_path` - Path of the EFI application to chainload.
+  * `path` - Path of the EFI application to chainload.
+  * `image_path` - Alias of `path`.
   * `resolution` - The resolution to be used. This setting takes the form of `<width>x<height>x<bpp>`. If the resolution is not available, Limine will pick another one automatically. Omitting `<bpp>` will default to 32.
 
 * BIOS Chainload protocol:
