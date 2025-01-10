@@ -1,3 +1,20 @@
+2025-01-10  mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 8.7.0 ***
+
+    Noteworthy changes compared to the previous release, 8.6.1:
+
+    New features:
+        - Limine boot protocol: Add support for PE executables.
+        - Linux boot protocol: Enable support for Loongarch64.
+        - Add support for selecting a random wallpaper every boot if multiple
+          are provided.
+        - Add `path` aliases for `kernel_path` and `image_path` for the Linux
+          and EFI Chainloading protocols respectively.
+
+    Miscellaneous:
+        - Submodule version/commit bumps.
+
 2024-12-26  mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.6.1 ***
