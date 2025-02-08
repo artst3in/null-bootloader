@@ -49,7 +49,6 @@ We have a Matrix room at `#limine:matrix.org` (preferred), and a [Discord server
 ### Supported filesystems
 * FAT12/16/32
 * ISO9660 (CDs/DVDs)
-* ext2/3/4 (NOTE: This is experimental and not supported. Maintainers wanted!)
 
 If your filesystem isn't listed here, please read [the philosophy](PHILOSOPHY.md) first, especially before
 opening issues or pull requests related to this.
