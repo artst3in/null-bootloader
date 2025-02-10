@@ -27,8 +27,6 @@ no_unwind bool bad_config = false;
 
 static char *config_addr;
 
-bool config_format_old = false;
-
 int init_config_disk(struct volume *part) {
     struct file_handle *f;
 
@@ -42,16 +40,8 @@ int init_config_disk(struct volume *part) {
         goto opened;
     }
 
-    if ((f = fopen(part, "/limine.cfg")) == NULL
-     && (f = fopen(part, "/limine/limine.cfg")) == NULL
-     && (f = fopen(part, "/boot/limine.cfg")) == NULL
-     && (f = fopen(part, "/boot/limine/limine.cfg")) == NULL
-     && (f = fopen(part, "/EFI/BOOT/limine.cfg")) == NULL) {
-        case_insensitive_fopen = old_cif;
-        return -1;
-    }
-
-    config_format_old = true;
+    case_insensitive_fopen = old_cif;
+    return -1;
 
 opened:
     case_insensitive_fopen = old_cif;
@@ -137,9 +127,9 @@ static int is_child(char *buf, size_t limit,
     if (strlen(buf) < current_depth + 1)
         return NOT_CHILD;
     for (size_t j = 0; j < current_depth; j++)
-        if (buf[j] != (config_format_old ? ':' : '/'))
+        if (buf[j] != '/')
             return NOT_CHILD;
-    if (buf[current_depth] == (config_format_old ? ':' : '/'))
+    if (buf[current_depth] == '/')
         return INDIRECT_CHILD;
     return DIRECT_CHILD;
 }
@@ -437,7 +427,7 @@ overflow:
     size_t s;
     char *c = config_get_entry(&s, 0);
     if (c != NULL) {
-        while (*c != (config_format_old ? ':' : '/')) {
+        while (*c != '/') {
             c--;
         }
         if (c > config_addr) {
@@ -455,7 +445,7 @@ static bool config_get_entry_name(char *ret, size_t index, size_t limit) {
     char *p = config_addr;
 
     for (size_t i = 0; i <= index; i++) {
-        while (*p != (config_format_old ? ':' : '/')) {
+        while (*p != '/') {
             if (!*p)
                 return false;
             p++;
@@ -486,7 +476,7 @@ static char *config_get_entry(size_t *size, size_t index) {
     char *p = config_addr;
 
     for (size_t i = 0; i <= index; i++) {
-        while (*p != (config_format_old ? ':' : '/')) {
+        while (*p != '/') {
             if (!*p)
                 return NULL;
             p++;
@@ -503,7 +493,7 @@ static char *config_get_entry(size_t *size, size_t index) {
     ret = p;
 
 cont:
-    while (*p != (config_format_old ? ':' : '/') && *p)
+    while (*p != '/' && *p)
         p++;
 
     if (*p && *(p - 1) != '\n') {
@@ -554,16 +544,14 @@ char *config_get_value(const char *config, size_t index, const char *key) {
     size_t key_len = strlen(key);
 
     for (size_t i = 0; config[i]; i++) {
-        if (!(config_format_old ? strncmp : strncasecmp)(&config[i], key, key_len) && config[i + key_len] == (config_format_old ? '=' : ':')) {
+        if (!strncasecmp(&config[i], key, key_len) && config[i + key_len] == ':') {
             if (i && config[i - 1] != SEPARATOR)
                 continue;
             if (index--)
                 continue;
             i += key_len + 1;
-            if (!config_format_old) {
-                while (config[i] == ' ' || config[i] == '\t') {
-                    i++;
-                }
+            while (config[i] == ' ' || config[i] == '\t') {
+                i++;
             }
             size_t value_len;
             for (value_len = 0;

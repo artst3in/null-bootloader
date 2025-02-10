@@ -25,26 +25,26 @@ bool uri_resolve(char *uri, char **resource, char **root, char **path, char **ha
 
     // Get resource
     for (size_t i = 0; ; i++) {
-        if (strlen(uri + i) < (config_format_old ? 3 : 1))
+        if (strlen(uri + i) < 1)
             return false;
 
-        if (!memcmp(uri + i, (config_format_old ? "://" : "("), (config_format_old ? 3 : 1))) {
+        if (!memcmp(uri + i, "(", 1)) {
             *resource = uri;
             uri[i] = 0;
-            uri += i + (config_format_old ? 3 : 1);
+            uri += i + 1;
             break;
         }
     }
 
     // Get root
     for (size_t i = 0; ; i++) {
-        if (strlen(uri + i) < (config_format_old ? 1 : 3))
+        if (strlen(uri + i) < 3)
             return false;
 
-        if (!memcmp(uri + i, (config_format_old ? "/" : "):/"), (config_format_old ? 1 : 3))) {
+        if (!memcmp(uri + i, "):/", 3)) {
             *root = uri;
             uri[i] = 0;
-            uri += i + (config_format_old ? 1 : 3);
+            uri += i + 3;
             break;
         }
     }
