@@ -1048,7 +1048,7 @@ Request:
 
 struct limine_internal_module {
     const char *path;
-    const char *cmdline;
+    const char *string;
     uint64_t flags;
 };
 
@@ -1073,7 +1073,7 @@ As part of `struct limine_internal_module`:
 
 * `path` - Path to the module to load. This path is *relative* to the location of
 the executable.
-* `cmdline` - Command line for the given module.
+* `string` - String associated with the given module.
 * `flags` - Flags changing module loading behaviour:
   - `LIMINE_INTERNAL_MODULE_REQUIRED`: Fail if the requested module is not found.
   - `LIMINE_INTERNAL_MODULE_COMPRESSED`: Deprecated. Bootloader may not support it and panic instead (from Limine 8.x onwards). Alternatively: the module is GZ-compressed and should be decompressed by the bootloader. This is honoured if the response is revision 2 or greater.
@@ -1114,7 +1114,7 @@ struct limine_file {
     void *address;
     uint64_t size;
     char *path;
-    char *cmdline;
+    char *string;
     uint32_t media_type;
     uint32_t unused;
     uint32_t tftp_ip;
@@ -1131,7 +1131,7 @@ struct limine_file {
 * `address` - The address of the file. This is always at least 4KiB aligned.
 * `size` - The size of the file.
 * `path` - The path of the file within the volume, with a leading slash.
-* `cmdline` - A command line associated with the file.
+* `string` - A string associated with the file.
 * `media_type` - Type of media file resides on.
 * `tftp_ip` - If non-0, this is the IP of the TFTP server the file was loaded
 from.
