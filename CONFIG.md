@@ -113,7 +113,7 @@ Editor control options:
 *Locally assignable (non protocol specific) options* are:
 
 * `comment` - An optional comment string that will be displayed by the bootloader on the menu when an entry is selected.
-* `protocol` - The boot protocol that will be used to boot the kernel/executable. Valid protocols are: `linux`, `limine`, `multiboot` (or `multiboot1`), `multiboot2`, `efi`, `bios`, and `chainload_next`.
+* `protocol` - The boot protocol that will be used to boot the kernel/executable. Valid protocols are: `linux`, `limine`, `multiboot` (or `multiboot1`), `multiboot2`, `efi`, and `bios`.
 * `cmdline` - The command line string to be passed to the kernel/executable. Can be omitted.
 * `kernel_cmdline` - Alias of `cmdline`.
 

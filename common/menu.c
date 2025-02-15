@@ -17,7 +17,6 @@
 #include <drivers/vga_textmode.h>
 #include <protos/linux.h>
 #include <protos/chainload.h>
-#include <protos/chainload_next.h>
 #include <protos/multiboot1.h>
 #include <protos/multiboot2.h>
 #include <protos/limine.h>
@@ -1194,8 +1193,6 @@ noreturn void boot(char *config) {
         quiet = false;
         print("Multiboot 2 is not available on non-x86 architectures.\n\n");
 #endif
-    } else if (!strcmp(proto, "chainload_next")) {
-        chainload_next(config, cmdline);
 #if defined (BIOS)
     } else if (!strcmp(proto, "bios_chainload")
             || !strcmp(proto, "bios")) {
