@@ -60,17 +60,17 @@ static volatile struct limine_executable_file_request exec_file_request = {
 
 struct limine_internal_module internal_module1 = {
     .path = "/boot/test.elf",
-    .cmdline = "First internal module"
+    .string = "First internal module"
 };
 
 struct limine_internal_module internal_module2 = {
     .path = "test.elf",
-    .cmdline = "Second internal module"
+    .string = "Second internal module"
 };
 
 struct limine_internal_module internal_module3 = {
     .path = "./limine.conf",
-    .cmdline = "Third internal module"
+    .string = "Third internal module"
 };
 
 struct limine_internal_module *internal_modules[] = {
@@ -204,7 +204,7 @@ static void print_file(struct limine_file *file) {
     e9_printf("File->Address: %x", file->address);
     e9_printf("File->Size: %x", file->size);
     e9_printf("File->Path: %s", file->path);
-    e9_printf("File->CmdLine: %s", file->cmdline);
+    e9_printf("File->String: %s", file->string);
     e9_printf("File->MediaType: %d", file->media_type);
     e9_printf("File->PartIndex: %d", file->partition_index);
     e9_printf("File->TFTPIP: %d.%d.%d.%d",

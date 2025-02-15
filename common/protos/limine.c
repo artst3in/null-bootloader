@@ -393,7 +393,7 @@ static struct limine_file get_file(struct file_handle *file, char *cmdline, bool
 
     ret.size = file->size;
 
-    ret.cmdline = reported_addr(cmdline);
+    ret.string = reported_addr(cmdline);
 
     return ret;
 }
@@ -1137,7 +1137,7 @@ FEAT_START
             struct limine_internal_module *internal_module = (void *)get_phys_addr(internal_modules[i]);
 
             module_path = (char *)get_phys_addr(internal_module->path);
-            module_cmdline = (char *)get_phys_addr(internal_module->cmdline);
+            module_cmdline = (char *)get_phys_addr(internal_module->string);
 
             char *module_path_abs = ext_mem_alloc(1024);
             char *module_path_abs_p = module_path_abs;
@@ -1161,10 +1161,14 @@ FEAT_START
         } else {
             struct conf_tuple conf_tuple =
                     config_get_tuple(config, i - (module_request->revision >= 1 ? module_request->internal_module_count : 0),
+                                     "MODULE_PATH", "MODULE_STRING");
+
+            struct conf_tuple conf_tuple1 =
+                    config_get_tuple(config, i - (module_request->revision >= 1 ? module_request->internal_module_count : 0),
                                      "MODULE_PATH", "MODULE_CMDLINE");
 
             module_path = conf_tuple.value1;
-            module_cmdline = conf_tuple.value2;
+            module_cmdline = conf_tuple.value2 ?: conf_tuple1.value2;
         }
 
         if (module_cmdline == NULL) {

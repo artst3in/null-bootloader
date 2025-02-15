@@ -61,7 +61,7 @@ override CFLAGS += \
     -I../freestnd-c-hdrs-0bsd \
     -I. \
     -D_LIMINE_PROTO \
-    -DLIMINE_API_REVISION=2
+    -DLIMINE_API_REVISION=3
 
 ifneq ($(findstring x86_64,$(shell $(CC_FOR_TARGET) -dumpmachine)),)
 override CFLAGS += \

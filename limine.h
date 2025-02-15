@@ -35,7 +35,7 @@ extern "C" {
 #  define LIMINE_API_REVISION 0
 #endif
 
-#if LIMINE_API_REVISION > 2
+#if LIMINE_API_REVISION > 3
 #  error "limine.h API revision unsupported"
 #endif
 
@@ -86,7 +86,11 @@ struct limine_file {
     LIMINE_PTR(void *) address;
     uint64_t size;
     LIMINE_PTR(char *) path;
+#if LIMINE_API_REVISION >= 3
+    LIMINE_PTR(char *) string;
+#else
     LIMINE_PTR(char *) cmdline;
+#endif
     uint32_t media_type;
     uint32_t unused;
     uint32_t tftp_ip;
@@ -530,7 +534,11 @@ struct limine_kernel_file_request {
 
 struct limine_internal_module {
     LIMINE_PTR(const char *) path;
+#if LIMINE_API_REVISION >= 3
+    LIMINE_PTR(const char *) string;
+#else
     LIMINE_PTR(const char *) cmdline;
+#endif
     uint64_t flags;
 };
 
