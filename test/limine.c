@@ -113,8 +113,8 @@ static volatile struct limine_efi_memmap_request efi_memmap_request = {
 };
 
 __attribute__((section(".limine_requests")))
-static volatile struct limine_boot_time_request boot_time_request = {
-    .id = LIMINE_BOOT_TIME_REQUEST,
+static volatile struct limine_date_at_boot_request date_at_boot_request = {
+    .id = LIMINE_DATE_AT_BOOT_REQUEST,
     .revision = 0, .response = NULL
 };
 
@@ -465,13 +465,13 @@ FEAT_END
 
 FEAT_START
     e9_printf("");
-    if (boot_time_request.response == NULL) {
+    if (date_at_boot_request.response == NULL) {
         e9_printf("Boot time not passed");
         break;
     }
-    struct limine_boot_time_response *boot_time_response = boot_time_request.response;
-    e9_printf("Boot time feature, revision %d", boot_time_response->revision);
-    e9_printf("Boot time: %d", boot_time_response->boot_time);
+    struct limine_date_at_boot_response *date_at_boot_response = date_at_boot_request.response;
+    e9_printf("Date at boot feature, revision %d", date_at_boot_response->revision);
+    e9_printf("Timestamp: %d", date_at_boot_response->timestamp);
 FEAT_END
 
 // TODO: LoongArch MP

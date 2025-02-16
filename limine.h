@@ -635,19 +635,39 @@ struct limine_efi_memmap_request {
     LIMINE_PTR(struct limine_efi_memmap_response *) response;
 };
 
-/* Boot time */
+/* Date at boot */
 
-#define LIMINE_BOOT_TIME_REQUEST { LIMINE_COMMON_MAGIC, 0x502746e184c088aa, 0xfbc5ec83e6327893 }
+#if LIMINE_API_REVISION >= 3
+#  define LIMINE_DATE_AT_BOOT_REQUEST { LIMINE_COMMON_MAGIC, 0x502746e184c088aa, 0xfbc5ec83e6327893 }
+#else
+#  define LIMINE_BOOT_TIME_REQUEST { LIMINE_COMMON_MAGIC, 0x502746e184c088aa, 0xfbc5ec83e6327893 }
+#endif
 
+#if LIMINE_API_REVISION >= 3
+struct limine_date_at_boot_response {
+#else
 struct limine_boot_time_response {
+#endif
     uint64_t revision;
+#if LIMINE_API_REVISION >= 3
+    int64_t timestamp;
+#else
     int64_t boot_time;
+#endif
 };
 
+#if LIMINE_API_REVISION >= 3
+struct limine_date_at_boot_request {
+#else
 struct limine_boot_time_request {
+#endif
     uint64_t id[4];
     uint64_t revision;
+#if LIMINE_API_REVISION >= 3
+    LIMINE_PTR(struct limine_date_at_boot_response *) response;
+#else
     LIMINE_PTR(struct limine_boot_time_response *) response;
+#endif
 };
 
 /* Executable address */

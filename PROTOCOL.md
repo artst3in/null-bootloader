@@ -1262,31 +1262,31 @@ struct limine_efi_memmap_response {
 Note: This feature provides data suitable for use with RT->SetVirtualAddressMap(), provided
 HHDM offset is subtracted from `memmap`.
 
-### Boot Time Feature
+### Date at Boot Feature
 
 ID:
 ```c
-#define LIMINE_BOOT_TIME_REQUEST { LIMINE_COMMON_MAGIC, 0x502746e184c088aa, 0xfbc5ec83e6327893 }
+#define LIMINE_DATE_AT_BOOT_REQUEST { LIMINE_COMMON_MAGIC, 0x502746e184c088aa, 0xfbc5ec83e6327893 }
 ```
 
 Request:
 ```c
-struct limine_boot_time_request {
+struct limine_date_at_boot_request {
     uint64_t id[4];
     uint64_t revision;
-    struct limine_boot_time_response *response;
+    struct limine_date_at_boot_response *response;
 };
 ```
 
 Response:
 ```c
-struct limine_boot_time_response {
+struct limine_date_at_boot_response {
     uint64_t revision;
-    int64_t boot_time;
+    int64_t timestamp;
 };
 ```
 
-* `boot_time` - The UNIX time on boot, in seconds, taken from the system RTC.
+* `timestamp` - The UNIX timestamp, in seconds, taken from the system RTC, representing the date and time of boot.
 
 ### Executable Address Feature
 

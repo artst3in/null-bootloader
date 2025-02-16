@@ -1291,17 +1291,17 @@ FEAT_END
 no_fb:
     // Boot time feature
 FEAT_START
-    struct limine_boot_time_request *boot_time_request = get_request(LIMINE_BOOT_TIME_REQUEST);
-    if (boot_time_request == NULL) {
+    struct limine_date_at_boot_request *date_at_boot_request = get_request(LIMINE_DATE_AT_BOOT_REQUEST);
+    if (date_at_boot_request == NULL) {
         break; // next feature
     }
 
-    struct limine_boot_time_response *boot_time_response =
-        ext_mem_alloc(sizeof(struct limine_boot_time_response));
+    struct limine_date_at_boot_response *date_at_boot_response =
+        ext_mem_alloc(sizeof(struct limine_date_at_boot_response));
 
-    boot_time_response->boot_time = time();
+    date_at_boot_response->timestamp = time();
 
-    boot_time_request->response = reported_addr(boot_time_response);
+    date_at_boot_request->response = reported_addr(date_at_boot_response);
 FEAT_END
 
     // Wrap-up stuff before memmap close
