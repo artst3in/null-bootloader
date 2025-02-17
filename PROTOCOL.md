@@ -455,6 +455,34 @@ struct limine_bootloader_info_response {
 `name` and `version` are 0-terminated ASCII strings containing the name and
 version of the loading bootloader.
 
+### Executable Command Line Feature
+
+ID:
+```c
+#define LIMINE_EXECUTABLE_CMDLINE_REQUEST { LIMINE_COMMON_MAGIC, 0x4b161536e598651e, 0xb390ad4a2f1f303a }
+```
+
+Request:
+```c
+struct limine_executable_cmdline_request {
+    uint64_t id[4];
+    uint64_t revision;
+    struct limine_executable_cmdline_response *response;
+};
+```
+
+Response:
+```c
+struct limine_executable_cmdline_response {
+    uint64_t revision;
+    char *cmdline;
+};
+```
+
+`cmdline` is a 0-terminated ASCII string containing the command line associated with the
+booted executable. This is equivalent to the `string` member of the `executable_file` structure of the
+Executable File feature.
+
 ### Firmware Type Feature
 
 ID:
@@ -1032,7 +1060,8 @@ struct limine_executable_file_response {
 ```
 
 * `executable_file` - Pointer to the `struct limine_file` structure (see below)
-for the executable file.
+for the executable file. The `string` member is equivalent to the `cmdline` value as reported by
+the Executable Command Line feature.
 
 ### Module Feature
 

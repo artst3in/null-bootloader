@@ -118,6 +118,21 @@ struct limine_bootloader_info_request {
     LIMINE_PTR(struct limine_bootloader_info_response *) response;
 };
 
+/* Executable command line */
+
+#define LIMINE_EXECUTABLE_CMDLINE_REQUEST { LIMINE_COMMON_MAGIC, 0x4b161536e598651e, 0xb390ad4a2f1f303a }
+
+struct limine_executable_cmdline_response {
+    uint64_t revision;
+    LIMINE_PTR(char *) cmdline;
+};
+
+struct limine_executable_cmdline_request {
+    uint64_t id[4];
+    uint64_t revision;
+    LIMINE_PTR(struct limine_executable_cmdline_response *) response;
+};
+
 /* Firmware type */
 
 #define LIMINE_FIRMWARE_TYPE_REQUEST { LIMINE_COMMON_MAGIC, 0x8c2f75d90bef28a8, 0x7045a4688eac00c3 }

@@ -908,6 +908,21 @@ FEAT_START
     bootloader_info_request->response = reported_addr(bootloader_info_response);
 FEAT_END
 
+    // Executable Command Line feature
+FEAT_START
+    struct limine_executable_cmdline_request *executable_cmdline_request = get_request(LIMINE_EXECUTABLE_CMDLINE_REQUEST);
+    if (executable_cmdline_request == NULL) {
+        break; // next feature
+    }
+
+    struct limine_executable_cmdline_response *executable_cmdline_response =
+        ext_mem_alloc(sizeof(struct limine_executable_cmdline_response));
+
+    executable_cmdline_response->cmdline = reported_addr(cmdline);
+
+    executable_cmdline_request->response = reported_addr(executable_cmdline_response);
+FEAT_END
+
     // Firmware type feature
 FEAT_START
     struct limine_firmware_type_request *firmware_type_request = get_request(LIMINE_FIRMWARE_TYPE_REQUEST);

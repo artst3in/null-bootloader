@@ -35,6 +35,12 @@ static volatile struct limine_bootloader_info_request bootloader_info_request = 
 };
 
 __attribute__((section(".limine_requests")))
+static volatile struct limine_executable_cmdline_request executable_cmdline_request = {
+    .id = LIMINE_EXECUTABLE_CMDLINE_REQUEST,
+    .revision = 0, .response = NULL
+};
+
+__attribute__((section(".limine_requests")))
 static volatile struct limine_firmware_type_request firmware_type_request = {
     .id = LIMINE_FIRMWARE_TYPE_REQUEST,
     .revision = 0, .response = NULL
@@ -305,6 +311,17 @@ FEAT_START
     e9_printf("Bootloader info feature, revision %d", bootloader_info_response->revision);
     e9_printf("Bootloader name: %s", bootloader_info_response->name);
     e9_printf("Bootloader version: %s", bootloader_info_response->version);
+FEAT_END
+
+FEAT_START
+    e9_printf("");
+    if (executable_cmdline_request.response == NULL) {
+        e9_printf("Executable command line not passed");
+        break;
+    }
+    struct limine_executable_cmdline_response *executable_cmdline_response = executable_cmdline_request.response;
+    e9_printf("Executable command line feature, revision %d", executable_cmdline_response->revision);
+    e9_printf("Command line: %s", executable_cmdline_response->cmdline);
 FEAT_END
 
 FEAT_START
