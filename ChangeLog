@@ -6,7 +6,7 @@
 
     Breaking changes:
         - Support for the ext2/3/4 filesystems has been once again dropped due
-          to lack of maintainance and to avoid extra potential attack surface
+          to lack of maintenance and to avoid extra potential attack surface
           during Secure Boot Limine usage.
         - Drop support for the legacy config format (limine.cfg) and only keep
           around the new one (limine.conf) introduced with Limine 8.x.
