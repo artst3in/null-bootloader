@@ -343,6 +343,8 @@ again:
     if (_ranges && _ranges_count) {
         size_t range_count = 0;
 
+        bool headers_within_section = false;
+
         for (size_t i = 0; i < nt_hdrs->FileHeader.NumberOfSections; i++) {
             IMAGE_SECTION_HEADER *section = &sections[i];
 
@@ -350,6 +352,14 @@ again:
                 continue;
             }
 
+            if (section->VirtualAddress == 0) {
+                headers_within_section = true;
+            }
+
+            range_count++;
+        }
+
+        if (!headers_within_section) {
             range_count++;
         }
 
@@ -358,7 +368,16 @@ again:
         *_ranges = ranges;
         *_ranges_count = range_count;
 
-        for (size_t i = 0, j = 0; i < nt_hdrs->FileHeader.NumberOfSections; i++) {
+        size_t range_index = 0;
+
+        if (!headers_within_section) {
+            struct mem_range *range = &ranges[range_index++];
+            range->base = *virtual_base;
+            range->length = ALIGN_UP(nt_hdrs->OptionalHeader.SizeOfHeaders, 0x1000);
+            range->permissions = MEM_RANGE_R;
+        }
+
+        for (size_t i = 0; i < nt_hdrs->FileHeader.NumberOfSections; i++) {
             IMAGE_SECTION_HEADER *section = &sections[i];
 
             if (section->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) {
@@ -367,22 +386,21 @@ again:
 
             uintptr_t misalign = section->VirtualAddress % alignment;
 
-            ranges[j].base = *virtual_base + ALIGN_DOWN(section->VirtualAddress, alignment);
-            ranges[j].length = ALIGN_UP(section->VirtualSize + misalign, alignment);
+            struct mem_range *range = &ranges[range_index++];
+            range->base = *virtual_base + ALIGN_DOWN(section->VirtualAddress, alignment);
+            range->length = ALIGN_UP(section->VirtualSize + misalign, alignment);
 
             if (section->Characteristics & IMAGE_SCN_MEM_EXECUTE) {
-                ranges[j].permissions |= MEM_RANGE_X;
+                range->permissions |= MEM_RANGE_X;
             }
 
             if (section->Characteristics & IMAGE_SCN_MEM_WRITE) {
-                ranges[j].permissions |= MEM_RANGE_W;
+                range->permissions |= MEM_RANGE_W;
             }
 
             if (section->Characteristics & IMAGE_SCN_MEM_READ) {
-                ranges[j].permissions |= MEM_RANGE_R;
+                range->permissions |= MEM_RANGE_R;
             }
-
-            j++;
         }
     }
 
