@@ -284,12 +284,8 @@ noreturn void chainload(char *config, char *cmdline) {
 
     size_t path_len = strlen(image->path);
 
-    CHAR16 *efi_file_path = NULL;
-    status = gBS->AllocatePool(EfiLoaderData, (path_len + 1) * sizeof(CHAR16),
-                               (void **)&efi_file_path);
-    if (status) {
-        panic(true, "efi: AllocatePool() failure (%x)", status);
-    }
+    size_t efi_file_path_len = (path_len + 1) * sizeof(CHAR16);
+    CHAR16 *efi_file_path = ext_mem_alloc(efi_file_path_len);
 
     bool leading_slash = true;
     size_t j = 0;
@@ -302,8 +298,6 @@ noreturn void chainload(char *config, char *cmdline) {
     }
     efi_file_path[j] = 0;
 
-    fclose(image);
-
     EFI_GUID device_path_protocol_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
     EFI_DEVICE_PATH_PROTOCOL *device_path = NULL;
     status = gBS->HandleProtocol(image->efi_part_handle, &device_path_protocol_guid, (void **)&device_path);
@@ -311,12 +305,10 @@ noreturn void chainload(char *config, char *cmdline) {
         panic(true, "efi: HandleProtocol() failure (%x)", status);
     }
 
+    fclose(image);
+
     size_t devpath_item_size = sizeof(EFI_DEVICE_PATH_PROTOCOL) + ((j + 1) * sizeof(CHAR16));
-    EFI_DEVICE_PATH_PROTOCOL *devpath_item = NULL;
-    status = gBS->AllocatePool(EfiLoaderData, devpath_item_size, (void **)&devpath_item);
-    if (status) {
-        panic(true, "efi: AllocatePool() failure (%x)", status);
-    }
+    EFI_DEVICE_PATH_PROTOCOL *devpath_item = ext_mem_alloc(devpath_item_size);
 
     devpath_item->Type = 0x04;
     devpath_item->SubType = 0x04;
@@ -324,8 +316,11 @@ noreturn void chainload(char *config, char *cmdline) {
     devpath_item->Length[1] = devpath_item_size >> 8;
 
     memcpy(&devpath_item[1], efi_file_path, (j + 1) * sizeof(CHAR16));
+    pmm_free(efi_file_path, efi_file_path_len);
 
     device_path = devpath_append(device_path, devpath_item);
+
+    pmm_free(devpath_item, devpath_item_size);
 
     term_notready();
 
