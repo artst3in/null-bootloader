@@ -200,35 +200,130 @@ void bios_chainload_volume(struct volume *p) {
 
 #elif defined (UEFI)
 
+static void devpath_print(EFI_DEVICE_PATH_PROTOCOL *DevicePath) {
+    for (;;) {
+        uint8_t type = DevicePath->Type;
+        uint8_t subtype = DevicePath->SubType;
+        size_t length = *(uint16_t *)DevicePath->Length;
+
+        print("Device Path Type: %x, SubType: %x, Length: %x\n", type, subtype, length);
+
+        if (type == 4 && subtype == 4) {
+            for (size_t i = sizeof(EFI_DEVICE_PATH_PROTOCOL); i < length; i += 2) {
+                print("%c", *(uint16_t *)((void *)DevicePath + i));
+            }
+            print("\n");
+        }
+
+        DevicePath = (EFI_DEVICE_PATH_PROTOCOL *)((uint8_t *)DevicePath + *(uint16_t *)DevicePath->Length);
+
+        if (type == END_DEVICE_PATH_TYPE) {
+            break;
+        }
+    }
+}
+
+static size_t get_devpath_len(EFI_DEVICE_PATH_PROTOCOL *devpath) {
+    size_t len = 0;
+    EFI_DEVICE_PATH_PROTOCOL *header = devpath;
+    for (;;) {
+        size_t this_len = *(uint16_t *)header->Length;
+        len += this_len;
+        if (header->Type == END_DEVICE_PATH_TYPE) {
+            break;
+        }
+        header = (void *)header + this_len;
+    }
+    return len;
+}
+
+static EFI_DEVICE_PATH_PROTOCOL *devpath_append(EFI_DEVICE_PATH_PROTOCOL *devpath,
+                                                EFI_DEVICE_PATH_PROTOCOL *item) {
+    EFI_STATUS status;
+
+    size_t devpath_len = get_devpath_len(devpath);
+    size_t item_size = *(uint16_t *)item->Length;
+    size_t new_devpath_len = devpath_len + item_size;
+
+    EFI_DEVICE_PATH_PROTOCOL *new_devpath = NULL;
+    status = gBS->AllocatePool(EfiLoaderData, new_devpath_len, (void **)&new_devpath);
+    if (status) {
+        panic(true, "efi: AllocatePool() failure (%x)", status);
+    }
+
+    memcpy(new_devpath, devpath, devpath_len);
+
+    EFI_DEVICE_PATH_PROTOCOL *item_ptr = (void *)new_devpath + (devpath_len - sizeof(EFI_DEVICE_PATH_PROTOCOL));
+    memcpy(item_ptr, item, item_size);
+
+    EFI_DEVICE_PATH_PROTOCOL *end_ptr = (void *)new_devpath + (new_devpath_len - sizeof(EFI_DEVICE_PATH_PROTOCOL));
+    end_ptr->Type = END_DEVICE_PATH_TYPE;
+    end_ptr->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+    end_ptr->Length[0] = sizeof(EFI_DEVICE_PATH);
+    end_ptr->Length[1] = sizeof(EFI_DEVICE_PATH) >> 8;
+
+    return new_devpath;
+}
+
 noreturn void chainload(char *config, char *cmdline) {
     char *image_path = config_get_value(config, 0, "PATH");
     if (image_path == NULL) {
         image_path = config_get_value(config, 0, "IMAGE_PATH");
     }
     if (image_path == NULL) {
-        panic(true, "chainload: Image path not specified");
+        panic(true, "efi: Image path not specified");
     }
 
     struct file_handle *image;
     if ((image = uri_open(image_path)) == NULL)
-        panic(true, "chainload: Failed to open image with path `%s`. Is the path correct?", image_path);
+        panic(true, "efi: Failed to open image with path `%s`. Is the path correct?", image_path);
 
-    efi_chainload_file(config, cmdline, image);
-}
-
-noreturn void efi_chainload_file(char *config, char *cmdline, struct file_handle *image) {
     EFI_STATUS status;
 
-    EFI_HANDLE efi_part_handle = image->efi_part_handle;
+    size_t path_len = strlen(image->path);
 
-    void *ptr = freadall(image, MEMMAP_RESERVED);
-    size_t image_size = image->size;
+    CHAR16 *efi_file_path = NULL;
+    status = gBS->AllocatePool(EfiLoaderData, (path_len + 1) * sizeof(CHAR16),
+                               (void **)&efi_file_path);
+    if (status) {
+        panic(true, "efi: AllocatePool() failure (%x)", status);
+    }
 
-    memmap_alloc_range_in(untouched_memmap, &untouched_memmap_entries,
-                          (uintptr_t)ptr, ALIGN_UP(image_size, 4096),
-                          MEMMAP_RESERVED, MEMMAP_USABLE, true, false, true);
+    bool leading_slash = true;
+    size_t j = 0;
+    for (size_t i = 0; i < path_len; i++) {
+        if (image->path[i] == '/' && leading_slash) {
+            continue;
+        }
+        leading_slash = false;
+        efi_file_path[j++] = image->path[i] == '/' ? '\\' : image->path[i];
+    }
+    efi_file_path[j] = 0;
 
     fclose(image);
+
+    EFI_GUID device_path_protocol_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
+    EFI_DEVICE_PATH_PROTOCOL *device_path = NULL;
+    status = gBS->HandleProtocol(image->efi_part_handle, &device_path_protocol_guid, (void **)&device_path);
+    if (status) {
+        panic(true, "efi: HandleProtocol() failure (%x)", status);
+    }
+
+    size_t devpath_item_size = sizeof(EFI_DEVICE_PATH_PROTOCOL) + ((j + 1) * sizeof(CHAR16));
+    EFI_DEVICE_PATH_PROTOCOL *devpath_item = NULL;
+    status = gBS->AllocatePool(EfiLoaderData, devpath_item_size, (void **)&devpath_item);
+    if (status) {
+        panic(true, "efi: AllocatePool() failure (%x)", status);
+    }
+
+    devpath_item->Type = 0x04;
+    devpath_item->SubType = 0x04;
+    devpath_item->Length[0] = devpath_item_size;
+    devpath_item->Length[1] = devpath_item_size >> 8;
+
+    memcpy(&devpath_item[1], efi_file_path, (j + 1) * sizeof(CHAR16));
+
+    device_path = devpath_append(device_path, devpath_item);
 
     term_notready();
 
@@ -254,33 +349,15 @@ noreturn void efi_chainload_file(char *config, char *cmdline, struct file_handle
 
     pmm_release_uefi_mem();
 
-    MEMMAP_DEVICE_PATH memdev_path[2];
-
-    memdev_path[0].Header.Type      = HARDWARE_DEVICE_PATH;
-    memdev_path[0].Header.SubType   = HW_MEMMAP_DP;
-    memdev_path[0].Header.Length[0] = sizeof(MEMMAP_DEVICE_PATH);
-    memdev_path[0].Header.Length[1] = sizeof(MEMMAP_DEVICE_PATH) >> 8;
-
-    memdev_path[0].MemoryType       = EfiLoaderCode;
-    memdev_path[0].StartingAddress  = (uintptr_t)ptr;
-    memdev_path[0].EndingAddress    = (uintptr_t)ptr + image_size;
-
-    memdev_path[1].Header.Type      = END_DEVICE_PATH_TYPE;
-    memdev_path[1].Header.SubType   = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-    memdev_path[1].Header.Length[0] = sizeof(EFI_DEVICE_PATH);
-    memdev_path[1].Header.Length[1] = sizeof(EFI_DEVICE_PATH) >> 8;
-
     EFI_HANDLE new_handle = 0;
 
     status = gBS->LoadImage(0, efi_image_handle,
-                            (EFI_DEVICE_PATH *)memdev_path,
-                            ptr, image_size, &new_handle);
+                            device_path,
+                            NULL, 0, &new_handle);
     if (status) {
         panic(false, "chainload: LoadImage failure (%x)", status);
     }
 
-    // Apparently we need to make sure that the DeviceHandle field is the same
-    // as us (the loader) for some EFI images to properly work (Windows for instance)
     EFI_GUID loaded_img_prot_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 
     EFI_LOADED_IMAGE_PROTOCOL *new_handle_loaded_image = NULL;
@@ -288,10 +365,6 @@ noreturn void efi_chainload_file(char *config, char *cmdline, struct file_handle
                                  (void **)&new_handle_loaded_image);
     if (status) {
         panic(false, "chainload: HandleProtocol failure (%x)", status);
-    }
-
-    if (efi_part_handle != 0) {
-        new_handle_loaded_image->DeviceHandle = efi_part_handle;
     }
 
     new_handle_loaded_image->LoadOptionsSize = cmdline_len * sizeof(CHAR16);
