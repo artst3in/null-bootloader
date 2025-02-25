@@ -92,7 +92,7 @@ noreturn void chainload(char *config, char *cmdline) {
         } else {
             val = strtoui(part_config, NULL, 10);
             if (val > 256) {
-                panic(true, "chainload: BIOS partition number outside range 0-256");
+                panic(true, "bios: BIOS partition number outside range 0-256");
             }
             part = val;
         }
@@ -104,7 +104,7 @@ noreturn void chainload(char *config, char *cmdline) {
         } else {
             val = strtoui(drive_config, NULL, 10);
             if (val < 1 || val > 256) {
-                panic(true, "chainload: BIOS drive number outside range 1-256");
+                panic(true, "bios: BIOS drive number outside range 1-256");
             }
             drive = val;
         }
@@ -119,30 +119,30 @@ noreturn void chainload(char *config, char *cmdline) {
     if (gpt_guid_s != NULL) {
         struct guid guid;
         if (!string_to_guid_be(&guid, gpt_guid_s)) {
-            panic(true, "chainload: Malformed GUID");
+            panic(true, "bios: Malformed GUID");
         }
 
         p = volume_get_by_guid(&guid);
         if (p == NULL) {
             if (!string_to_guid_mixed(&guid, gpt_guid_s)) {
-                panic(true, "chainload: Malformed GUID");
+                panic(true, "bios: Malformed GUID");
             }
 
             p = volume_get_by_guid(&guid);
         }
 
         if (p == NULL) {
-            panic(true, "chainload: No matching GPT drive for GPT_GUID found");
+            panic(true, "bios: No matching GPT drive for GPT_GUID found");
         }
 
         if (p->partition != 0) {
-            panic(true, "chainload: GPT_GUID is that of a partition, not a drive");
+            panic(true, "bios: GPT_GUID is that of a partition, not a drive");
         }
 
         p = volume_get_by_coord(false, p->index, part);
 
         if (p == NULL) {
-            panic(true, "chainload: Partition specified is not valid");
+            panic(true, "bios: Partition specified is not valid");
         }
 
         goto load;
@@ -166,20 +166,20 @@ noreturn void chainload(char *config, char *cmdline) {
                 p = volume_get_by_coord(false, p->index, part);
 
                 if (p == NULL) {
-                    panic(true, "chainload: Partition specified is not valid");
+                    panic(true, "bios: Partition specified is not valid");
                 }
 
                 goto load;
             }
         }
 
-        panic(true, "chainload: No matching MBR ID found");
+        panic(true, "bios: No matching MBR ID found");
     }
 
 load:
     bios_chainload_volume(p);
 
-    panic(true, "chainload: Volume is not bootable");
+    panic(true, "bios: Volume is not bootable");
 }
 
 void bios_chainload_volume(struct volume *p) {
@@ -338,7 +338,7 @@ noreturn void chainload(char *config, char *cmdline) {
     CHAR16 *new_cmdline;
     status = gBS->AllocatePool(EfiLoaderData, (cmdline_len + 1) * sizeof(CHAR16), (void **)&new_cmdline);
     if (status) {
-        panic(true, "chainload: Allocation failure");
+        panic(true, "efi: Allocation failure");
     }
     for (size_t i = 0; i < cmdline_len + 1; i++) {
         new_cmdline[i] = cmdline[i];
@@ -352,7 +352,7 @@ noreturn void chainload(char *config, char *cmdline) {
                             device_path,
                             NULL, 0, &new_handle);
     if (status) {
-        panic(false, "chainload: LoadImage failure (%x)", status);
+        panic(false, "efi: LoadImage failure (%x)", status);
     }
 
     EFI_GUID loaded_img_prot_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
@@ -361,7 +361,7 @@ noreturn void chainload(char *config, char *cmdline) {
     status = gBS->HandleProtocol(new_handle, &loaded_img_prot_guid,
                                  (void **)&new_handle_loaded_image);
     if (status) {
-        panic(false, "chainload: HandleProtocol failure (%x)", status);
+        panic(false, "efi: HandleProtocol failure (%x)", status);
     }
 
     new_handle_loaded_image->LoadOptionsSize = cmdline_len * sizeof(CHAR16);
@@ -373,7 +373,7 @@ noreturn void chainload(char *config, char *cmdline) {
 
     status = gBS->Exit(efi_image_handle, exit_status, exit_data_size, exit_data);
     if (status) {
-        panic(false, "chainload: Exit failure (%x)", status);
+        panic(false, "efi: Exit failure (%x)", status);
     }
 
     __builtin_unreachable();
