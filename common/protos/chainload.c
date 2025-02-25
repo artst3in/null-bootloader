@@ -200,6 +200,7 @@ void bios_chainload_volume(struct volume *p) {
 
 #elif defined (UEFI)
 
+/*
 static void devpath_print(EFI_DEVICE_PATH_PROTOCOL *DevicePath) {
     for (;;) {
         uint8_t type = DevicePath->Type;
@@ -222,6 +223,7 @@ static void devpath_print(EFI_DEVICE_PATH_PROTOCOL *DevicePath) {
         }
     }
 }
+*/
 
 static size_t get_devpath_len(EFI_DEVICE_PATH_PROTOCOL *devpath) {
     size_t len = 0;
