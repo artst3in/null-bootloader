@@ -177,12 +177,6 @@ noreturn void chainload(char *config, char *cmdline) {
     }
 
 load:
-    bios_chainload_volume(p);
-
-    panic(true, "bios: Volume is not bootable");
-}
-
-void bios_chainload_volume(struct volume *p) {
     vga_textmode_init(false);
 
     void *buf = ext_mem_alloc(512);
@@ -192,7 +186,7 @@ void bios_chainload_volume(struct volume *p) {
     uint16_t *boot_sig = (uint16_t *)(buf + 0x1fe);
 
     if (*boot_sig != 0xaa55) {
-        return;
+        panic(true, "bios: Volume is not bootable");
     }
 
     spinup(p->drive, buf);
