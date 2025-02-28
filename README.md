@@ -19,7 +19,7 @@ If you want to support the work I ([@mintsuki](https://github.com/mintsuki)) do 
 Donations welcome, but absolutely not mandatory!
 
 #### Community
-We have a Matrix room at `#limine:matrix.org` (preferred), and a [Discord server](https://discord.gg/QEeZMz4) if you need support, info, or you just want to hang out with us.
+We have a Matrix room at `#limine:matrix.org` (preferred), and a [Discord server](https://discord.gg/eHMQz86uGk) if you need support, info, or you just want to hang out with us.
 
 ### Limine's boot menu
 
