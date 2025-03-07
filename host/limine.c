@@ -185,6 +185,29 @@ static int gpt2mbr_type(uint64_t gpt_type1, uint64_t gpt_type2) {
     return -1;
 }
 
+static void lba2chs(uint8_t *chs, uint64_t lba) {
+    // If LBA is too big to express, use a standard value for CHS.
+    if (lba > 63 * 255 * 1024) {
+        goto lba_too_big;
+    }
+
+    uint64_t cylinder = lba / (255 * 63);
+    if (cylinder >= 1024) {
+lba_too_big:
+        chs[0] = 0xfe;
+        chs[1] = 0xff;
+        chs[2] = 0xff;
+        return;
+    }
+    uint64_t head = (lba / 63) % 255;
+    uint64_t sector = (lba % 63) + 1;
+
+    chs[0] = head;
+    chs[1] = (cylinder >> 2) & 0xc0; // high 2 bits
+    chs[1] |= sector & 0x3f;
+    chs[2] = cylinder; // low 8 bits
+}
+
 static uint32_t crc32(void *_stream, size_t len) {
     uint8_t *stream = _stream;
     uint32_t ret = 0xffffffff;
@@ -761,6 +784,8 @@ static int bios_install(int argc, char *argv[]) {
         struct {
             uint64_t lba_start;
             uint64_t lba_end;
+            uint8_t chs_start[3];
+            uint8_t chs_end[3];
             uint8_t type;
         } part_to_conv[4];
         size_t part_to_conv_i = 0;
@@ -784,6 +809,8 @@ static int bios_install(int argc, char *argv[]) {
                 goto no_mbr_conv;
             }
             part_to_conv[part_to_conv_i].lba_start = ENDSWAP(gpt_entry.starting_lba);
+            lba2chs(part_to_conv[part_to_conv_i].chs_start, part_to_conv[part_to_conv_i].lba_start);
+
             if (ENDSWAP(gpt_entry.ending_lba) > UINT32_MAX) {
                 if (!quiet) {
                     fprintf(stderr, "Ending LBA of partition %zu is greater than UINT32_MAX, will not convert GPT.\n", i + 1);
@@ -791,6 +818,7 @@ static int bios_install(int argc, char *argv[]) {
                 goto no_mbr_conv;
             }
             part_to_conv[part_to_conv_i].lba_end = ENDSWAP(gpt_entry.ending_lba);
+            lba2chs(part_to_conv[part_to_conv_i].chs_end, part_to_conv[part_to_conv_i].lba_end);
 
             int type = gpt2mbr_type(ENDSWAP(gpt_entry.partition_type_guid[0]),
                                     ENDSWAP(gpt_entry.partition_type_guid[1]));
@@ -849,6 +877,9 @@ static int bios_install(int argc, char *argv[]) {
             device_write(&lba_start, 0x1be + i * 16 + 0x08, 4);
             uint32_t sect_count = ENDSWAP((part_to_conv[i].lba_end - part_to_conv[i].lba_start) + 1);
             device_write(&sect_count, 0x1be + i * 16 + 0x0c, 4);
+
+            device_write(part_to_conv[i].chs_start, 0x1be + i * 16 + 1, 3);
+            device_write(part_to_conv[i].chs_end, 0x1be + i * 16 + 5, 3);
         }
 
         if (!quiet) {
