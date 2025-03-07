@@ -1,3 +1,15 @@
+2025-03-07  mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 9.1.0 ***
+
+    Noteworthy changes compared to the previous release, 9.0.1:
+
+    New features:
+        - `limine` host tool: When using the `bios-install` command on an
+          ISOHYBRID with a GPT, automatically convert it to MBR, if possible
+          and unless explicitly disabled, in order to enhance compatibility of
+          said ISOHYBRIDs with many systems (of note, Lenovo Thinkpads).
+
 2025-02-25  mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.0.1 ***
