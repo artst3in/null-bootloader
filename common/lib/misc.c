@@ -28,20 +28,20 @@ bool help_hidden = false;
 #if defined (UEFI)
 bool is_efi_serial_present(void) {
     EFI_STATUS status;
-    EFI_SERIAL_IO_PROTOCOL *serial = NULL;
+    EFI_SERIAL_IO_PROTOCOL *serial_io = NULL;
     EFI_GUID serial_io_guid = EFI_SERIAL_IO_PROTOCOL_GUID;
 
-    status = gBS->LocateProtocol(&serial_io_guid, NULL, (void **)&serial);
+    status = gBS->LocateProtocol(&serial_io_guid, NULL, (void **)&serial_io);
     if (status) {
         return false;
     }
 
-    if (serial == NULL) {
+    if (serial_io == NULL) {
         return false;
     }
 
     UINT32 control;
-    status = serial->GetControl(serial, &control);
+    status = serial_io->GetControl(serial_io, &control);
     if (status) {
         return false;
     }
