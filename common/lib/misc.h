@@ -26,6 +26,8 @@ extern UINT32 efi_desc_ver;
 
 extern bool efi_boot_services_exited;
 bool efi_exit_boot_services(void);
+
+bool is_efi_serial_present(void);
 #endif
 
 void *get_device_tree_blob(const char *config, size_t extra_size);

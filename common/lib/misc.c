@@ -25,6 +25,31 @@ UINT32 efi_desc_ver = 0;
 bool editor_enabled = true;
 bool help_hidden = false;
 
+#if defined (UEFI)
+bool is_efi_serial_present(void) {
+    EFI_STATUS status;
+    EFI_SERIAL_IO_PROTOCOL *serial = NULL;
+    EFI_GUID serial_io_guid = EFI_SERIAL_IO_PROTOCOL_GUID;
+
+    status = gBS->LocateProtocol(&serial_io_guid, NULL, (void **)&serial);
+    if (status) {
+        return false;
+    }
+
+    if (serial == NULL) {
+        return false;
+    }
+
+    UINT32 control;
+    status = serial->GetControl(serial, &control);
+    if (status) {
+        return false;
+    }
+
+    return true;
+}
+#endif
+
 bool parse_resolution(size_t *width, size_t *height, size_t *bpp, const char *buf) {
     size_t res[3] = {0};
 
