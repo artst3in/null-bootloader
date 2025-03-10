@@ -87,7 +87,7 @@ jobs:
           git add -f .
           git commit -m "Binary release $TAG_NAME" -S
           git push origin $BRANCH_NAME-binary
-          git tag $TAG_NAME-binary
+          git tag $TAG_NAME-binary -s -m $TAG_NAME-binary
           git push origin $BRANCH_NAME-binary --tags
 
       - name: Cleanup source tree
@@ -99,9 +99,9 @@ jobs:
       - name: Sign release tarball
         run: |
           set -e
-          for f in limine-*.tar.*; do
-            gpg --batch --default-key 05D29860D0A0668AAEFB9D691F3C021BECA23821 --detach-sign $f
-          done
+          for f in limine-*.tar.*; do \
+            gpg --batch --default-key 05D29860D0A0668AAEFB9D691F3C021BECA23821 --detach-sign $f; \
+          done \
 
       - name: Create release notes
         run: |
