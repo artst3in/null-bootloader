@@ -16,7 +16,7 @@ jobs:
         run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel gnupg gzip bzip2 lzip zstd git autoconf automake nasm curl mtools llvm clang lld mingw-w64-gcc
 
       - name: Import GPG public key
-        run: gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 05D29860D0A0668AAEFB9D691F3C021BECA23821
+        run: gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys 05D29860D0A0668AAEFB9D691F3C021BECA23821
 
       - name: Import GPG private key
         run: echo "$MINTSUKI_PRIVATE_KEY" | gpg --batch --import
@@ -97,7 +97,11 @@ jobs:
         run: ./bootstrap && ./configure --enable-all && make dist
 
       - name: Sign release tarball
-        run: gpg --batch --default-key 05D29860D0A0668AAEFB9D691F3C021BECA23821 --detach-sign limine-*.tar.*
+        run: |
+          set -e
+          for f in limine-*.tar.*; do
+            gpg --batch --default-key 05D29860D0A0668AAEFB9D691F3C021BECA23821 --detach-sign $f
+          done
 
       - name: Create release notes
         run: |
@@ -106,11 +110,11 @@ jobs:
 
           Binary release can be found [here](https://github.com/limine-bootloader/limine/tree/$TAG_NAME-binary).
 
-          Tarballs are signed using key ID 05D29860D0A0668AAEFB9D691F3C021BECA23821 which can be obtained from the keyservers: keys.openpgp.org, keyring.debian.org, keyserver.ubuntu.com.
+          Tarballs are signed using key ID `05D29860D0A0668AAEFB9D691F3C021BECA23821` which can be obtained from a keyserver such as `keyserver.ubuntu.com`.
 
           Import the public key with:
           ```bash
-          gpg --keyserver <a keyserver from list above> --recv-keys 05D29860D0A0668AAEFB9D691F3C021BECA23821
+          gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 05D29860D0A0668AAEFB9D691F3C021BECA23821
           ```
 
           In order to verify the tarball with the given signature, do:
