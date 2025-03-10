@@ -146,7 +146,13 @@ See [USAGE.md](USAGE.md).
 
 [0BSD Freestanding C Headers](https://github.com/osdev0/freestnd-c-hdrs-0bsd) (0BSD License) provide GCC and Clang compatible freestanding C headers.
 
-[Nyu-EFI](https://github.com/osdev0/nyu-efi) (Intel Open Source License/BSD-2-Clause License/HP License) provides headers and build-time support for UEFI.
+[Nyu-EFI](https://github.com/osdev0/nyu-efi) (Licenses follow) provides headers and build-time support for UEFI.
+
+- BSD-2-Clause
+- BSD-2-Clause-Patent
+- BSD-3-Clause
+- BSD-Axis without modification (https://scancode-licensedb.aboutcode.org/bsd-axis-nomod.html)
+- MIT
 
 [tinf](https://github.com/jibsen/tinf) (zlib License) is used in early x86 BIOS stages for GZIP decompression of stage2.
 
