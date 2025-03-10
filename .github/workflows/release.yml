@@ -88,7 +88,7 @@ jobs:
           git commit -m "Binary release $TAG_NAME" -S
           git push origin $BRANCH_NAME-binary
           git tag $TAG_NAME-binary -s -m $TAG_NAME-binary
-          git push origin $BRANCH_NAME-binary --tags
+          git push origin $TAG_NAME-binary
 
       - name: Cleanup source tree
         run: git checkout $TAG_NAME && rm -rf * && git checkout .
