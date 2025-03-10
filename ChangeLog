@@ -1,3 +1,14 @@
+2023-03-11  mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 9.1.2 ***
+
+    Noteworthy changes compared to the previous release, 9.1.1:
+
+    This release does not change anything code-wise, but rather it focuses on
+    sorting out the licensing mess of Nyu-EFI, by updating it to the latest
+    revision which tackles this problem, and furthermore it improves the
+    COPYING file to be more explicit about submodules and their licensing.
+
 2025-03-10  mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.1.1 ***
