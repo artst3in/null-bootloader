@@ -1,3 +1,19 @@
+2025-03-10  mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 9.1.1 ***
+
+    Noteworthy changes compared to the previous release, 9.1.0:
+
+    Bug fixes:
+        - Do not use ConOut for serial output exclusively unless serial is
+          verified to be present to the best of our abilities. This fixes an
+          issue where if `serial=yes` is used on some machines (including
+          several Apple Mac models) a black screen will be shown instead of the
+          Limine menu.
+
+    Miscellaneous:
+        - Begin signing tarballs and (most) commits.
+
 2025-03-07  mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.1.0 ***
