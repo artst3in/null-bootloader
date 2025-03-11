@@ -50,7 +50,7 @@ We have a Matrix room at `#limine:matrix.org` (preferred), and a [Discord server
 * FAT12/16/32
 * ISO9660 (CDs/DVDs)
 
-If your filesystem isn't listed here, please read [the philosophy](PHILOSOPHY.md) first, especially before
+If your filesystem isn't listed here, please read [the FAQ](FAQ.md) first, especially before
 opening issues or pull requests related to this.
 
 ### Minimum system requirements

@@ -1,4 +1,4 @@
-# Limine's Design Philosophy
+# Frequently Asked Questions
 
 ### Why not support filesystem X or feature Y? (eg: LUKS, LVM)
 

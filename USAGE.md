@@ -15,7 +15,7 @@ Limine can be booted with secure boot if the executable is signed and the key us
 sign it is added to the firmware's keychain. This should be done in combination with enrolling
 the BLAKE2B hash of the Limine config file into the Limine EFI executable image itself for
 verification purposes.
-For more information see the `limine enroll-config` program and [the philosophy](PHILOSOPHY.md).
+For more information see the `limine enroll-config` program and [the FAQ](FAQ.md).
 
 ### BIOS/MBR
 In order to install Limine on a MBR device (which can just be a raw image file),
