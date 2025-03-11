@@ -1,5 +1,8 @@
 # Build and Install Instructions
 
+> **NOTE:** This document is about building and installing Limine.
+> For information about deployment for usage, see [USAGE.md](USAGE.md).
+
 ## Prerequisites
 
 In order to build Limine, the following programs have to be installed:
