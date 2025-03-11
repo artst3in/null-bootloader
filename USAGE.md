@@ -1,5 +1,9 @@
 # Usage
 
+> **NOTE:** The Limine files referred to here are those contained inside
+> ${PREFIX}/share/, installed there as a product of the steps described in
+> [INSTALL.md](INSTALL.md).
+
 ### UEFI
 The `BOOT*.EFI` files are valid EFI applications that can be simply copied to
 the `/EFI/BOOT` directory of a FAT formatted EFI system partition. These files
