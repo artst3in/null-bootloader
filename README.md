@@ -140,24 +140,6 @@ make install    # (or gmake where applicable)
 
 See [USAGE.md](USAGE.md).
 
-## Acknowledgments
+## 3rd Party Software Acknowledgments
 
-[cc-runtime](https://github.com/osdev0/cc-runtime) (Apache License v2.0 with LLVM Exceptions) is used to provide runtime libgcc-like routines.
-
-[0BSD Freestanding C Headers](https://github.com/osdev0/freestnd-c-hdrs-0bsd) (0BSD License) provide GCC and Clang compatible freestanding C headers.
-
-[Nyu-EFI](https://github.com/osdev0/nyu-efi) (Licenses follow) provides headers and build-time support for UEFI.
-
-- BSD-2-Clause
-- BSD-2-Clause-Patent
-- BSD-3-Clause
-- BSD-2-Clause no disclaimer Unmod (https://scancode-licensedb.aboutcode.org/bsd-no-disclaimer-unmodified.html)
-- MIT
-
-[tinf](https://github.com/jibsen/tinf) (zlib License) is used in early x86 BIOS stages for GZIP decompression of stage2.
-
-[Flanterm](https://github.com/mintsuki/flanterm) (BSD-2-Clause License) is used for text related screen drawing.
-
-[stb_image](https://github.com/nothings/stb/blob/master/stb_image.h) (MIT License/Public Domain) is used for wallpaper image loading.
-
-[libfdt](https://git.kernel.org/pub/scm/utils/dtc/dtc.git) (BSD-2-Clause License) is used for manipulating Flat Device Trees.
+See [3RDPARTY.md](3RDPARTY.md).
