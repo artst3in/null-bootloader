@@ -151,7 +151,7 @@ See [USAGE.md](USAGE.md).
 - BSD-2-Clause
 - BSD-2-Clause-Patent
 - BSD-3-Clause
-- BSD-Axis without modification (https://scancode-licensedb.aboutcode.org/bsd-axis-nomod.html)
+- BSD-2-Clause no disclaimer Unmod (https://scancode-licensedb.aboutcode.org/bsd-no-disclaimer-unmodified.html)
 - MIT
 
 [tinf](https://github.com/jibsen/tinf) (zlib License) is used in early x86 BIOS stages for GZIP decompression of stage2.
