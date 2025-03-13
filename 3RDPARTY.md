@@ -1,14 +1,20 @@
 # 3rd Party Software Acknowledgments
 
-The Limine project depends on several other projects which are pulled in by the
+The Limine project depends on several other projects.
+
+(For readers with access to source code, know that these are pulled in by the
 `./bootstrap` script, or, in the case of release tarballs, are shipped
 alongside the core Limine code in the tarballs themselves, similar to
-`./bootstrap` having already been run.
+`./bootstrap` having already been run.)
 
-These additional projects are NOT covered by the License as present inside the
-COPYING file, but are instead licensed as described by each individual
-project's documentation present in the project's dedicated subdirectory or
-license header(s).
+These additional projects are NOT covered by the License as contained inside
+the `COPYING` file as present at the root of the source tree, or, for installed
+copies, present at `${DOCDIR}/COPYING` (assuming the file has not been
+otherwise removed by the packager). These are instead licensed as described by
+each individual project's documentation present in each project's dedicated
+subdirectory or license header(s) in the source tree. For readers without access
+to the source code, one can read the following for a quick overview of licenses
+that Limine is distributed under:
 
 A non-binding, informal summary of all projects Limine depends on, and the
 licenses used by said projects, in SPDX format, is as follows:
