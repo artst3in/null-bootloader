@@ -11,7 +11,7 @@ project's documentation present in the project's dedicated subdirectory or
 license header(s).
 
 A non-binding, informal summary of all projects Limine depends on, and the
-licenses used by said projects, in SPDX format where possible, is as follows:
+licenses used by said projects, in SPDX format, is as follows:
 
 - [cc-runtime](https://github.com/osdev0/cc-runtime)
 (Apache-2.0 WITH LLVM-exception) is used to provide runtime libgcc-like
@@ -25,7 +25,7 @@ below) provides headers and build-time support for UEFI.
     - BSD-2-Clause
     - BSD-2-Clause-Patent
     - BSD-3-Clause
-    - BSD-2-Clause no disclaimer Unmod
+    - [LicenseRef-scancode-bsd-no-disclaimer-unmodified]
 (https://scancode-licensedb.aboutcode.org/bsd-no-disclaimer-unmodified.html)
     - MIT
 
