@@ -25,9 +25,15 @@ below) provides headers and build-time support for UEFI.
     - BSD-2-Clause
     - BSD-2-Clause-Patent
     - BSD-3-Clause
-    - [LicenseRef-scancode-bsd-no-disclaimer-unmodified]
-(https://scancode-licensedb.aboutcode.org/bsd-no-disclaimer-unmodified.html)
+    - LicenseRef-scancode-bsd-no-disclaimer-unmodified
     - MIT
+
+    For more information about the
+    LicenseRef-scancode-bsd-no-disclaimer-unmodified license used by parts of
+    Nyu-EFI, see
+    https://scancode-licensedb.aboutcode.org/bsd-no-disclaimer-unmodified.html
+    and the LicenseRef file
+    [here](LICENSES/LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt).
 
 - [tinf](https://github.com/jibsen/tinf) (Zlib) is used in early x86 BIOS
 stages for GZIP decompression of stage2.
