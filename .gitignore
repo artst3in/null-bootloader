@@ -26,7 +26,7 @@
 /build
 /toolchain-files
 /nyu-efi
-/freestnd-c-hdrs-0bsd
+/freestnd-c-hdrs
 /common/flanterm
 /common/libfdt
 /common/lib/stb_image.h.nopatch

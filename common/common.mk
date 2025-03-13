@@ -44,7 +44,7 @@ override CFLAGS_FOR_TARGET += \
 
 override CPPFLAGS_FOR_TARGET := \
     -I libc-compat \
-    -isystem ../freestnd-c-hdrs-0bsd \
+    -isystem ../freestnd-c-hdrs \
     -I'$(call SHESCAPE,$(BUILDDIR))/..' \
     -I. \
     -I libfdt \
@@ -287,7 +287,7 @@ $(call MKESCAPE,$(BUILDDIR))/cc-runtime/cc-runtime.a: ../cc-runtime/*
 		CC="$(CC_FOR_TARGET)" \
 		AR="$(AR_FOR_TARGET)" \
 		CFLAGS="$(CFLAGS_FOR_TARGET)" \
-		CPPFLAGS='-isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd -DCC_RUNTIME_NO_FLOAT'
+		CPPFLAGS='-isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs -DCC_RUNTIME_NO_FLOAT'
 
 ifeq ($(TARGET),bios)
 
@@ -408,7 +408,7 @@ nyu-efi: $(call MKESCAPE,$(BUILDDIR))/nyu-efi
 	$(MAKE) -C '$(call SHESCAPE,$(BUILDDIR))/nyu-efi/src' -f nyu-efi.mk \
 		CC="$(CC_FOR_TARGET)" \
 		CFLAGS="$(BASE_CFLAGS)" \
-		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd' \
+		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs' \
 		ARCH=x86_64
 
 $(call MKESCAPE,$(BUILDDIR))/linker_nomap.ld: linker_uefi_x86_64.ld.in
@@ -455,7 +455,7 @@ nyu-efi: $(call MKESCAPE,$(BUILDDIR))/nyu-efi
 	$(MAKE) -C '$(call SHESCAPE,$(BUILDDIR))/nyu-efi/src' -f nyu-efi.mk \
 		CC="$(CC_FOR_TARGET)" \
 		CFLAGS="$(BASE_CFLAGS)" \
-		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd' \
+		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs' \
 		ARCH=aarch64
 
 $(call MKESCAPE,$(BUILDDIR))/linker_nomap.ld: linker_uefi_aarch64.ld.in
@@ -501,7 +501,7 @@ nyu-efi: $(call MKESCAPE,$(BUILDDIR))/nyu-efi
 	$(MAKE) -C '$(call SHESCAPE,$(BUILDDIR))/nyu-efi/src' -f nyu-efi.mk \
 		CC="$(CC_FOR_TARGET)" \
 		CFLAGS="$(BASE_CFLAGS)" \
-		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd' \
+		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs' \
 		ARCH=riscv64
 
 $(call MKESCAPE,$(BUILDDIR))/linker_nomap.ld: linker_uefi_riscv64.ld.in
@@ -547,7 +547,7 @@ nyu-efi: $(call MKESCAPE,$(BUILDDIR))/nyu-efi
 	$(MAKE) -C '$(call SHESCAPE,$(BUILDDIR))/nyu-efi/src' -f nyu-efi.mk \
 		CC="$(CC_FOR_TARGET)" \
 		CFLAGS="$(BASE_CFLAGS)" \
-		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd' \
+		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs' \
 		ARCH=loongarch64
 
 $(call MKESCAPE,$(BUILDDIR))/linker_nomap.ld: linker_uefi_loongarch64.ld.in
@@ -593,7 +593,7 @@ nyu-efi: $(call MKESCAPE,$(BUILDDIR))/nyu-efi
 	$(MAKE) -C '$(call SHESCAPE,$(BUILDDIR))/nyu-efi/src' -f nyu-efi.mk \
 		CC="$(CC_FOR_TARGET)" \
 		CFLAGS="$(BASE_CFLAGS)" \
-		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd' \
+		CPPFLAGS='-nostdinc -isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs' \
 		ARCH=ia32
 
 $(call MKESCAPE,$(BUILDDIR))/linker_nomap.ld: linker_uefi_ia32.ld.in

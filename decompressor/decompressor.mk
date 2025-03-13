@@ -34,7 +34,7 @@ override CFLAGS_FOR_TARGET += \
     -mno-80387
 
 override CPPFLAGS_FOR_TARGET := \
-    -isystem ../freestnd-c-hdrs-0bsd \
+    -isystem ../freestnd-c-hdrs \
     -I./tinf \
     -I. \
     $(CPPFLAGS_FOR_TARGET) \
@@ -72,7 +72,7 @@ $(call MKESCAPE,$(BUILDDIR))/cc-runtime/cc-runtime.a: ../cc-runtime/*
 		CC="$(CC_FOR_TARGET)" \
 		AR="$(AR_FOR_TARGET)" \
 		CFLAGS="$(CFLAGS_FOR_TARGET)" \
-		CPPFLAGS='-isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs-0bsd -DCC_RUNTIME_NO_FLOAT'
+		CPPFLAGS='-isystem $(call SHESCAPE,$(SRCDIR))/../freestnd-c-hdrs -DCC_RUNTIME_NO_FLOAT'
 
 $(call MKESCAPE,$(BUILDDIR))/decompressor.bin: $(OBJ) $(call MKESCAPE,$(BUILDDIR))/cc-runtime/cc-runtime.a
 	$(LD_FOR_TARGET) '$(call OBJESCAPE,$^)' $(LDFLAGS_FOR_TARGET) -o '$(call SHESCAPE,$(BUILDDIR))/decompressor.elf'
