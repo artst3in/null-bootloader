@@ -94,7 +94,7 @@ loongarch_spinup:
         jirl    $zero, $t0, 0
 
 .global loongarch_handle_refill
-.align 4
+.align 12
 loongarch_handle_refill:
         csrwr   $t0, CSR_TLBRSAVE
         csrrd   $t0, CSR_PGD
