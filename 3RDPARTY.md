@@ -1,9 +1,9 @@
 # 3rd Party Software Acknowledgments
 
 The Limine project depends on several other projects which are pulled in by the
-./bootstrap script, or, in the case of release tarballs, are shipped alongside
-the core Limine code in the tarballs themselves, similar to ./bootstrap having
-been already run.
+`./bootstrap` script, or, in the case of release tarballs, are shipped
+alongside the core Limine code in the tarballs themselves, similar to
+`./bootstrap` having already been run.
 
 These additional projects are NOT covered by the License as present inside the
 COPYING file, but are instead licensed as described by each individual
@@ -33,7 +33,11 @@ below) provides headers and build-time support for UEFI.
     Nyu-EFI, see
     https://scancode-licensedb.aboutcode.org/bsd-no-disclaimer-unmodified.html
     and the LicenseRef file
-    [here](LICENSES/LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt).
+    [here](LICENSES/LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt),
+    in case of viewing this file from inside the source tree, alternatively at
+    `${DOCDIR}/LICENSES/LicenseRef-scancode-bsd-no-disclaimer-unmodified.txt`
+    in case of installed copies, assuming the file has not been otherwise
+    removed by the packager.
 
 - [tinf](https://github.com/jibsen/tinf) (Zlib) is used in early x86 BIOS
 stages for GZIP decompression of stage2.
