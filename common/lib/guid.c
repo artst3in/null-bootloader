@@ -67,3 +67,29 @@ bool string_to_guid_mixed(struct guid *guid, const char *s) {
 
     return true;
 }
+
+static void uint_to_hex(uint32_t num, char *dest, int len) {
+    const char digits[] = "0123456789abcdef";
+    for (int i = 0; i < len; i++) {
+        dest[i] = digits[(num >> ((len - 1 - i) * 4)) & 0xf];
+    }
+}
+
+void guid_to_string(const struct guid *guid, char *s) {
+    uint_to_hex(guid->a, s, 8);
+    s[8] = '-';
+    uint_to_hex(guid->b, s + 9, 4);
+    s[13] = '-';
+    uint_to_hex(guid->c, s + 14, 4);
+    s[18] = '-';
+    uint_to_hex(guid->d[0], s + 19, 2);
+    uint_to_hex(guid->d[1], s + 21, 2);
+    s[23] = '-';
+    uint_to_hex(guid->d[2], s + 24, 2);
+    uint_to_hex(guid->d[3], s + 26, 2);
+    uint_to_hex(guid->d[4], s + 28, 2);
+    uint_to_hex(guid->d[5], s + 30, 2);
+    uint_to_hex(guid->d[6], s + 32, 2);
+    uint_to_hex(guid->d[7], s + 34, 2);
+    s[36] = 0;
+}
