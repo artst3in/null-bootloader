@@ -13,8 +13,11 @@ Next, Limine scans for a config file on *the boot drive*. Every partition on
 the boot drive is scanned sequentially - first partition first (or, on UEFI,
 the partition containing the EFI executable of the booted Limine is scanned
 first), last partition last - for the presence of either a `/limine.conf`,
-`/limine/limine.conf`, `/boot/limine.conf`, `/boot/limine/limine.conf`, or
-a `/EFI/BOOT/limine.conf` file, in that order.
+`/limine/limine.conf`, `/boot/limine.conf`, or a `/boot/limine/limine.conf`
+file, in that order.
+
+For EFI-booted Limine, `/EFI/BOOT/limine.conf` and `/EFI/limine/limine.conf`
+are also scanned, after the aforementioned paths, in that order.
 
 Once the file is located, Limine will use it as its config file. Other possible
 candidates in subsequent partitions or directories are ignored.

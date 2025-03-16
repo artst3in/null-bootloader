@@ -105,7 +105,11 @@ could_not_match:
                  || (f = fopen(volume_index[i], "/limine/limine.conf")) != NULL
                  || (f = fopen(volume_index[i], "/boot/limine.conf")) != NULL
                  || (f = fopen(volume_index[i], "/boot/limine/limine.conf")) != NULL
-                 || (f = fopen(volume_index[i], "/EFI/BOOT/limine.conf")) != NULL) {
+#if defined (UEFI)
+                 || (f = fopen(volume_index[i], "/EFI/BOOT/limine.conf")) != NULL
+                 || (f = fopen(volume_index[i], "/EFI/limine/limine.conf")) != NULL
+#endif
+                ) {
                     goto opened;
                 }
 

@@ -36,7 +36,11 @@ int init_config_disk(struct volume *part) {
      || (f = fopen(part, "/limine/limine.conf")) != NULL
      || (f = fopen(part, "/boot/limine.conf")) != NULL
      || (f = fopen(part, "/boot/limine/limine.conf")) != NULL
-     || (f = fopen(part, "/EFI/BOOT/limine.conf")) != NULL) {
+#if defined (UEFI)
+     || (f = fopen(part, "/EFI/BOOT/limine.conf")) != NULL
+     || (f = fopen(part, "/EFI/limine/limine.conf")) != NULL
+#endif
+    ) {
         goto opened;
     }
 
