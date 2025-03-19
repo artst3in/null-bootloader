@@ -30,6 +30,7 @@
 #define DT_RELRENT  0x00000025
 #define DT_SYMTAB   0x00000006
 #define DT_SYMENT   0x0000000b
+#define DT_STRTAB   0x00000005
 #define DT_PLTREL   0x00000014
 #define DT_PLTRELSZ 0x00000002
 #define DT_JMPREL   0x00000017
@@ -264,6 +265,7 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
 
     uint64_t symtab_offset = 0;
     uint64_t symtab_ent = 0;
+    uint64_t strtab_offset = 0;
 
     uint64_t dt_pltrel = 0;
     uint64_t dt_pltrelsz = 0;
@@ -308,6 +310,9 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
                     break;
                 case DT_SYMTAB:
                     symtab_offset = dyn->d_un;
+                    break;
+                case DT_STRTAB:
+                    strtab_offset = dyn->d_un;
                     break;
                 case DT_SYMENT:
                     symtab_ent = dyn->d_un;
@@ -366,6 +371,18 @@ end_of_pt_segment:
             if (_phdr->p_vaddr <= symtab_offset && _phdr->p_vaddr + _phdr->p_filesz > symtab_offset) {
                 symtab_offset -= _phdr->p_vaddr;
                 symtab_offset += _phdr->p_offset;
+                break;
+            }
+        }
+    }
+
+    if (strtab_offset != 0) {
+        for (uint16_t i = 0; i < hdr->ph_num; i++) {
+            struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
+
+            if (_phdr->p_vaddr <= strtab_offset && _phdr->p_vaddr + _phdr->p_filesz > strtab_offset) {
+                strtab_offset -= _phdr->p_vaddr;
+                strtab_offset += _phdr->p_offset;
                 break;
             }
         }
@@ -516,7 +533,7 @@ end_of_pt_segment:
                         *ptr = 0;
                         break;
                     }
-                    panic(true, "elf: Unresolved symbol");
+                    panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
                 }
                 *ptr = slide + s->st_value
 #if defined (__aarch64__)
@@ -541,7 +558,7 @@ end_of_pt_segment:
                         *ptr = 0;
                         break;
                     }
-                    panic(true, "elf: Unresolved symbol");
+                    panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
                 }
                 *ptr = slide + s->st_value + relocation->r_addend;
                 break;
