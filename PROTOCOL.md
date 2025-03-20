@@ -737,7 +737,7 @@ Values assignable to `mode`, `max_mode`, and `min_mode`:
 #define LIMINE_PAGING_MODE_MIN LIMINE_PAGING_MODE_RISCV_SV39
 ```
 
-### loongarch64
+#### loongarch64
 
 Values assignable to `mode`, `max_mode`, and `min_mode`:
 ```c
