@@ -1,4 +1,4 @@
-2025-03-16  mintsuki  <mintsuki@protonmail.com>
+2025-03-16  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.2.0 ***
 
@@ -13,7 +13,7 @@
     Miscellaneous:
         - Do not try config path /EFI/BOOT/limine.conf unless booted using EFI.
 
-2025-03-13  mintsuki  <mintsuki@protonmail.com>
+2025-03-13  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.1.3 ***
 
@@ -26,7 +26,7 @@
         - Many fixes and improvements to documentation, installed or otherwise,
           including further licensing clarifications.
 
-2025-03-11  mintsuki  <mintsuki@protonmail.com>
+2025-03-11  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.1.2 ***
 
@@ -37,7 +37,7 @@
     revision which tackles this problem, and furthermore it improves the
     COPYING file to be more explicit about submodules and their licensing.
 
-2025-03-10  mintsuki  <mintsuki@protonmail.com>
+2025-03-10  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.1.1 ***
 
@@ -53,7 +53,7 @@
     Miscellaneous:
         - Begin signing tarballs and (most) commits.
 
-2025-03-07  mintsuki  <mintsuki@protonmail.com>
+2025-03-07  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.1.0 ***
 
@@ -65,7 +65,7 @@
           and unless explicitly disabled, in order to enhance compatibility of
           said ISOHYBRIDs with many systems (of note, Lenovo Thinkpads).
 
-2025-02-25  mintsuki  <mintsuki@protonmail.com>
+2025-02-25  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.0.1 ***
 
@@ -76,7 +76,7 @@
           friendly to other EFI bootloaders such as rEFInd.
         - Limine boot protocol/PE: Map previously unmapped PE image headers.
 
-2025-02-17  mintsuki  <mintsuki@protonmail.com>
+2025-02-17  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.0.0 ***
 
@@ -108,7 +108,7 @@
     Miscellaneous:
         - Update Flanterm submodule to latest.
 
-2025-01-10  mintsuki  <mintsuki@protonmail.com>
+2025-01-10  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.7.0 ***
 
@@ -125,7 +125,7 @@
     Miscellaneous:
         - Submodule version/commit bumps.
 
-2024-12-26  mintsuki  <mintsuki@protonmail.com>
+2024-12-26  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.6.1 ***
 
@@ -141,7 +141,7 @@
           information as EFI configuration tables alongside already passed DTB
           parameters for the same, in preparation for loongarch64 support.
 
-2024-12-05  mintsuki  <mintsuki@protonmail.com>
+2024-12-05  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.6.0 ***
 
@@ -158,7 +158,7 @@
         - Config: add 'path' alias for 'kernel_path' for the Limine and
           multiboot1 and 2 protocols.
 
-2024-11-30  mintsuki  <mintsuki@protonmail.com>
+2024-11-30  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.5.0 ***
 
@@ -180,7 +180,7 @@
           uint64_t's to better represent their physical nature; limine.h API
           revision 1+.
 
-2024-11-25  mintsuki  <mintsuki@protonmail.com>
+2024-11-25  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.4.1 ***
 
@@ -193,7 +193,7 @@
           panics) if boot services have been exited instead of bailing out.
         - Miscellaneous build system updates.
 
-2024-11-08  mintsuki  <mintsuki@protonmail.com>
+2024-11-08  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.4.0 ***
 
@@ -205,7 +205,7 @@
     Miscellaneous:
         - Update cc-runtime to latest; use non-packed version.
 
-2024-10-31  mintsuki  <mintsuki@protonmail.com>
+2024-10-31  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.3.2 ***
 
@@ -215,7 +215,7 @@
         - Limine boot protocol: Amend base revision 3 to mandate reporting base
           revision used to kernels.
 
-2024-10-28  mintsuki  <mintsuki@protonmail.com>
+2024-10-28  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.3.1 ***
 
@@ -224,7 +224,7 @@
     Bug fixes:
         - Limine boot protocol: Revert broken optimisation.
 
-2024-10-28  mintsuki  <mintsuki@protonmail.com>
+2024-10-28  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.3.0 ***
 
@@ -239,7 +239,7 @@
         - Bump Flanterm revision to a6f6edd6631c01caab932a59dce97bbd5f0c72c8.
         - Limine boot protocol: Misc optimisations to page tables usage.
 
-2024-10-23  mintsuki  <mintsuki@protonmail.com>
+2024-10-23  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.2.0 ***
 
@@ -259,7 +259,7 @@
           example those generated when compiling with -O0).
         - Bump cc-runtime revision to d5425655388977fa12ff9b903e554a20b20c426e.
 
-2024-10-15  mintsuki  <mintsuki@protonmail.com>
+2024-10-15  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.1.2 ***
 
@@ -275,7 +275,7 @@
         - Ignore UEFI memory map entries of length 0. This fixes crashes that
           could have happened on quirky UEFI firmwares passing such entries.
 
-2024-10-12  mintsuki  <mintsuki@protonmail.com>
+2024-10-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.1.1 ***
 
@@ -285,7 +285,7 @@
         - Limine boot protocol: Do not hard depend on the CPU supporting the
           Page Attribute Table (PAT) *for SMP processors as well*.
 
-2024-10-12  mintsuki  <mintsuki@protonmail.com>
+2024-10-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.1.0 ***
 
@@ -301,7 +301,7 @@
     Miscellaneous:
         - Update libfdt (from dtc) to 1.7.1.
 
-2024-09-29  mintsuki  <mintsuki@protonmail.com>
+2024-09-29  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.14 ***
 
@@ -311,7 +311,7 @@
         - Limine boot protocol: Increase maximum memory map entry count from
           256 to 1024 as it would otherwise cause issues on certain systems.
 
-2024-09-18  mintsuki  <mintsuki@protonmail.com>
+2024-09-18  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.13 ***
 
@@ -320,7 +320,7 @@
     Bug fixes:
         - multiboot2: Fix handling of relocatable kernels.
 
-2024-09-15  mintsuki  <mintsuki@protonmail.com>
+2024-09-15  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.12 ***
 
@@ -335,7 +335,7 @@
           "freestnd-c-hdrs-0bsd".
         - Updates for "limine-efi" being rebranded to "nyu-efi".
 
-2024-09-10  mintsuki  <mintsuki@protonmail.com>
+2024-09-10  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.11 ***
 
@@ -345,7 +345,7 @@
         - Replace "freestnd-c-hdrs" back with "freestanding-headers" due to
           GPLv3 with Runtime Exceptions licensing concerns and size.
 
-2024-09-09  mintsuki  <mintsuki@protonmail.com>
+2024-09-09  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.10 ***
 
@@ -360,7 +360,7 @@
     Miscellaneous:
         - Replace "freestanding-headers" with GCC-provided "freestnd-c-hdrs".
 
-2024-09-04  mintsuki  <mintsuki@protonmail.com>
+2024-09-04  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.9 ***
 
@@ -370,7 +370,7 @@
         - Fix an issue that could cause Limine to not boot on UEFI systems with
           too many memory map entries.
 
-2024-09-03  mintsuki  <mintsuki@protonmail.com>
+2024-09-03  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.8 ***
 
@@ -380,7 +380,7 @@
         - Work around makefile issues that caused GNU make versions 4.0 and 4.1
           as well as version 3.80 to fail to build Limine.
 
-2024-09-02  mintsuki  <mintsuki@protonmail.com>
+2024-09-02  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.7 ***
 
@@ -391,7 +391,7 @@
           make versions.
         - Miscellaneous build system improvements.
 
-2024-08-25  mintsuki  <mintsuki@protonmail.com>
+2024-08-25  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.6 ***
 
@@ -405,7 +405,7 @@
         - Update limine-efi dependency to latest.
         - Minor build system improvements.
 
-2024-08-12  mintsuki  <mintsuki@protonmail.com>
+2024-08-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.5 ***
 
@@ -416,7 +416,7 @@
           This fixes crashes on some odd machines whose firmware remaps the
           BSP's LAPIC ID from the default one.
 
-2024-08-10  mintsuki  <mintsuki@protonmail.com>
+2024-08-10  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.4 ***
 
@@ -429,7 +429,7 @@
     Miscellaneous:
         - Updated cc-runtime dependency to latest, packed version.
 
-2024-08-09  mintsuki  <mintsuki@protonmail.com>
+2024-08-09  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.3 ***
 
@@ -439,7 +439,7 @@
         - AArch64, riscv64: SMP: Fix BSP potentially timing out while waiting
           for APs due to missing delay.
 
-2024-08-08  mintsuki  <mintsuki@protonmail.com>
+2024-08-08  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.2 ***
 
@@ -452,7 +452,7 @@
     Miscellaneous:
         - Config: Accept tab characters as whitespace after option colon.
 
-2024-08-05  mintsuki  <mintsuki@protonmail.com>
+2024-08-05  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.1 ***
 
@@ -465,7 +465,7 @@
     Miscellaneous:
         - Documentation fixes for 8.x.
 
-2024-08-02  mintsuki  <mintsuki@protonmail.com>
+2024-08-02  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 8.0.0 ***
 
@@ -485,7 +485,7 @@
         - Removed support for GZ-compressed files (and internal Limine
           protocol modules).
 
-2024-08-02  mintsuki  <mintsuki@protonmail.com>
+2024-08-02  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.13.3 ***
 
@@ -500,7 +500,7 @@
     Miscellaneous:
         - Remove Nix flake stuff from repository/tarball.
 
-2024-07-30  mintsuki  <mintsuki@protonmail.com>
+2024-07-30  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.13.2 ***
 
@@ -510,7 +510,7 @@
         - Limine boot protocol: Fix a bug introduced in 7.13.0 that made
           compressed modules not work on IA-32 ports.
 
-2024-07-29  mintsuki  <mintsuki@protonmail.com>
+2024-07-29  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.13.1 ***
 
@@ -521,7 +521,7 @@
           protocol unusable with the BIOS port when loading any modules, when
           Limine was linked using ld.bfd.
 
-2024-07-29  mintsuki  <mintsuki@protonmail.com>
+2024-07-29  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.13.0 ***
 
@@ -534,7 +534,7 @@
     Miscellaneous:
         - Build system improvements.
 
-2024-07-27  mintsuki  <mintsuki@protonmail.com>
+2024-07-27  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.12.1 ***
 
@@ -546,7 +546,7 @@
           than half of the higher half.
         - Build system improvements.
 
-2024-07-21  mintsuki  <mintsuki@protonmail.com>
+2024-07-21  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.12.0 ***
 
@@ -576,7 +576,7 @@
         - Limine boot protocol: aarch64: Specify the condition of TTBR0_EL1 and
           TTBR1_EL1 at entry.
 
-2024-07-18  mintsuki  <mintsuki@protonmail.com>
+2024-07-18  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.11.0 ***
 
@@ -587,7 +587,7 @@
         - Limine boot protocol: Specify and implement revision 1 "paging mode"
           request extension.
 
-2024-07-16  mintsuki  <mintsuki@protonmail.com>
+2024-07-16  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.10.3 ***
 
@@ -603,7 +603,7 @@
         - Miscellaneous improvements and optimisations of code introduced in
           version 7.10.2.
 
-2024-07-14  mintsuki  <mintsuki@protonmail.com>
+2024-07-14  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.10.2 ***
 
@@ -615,7 +615,7 @@
           entry without a valid config.
         - Add missing "loading" prints when booting Linux on non-x86.
 
-2024-07-12  mintsuki  <mintsuki@protonmail.com>
+2024-07-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.10.1 ***
 
@@ -624,7 +624,7 @@
     Bug fixes:
         - DTB: Never pass UEFI DTB buffer directly; fix misuse of libfdt API.
 
-2024-07-12  mintsuki  <mintsuki@protonmail.com>
+2024-07-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.10.0 ***
 
@@ -644,7 +644,7 @@
         - Limine boot protocol: Do not pass a framebuffer response if no
           framebuffers are available.
 
-2024-07-06  mintsuki  <mintsuki@protonmail.com>
+2024-07-06  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.9.2 ***
 
@@ -663,7 +663,7 @@
           lower half load addresses, instead of always applying a slide of
           0xffffffff80000000.
 
-2024-06-29  mintsuki  <mintsuki@protonmail.com>
+2024-06-29  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.9.1 ***
 
@@ -673,7 +673,7 @@
         - `limine`: Revert change that marked protective MBR wrapper partition
           as active on GPT.
 
-2024-06-28  mintsuki  <mintsuki@protonmail.com>
+2024-06-28  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.9.0 ***
 
@@ -693,7 +693,7 @@
           ELF file type is ET_DYN.
         - Some dead code removal.
 
-2024-06-24  mintsuki  <mintsuki@protonmail.com>
+2024-06-24  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.8.0 ***
 
@@ -709,7 +709,7 @@
         - UEFI: Allocate most memory as EfiLoaderCode instead of EfiLoaderData.
         - Smaller fixes and improvements.
 
-2024-06-09  mintsuki  <mintsuki@protonmail.com>
+2024-06-09  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.7.2 ***
 
@@ -722,7 +722,7 @@
           DT_RELA relocations. This is because DT_RELAENT may not be present.
         - multiboot 1 and 2 protocols: Reject relocatable ELFs.
 
-2024-06-06  mintsuki  <mintsuki@protonmail.com>
+2024-06-06  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.7.1 ***
 
@@ -732,7 +732,7 @@
         - Limine boot protocol/ELF: Stop parsing PT_DYNAMIC segment once
           DT_NULL is reached.
 
-2024-06-04  mintsuki  <mintsuki@protonmail.com>
+2024-06-04  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.7.0 ***
 
@@ -751,7 +751,7 @@
     Miscellaneous:
         - Bring back .xz compressed release tarball.
 
-2024-06-01  mintsuki  <mintsuki@protonmail.com>
+2024-06-01  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.6.0 ***
 
@@ -760,7 +760,7 @@
     New features:
         - RISC-V: Add support for RISC-V systems without ACPI (using DTBs).
 
-2024-05-24  mintsuki  <mintsuki@protonmail.com>
+2024-05-24  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.5.3 ***
 
@@ -776,7 +776,7 @@
           segment. This ensures that certain relocatable ELF files that were
           previously misidentified as non-relocatable are recognised as such.
 
-2024-05-22  mintsuki  <mintsuki@protonmail.com>
+2024-05-22  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.5.2 ***
 
@@ -791,7 +791,7 @@
           address of 0 in LD BFD/LLD linker scripts which makes LD BFD (the
           default GNU LD) actually emit an ELF with ET_DYN type.
 
-2024-05-08  mintsuki  <mintsuki@protonmail.com>
+2024-05-08  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.5.1 ***
 
@@ -801,7 +801,7 @@
         - Workarounds for issues related to drive iteration on BIOS. Discovered
           on an HP Pavilion dv6-3152er.
 
-2024-05-03  mintsuki  <mintsuki@protonmail.com>
+2024-05-03  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.5.0 ***
 
@@ -822,7 +822,7 @@
         - General documentation updates and improvements; split USAGE.md from
           README.md and install the former only.
 
-2024-04-29  mintsuki  <mintsuki@protonmail.com>
+2024-04-29  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.4.1 ***
 
@@ -833,7 +833,7 @@
         - Improve how ISA name and firmware type is reported as part of the
           default branding.
 
-2024-04-20  mintsuki  <mintsuki@protonmail.com>
+2024-04-20  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.4.0 ***
 
@@ -850,7 +850,7 @@
     Miscellaneous:
         - Console has been removed.
 
-2024-04-11  mintsuki  <mintsuki@protonmail.com>
+2024-04-11  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.3.1 ***
 
@@ -863,7 +863,7 @@
         - Bump the Flanterm revision to current latest.
         - Some dead code removal.
 
-2024-03-31  mintsuki  <mintsuki@protonmail.com>
+2024-03-31  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.3.0 ***
 
@@ -881,7 +881,7 @@
         - No longer produce xz compressed release tarballs. Add bzip2, lzip,
           and zstd as alternatives in its place.
 
-2024-03-28  mintsuki  <mintsuki@protonmail.com>
+2024-03-28  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.2.1 ***
 
@@ -891,7 +891,7 @@
         - Implement workaround to allow Limine loaded above 4GiB by UEFI on
           x86-64 to work in some configurations, instead of panicking.
 
-2024-03-24  mintsuki  <mintsuki@protonmail.com>
+2024-03-24  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.2.0 ***
 
@@ -901,7 +901,7 @@
         - Add support for remembering the last booted entry on UEFI by means
           of the `REMEMBER_LAST_ENTRY` config option.
 
-2024-03-19  mintsuki  <mintsuki@protonmail.com>
+2024-03-19  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.1.0 ***
 
@@ -913,7 +913,7 @@
     Bug fixes:
         - Fixed a potential security vulnerability in the ISO9660 driver.
 
-2024-02-15  mintsuki  <mintsuki@protonmail.com>
+2024-02-15  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.0.5 ***
 
@@ -923,7 +923,7 @@
         - Build system related fixes and improvements. This fixes an issue that
           caused Limine 7.0.4 to fail building on Busybox systems.
 
-2024-02-14  mintsuki  <mintsuki@protonmail.com>
+2024-02-14  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.0.4 ***
 
@@ -935,7 +935,7 @@
     Miscellaneous:
         - Significantly improve reproducibility of builds.
 
-2024-02-08  mintsuki  <mintsuki@protonmail.com>
+2024-02-08  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.0.3 ***
 
@@ -951,7 +951,7 @@
           rendition (especially colour palettes).
         - Serial: Add a baud rate config setting for Limine's BIOS version.
 
-2024-01-26  mintsuki  <mintsuki@protonmail.com>
+2024-01-26  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.0.2 ***
 
@@ -965,7 +965,7 @@
     Miscellaneous:
         - Exclusively use git for obtaining dependencies in "bootstrap" script.
 
-2024-01-22  mintsuki  <mintsuki@protonmail.com>
+2024-01-22  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.0.1 ***
 
@@ -984,7 +984,7 @@
           us able to ship Limine tarballs without included binary blobs, and
           should improve compatibility with more obscure toolchain set ups.
 
-2024-01-14  mintsuki  <mintsuki@protonmail.com>
+2024-01-14  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 7.0.0 ***
 
@@ -1000,7 +1000,7 @@
           Versioning).
         - Fix versions of external dependencies in "bootstrap" script.
 
-2024-01-07  mintsuki  <mintsuki@protonmail.com>
+2024-01-07  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 6.20240107.0 ***
 
@@ -1013,7 +1013,7 @@
         - Improve error reporting from host "limine" executable.
         - Track "master" branch of stb_image upstream.
 
-2023-12-27  mintsuki  <mintsuki@protonmail.com>
+2023-12-27  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 6.20231227.0 ***
 
@@ -1023,7 +1023,7 @@
         - Actually regenerate build system with GNU Autoconf 2.72 instead of
           GNU Autoconf 2.71.
 
-2023-12-26  mintsuki  <mintsuki@protonmail.com>
+2023-12-26  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 6.20231226.0 ***
 
@@ -1036,7 +1036,7 @@
         - Regenerate build system with GNU Autoconf 2.72.
         - Minor build system adjustments.
 
-2023-12-16  mintsuki  <mintsuki@protonmail.com>
+2023-12-16  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 6.20231216.0 ***
 
@@ -1050,7 +1050,7 @@
     Miscellaneous:
         - General improvements to the `--help` texts for the `limine` program.
 
-2023-12-10  mintsuki  <mintsuki@protonmail.com>
+2023-12-10  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 6.20231210.0 ***
 
@@ -1063,7 +1063,7 @@
     - Chainloading protocol split into 2 protocols: EFI chainloading and BIOS
       chainloading.
 
-2023-12-07  mintsuki  <mintsuki@protonmail.com>
+2023-12-07  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 5.20231207.1 ***
 
@@ -1075,7 +1075,7 @@
         - Fix implementation of a function that detects whether a given memory
           range is physical RAM.
 
-2023-12-07  mintsuki  <mintsuki@protonmail.com>
+2023-12-07  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 5.20231207.0 ***
 
@@ -1090,7 +1090,7 @@
         - Improve error reporting from host "limine" executable.
         - Do not ignore errors from mtools when building limine-uefi-cd.bin.
 
-2023-11-24  mintsuki  <mintsuki@protonmail.com>
+2023-11-24  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 5.20231124.0 ***
 
