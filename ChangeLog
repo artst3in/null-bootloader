@@ -4,6 +4,9 @@
 
     Noteworthy changes compared to the previous release, 9.2.0:
 
+    Bug fixes:
+        - Fix potential buffer overflow bug with our stb_image support code.
+
     Miscellaneous:
         - Dynamically allocate volume index instead of relying on a hard coded
           limit and a fixed allocation. This fixes potential panics or failure
