@@ -105,7 +105,7 @@ jobs:
 
       - name: Create release notes
         run: |
-          cat <<"EOF" >rel_notes.txt
+          cat <<EOF >rel_notes.txt
           Changelog can be found [here](https://github.com/limine-bootloader/limine/blob/$TAG_NAME/ChangeLog).
 
           Binary release can be found [here](https://github.com/limine-bootloader/limine/tree/$TAG_NAME-binary).
