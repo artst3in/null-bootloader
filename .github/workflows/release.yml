@@ -111,6 +111,7 @@ jobs:
           Binary release can be found [here](https://github.com/limine-bootloader/limine/tree/$TAG_NAME-binary).
           EOF
           cat <<'EOF' >>rel_notes.txt
+
           Tarballs are signed using key ID `05D29860D0A0668AAEFB9D691F3C021BECA23821` which can be obtained from a keyserver such as `keyserver.ubuntu.com`.
 
           Import the public key with:
