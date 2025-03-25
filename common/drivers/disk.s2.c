@@ -21,8 +21,6 @@
 
 #if defined (BIOS)
 
-#define MAX_VOLUMES 64
-
 struct dpte {
     uint16_t io_port;
     uint16_t control_port;
@@ -242,8 +240,6 @@ static bool detect_sector_size(struct volume *volume) {
 }
 
 void disk_create_index(void) {
-    volume_index = ext_mem_alloc(sizeof(struct volume) * MAX_VOLUMES);
-
     // Disk count (only non-removable) at 0040:0075
     uint8_t bda_disk_count = mminb(rm_desegment(0x0040, 0x0075));
 
@@ -317,10 +313,11 @@ void disk_create_index(void) {
             block->guid_valid = true;
         }
 
-        if (volume_index_i == MAX_VOLUMES) {
-            print("WARNING: TOO MANY VOLUMES!");
-            return;
-        }
+        volume_index = pmm_realloc(
+            volume_index,
+            volume_index_i * sizeof(struct volume),
+            (volume_index_i + 1) * sizeof(struct volume)
+        );
         volume_index[volume_index_i++] = block;
 
         for (int part = 0; ; part++) {
@@ -332,10 +329,11 @@ void disk_create_index(void) {
             if (ret == NO_PARTITION)
                 continue;
 
-            if (volume_index_i == MAX_VOLUMES) {
-                print("WARNING: TOO MANY VOLUMES!");
-                return;
-            }
+            volume_index = pmm_realloc(
+                volume_index,
+                volume_index_i * sizeof(struct volume),
+                (volume_index_i + 1) * sizeof(struct volume)
+            );
             volume_index[volume_index_i++] = p;
 
             block->max_partition++;
@@ -346,8 +344,6 @@ void disk_create_index(void) {
 #endif
 
 #if defined (UEFI)
-
-#define MAX_VOLUMES 256
 
 int disk_read_sectors(struct volume *volume, void *buf, uint64_t block, size_t count) {
     EFI_STATUS status;
@@ -618,8 +614,6 @@ fail:
         panic(false, "LocateHandle for BLOCK_IO_PROTOCOL failed. Machine not supported by Limine UEFI.");
     }
 
-    volume_index = ext_mem_alloc(sizeof(struct volume) * MAX_VOLUMES);
-
     int optical_indices = 1, hdd_indices = 1;
 
     size_t handle_count = handles_size / sizeof(EFI_HANDLE);
@@ -675,10 +669,11 @@ fail:
             block->guid_valid = true;
         }
 
-        if (volume_index_i == MAX_VOLUMES) {
-            print("WARNING: TOO MANY VOLUMES!");
-            return;
-        }
+        volume_index = pmm_realloc(
+            volume_index,
+            volume_index_i * sizeof(struct volume),
+            (volume_index_i + 1) * sizeof(struct volume)
+        );
         volume_index[volume_index_i++] = block;
 
         for (int part = 0; ; part++) {
@@ -694,10 +689,11 @@ fail:
             struct volume *p = ext_mem_alloc(sizeof(struct volume));
             memcpy(p, &_p, sizeof(struct volume));
 
-            if (volume_index_i == MAX_VOLUMES) {
-                print("WARNING: TOO MANY VOLUMES!");
-                return;
-            }
+            volume_index = pmm_realloc(
+                volume_index,
+                volume_index_i * sizeof(struct volume),
+                (volume_index_i + 1) * sizeof(struct volume)
+            );
             volume_index[volume_index_i++] = p;
 
             block->max_partition++;
