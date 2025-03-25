@@ -552,6 +552,16 @@ void pmm_free(void *ptr, size_t count) {
     memmap_alloc_range((uintptr_t)ptr, count, MEMMAP_USABLE, 0, false, false, true);
 }
 
+void *pmm_realloc(void *old_ptr, size_t old_size, size_t new_size) {
+    void *new_ptr = ext_mem_alloc(new_size);
+
+    memcpy(new_ptr, old_ptr, MIN(new_size, old_size));
+
+    pmm_free(old_ptr, old_size);
+
+    return new_ptr;
+}
+
 void *ext_mem_alloc(size_t count) {
     return ext_mem_alloc_type(count, MEMMAP_BOOTLOADER_RECLAIMABLE);
 }

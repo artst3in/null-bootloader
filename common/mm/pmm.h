@@ -61,6 +61,7 @@ void *ext_mem_alloc_type_aligned_mode(size_t count, uint32_t type, size_t alignm
 void *conv_mem_alloc(size_t count);
 
 void pmm_free(void *ptr, size_t length);
+void *pmm_realloc(void *old_ptr, size_t old_size, size_t new_size);
 
 #if defined (UEFI)
 void pmm_release_uefi_mem(void);
