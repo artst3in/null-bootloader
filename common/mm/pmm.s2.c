@@ -553,6 +553,16 @@ void pmm_free(void *ptr, size_t count) {
 }
 
 void *pmm_realloc(void *old_ptr, size_t old_size, size_t new_size) {
+    if (new_size == 0) {
+        if (old_ptr != NULL) {
+            pmm_free(old_ptr, old_size);
+        }
+        return NULL;
+    }
+    if (old_ptr == NULL) {
+        return ext_mem_alloc(new_size);
+    }
+
     void *new_ptr = ext_mem_alloc(new_size);
 
     memcpy(new_ptr, old_ptr, MIN(new_size, old_size));
