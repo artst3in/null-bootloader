@@ -315,8 +315,8 @@ void disk_create_index(void) {
 
         volume_index = pmm_realloc(
             volume_index,
-            volume_index_i * sizeof(struct volume),
-            (volume_index_i + 1) * sizeof(struct volume)
+            volume_index_i * sizeof(void *),
+            (volume_index_i + 1) * sizeof(void *)
         );
         volume_index[volume_index_i++] = block;
 
@@ -331,8 +331,8 @@ void disk_create_index(void) {
 
             volume_index = pmm_realloc(
                 volume_index,
-                volume_index_i * sizeof(struct volume),
-                (volume_index_i + 1) * sizeof(struct volume)
+                volume_index_i * sizeof(void *),
+                (volume_index_i + 1) * sizeof(void *)
             );
             volume_index[volume_index_i++] = p;
 
@@ -671,8 +671,8 @@ fail:
 
         volume_index = pmm_realloc(
             volume_index,
-            volume_index_i * sizeof(struct volume),
-            (volume_index_i + 1) * sizeof(struct volume)
+            volume_index_i * sizeof(void *),
+            (volume_index_i + 1) * sizeof(void *)
         );
         volume_index[volume_index_i++] = block;
 
@@ -691,8 +691,8 @@ fail:
 
             volume_index = pmm_realloc(
                 volume_index,
-                volume_index_i * sizeof(struct volume),
-                (volume_index_i + 1) * sizeof(struct volume)
+                volume_index_i * sizeof(void *),
+                (volume_index_i + 1) * sizeof(void *)
             );
             volume_index[volume_index_i++] = p;
 
