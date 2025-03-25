@@ -1,3 +1,16 @@
+2025-03-25  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 9.2.1 ***
+
+    Noteworthy changes compared to the previous release, 9.2.0:
+
+    Miscellaneous:
+        - Dynamically allocate volume index instead of relying on a hard coded
+          limit and a fixed allocation. This fixes potential panics or failure
+          to access volumes on systems with a lot of drives/partitions.
+        - Limine boot protocol/ELF: Print the name of unresolved symbols on
+          panic.
+
 2025-03-16  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 9.2.0 ***
