@@ -60,6 +60,18 @@ int pit_sleep_and_quit_on_keypress(int seconds);
 
 uint64_t strtoui(const char *s, const char **end, int base);
 
+#define MIN(a, b) ({ \
+    __auto_type MIN_a = (a); \
+    __auto_type MIN_b = (b); \
+    MIN_a > MIN_b ? MIN_b : MIN_a; \
+})
+
+#define MAX(a, b) ({ \
+    __auto_type MAX_a = (a); \
+    __auto_type MAX_b = (b); \
+    MAX_a > MAX_b ? MAX_a : MAX_b; \
+})
+
 #define DIV_ROUNDUP(a, b) ({ \
     __auto_type DIV_ROUNDUP_a = (a); \
     __auto_type DIV_ROUNDUP_b = (b); \
