@@ -326,13 +326,15 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
 
         switch (reloc_tag.preference) {
             default:
-            case 0: case 1: // Prefer lowest to highest
+            case 0: case 1: case 2: // Prefer lowest to highest
                 reloc_ascend = true;
                 relocated_base = ALIGN_UP(reloc_tag.min_addr, reloc_tag.align);
                 if (relocated_base + ranges->length > reloc_tag.max_addr) {
                     goto reloc_fail;
                 }
                 break;
+/*
+            XXX: We do not support this properly, hence ignore, for now.
             case 2: // Prefer highest to lowest
                 reloc_ascend = false;
                 relocated_base = ALIGN_DOWN(reloc_tag.max_addr - ranges->length, reloc_tag.align);
@@ -340,6 +342,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                     goto reloc_fail;
                 }
                 break;
+*/
         }
 
         for (;;) {
