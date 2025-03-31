@@ -556,6 +556,27 @@ static size_t print_tree(size_t offset, size_t window, const char *shift, size_t
         size_t cur_len = 0;
         if (current_entry == NULL)
             break;
+        if (current_entry->sub == NULL) {
+            bool skip_entry = false;
+            char *cur_entry_protocol = config_get_value(current_entry->body, 0, "PROTOCOL");
+            if (cur_entry_protocol) {
+#if defined (UEFI)
+                if (strcmp(cur_entry_protocol, "bios") == 0
+                 || strcmp(cur_entry_protocol, "bios_chainload") == 0) {
+#elif defined (BIOS)
+                if (strcmp(cur_entry_protocol, "efi") == 0
+                 || strcmp(cur_entry_protocol, "uefi") == 0
+                 || strcmp(cur_entry_protocol, "efi_chainload") == 0) {
+#endif
+                    skip_entry = true;
+                }
+                pmm_free(cur_entry_protocol, strlen(cur_entry_protocol) + 1);
+                if (skip_entry) {
+                    current_entry = current_entry->next;
+                    continue;
+                }
+            }
+        }
         if (!no_print && base_index + max_entries < offset) {
             goto skip_line;
         }

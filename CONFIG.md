@@ -190,6 +190,9 @@ Editor control options:
 > **NOTE:** `uefi` and `efi_chainload` are aliases of the `efi` protocol
 > option. `bios_chainload` is an alias of the `bios` protocol option.
 
+> **NOTE:** BIOS chainloading entries will be hidden when booting using UEFI
+> and vice-versa.
+
 *Locally assignable (protocol specific) options* are:
 
 * Linux protocol:
