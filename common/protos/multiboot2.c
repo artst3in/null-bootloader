@@ -147,17 +147,19 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                         case MULTIBOOT_TAG_TYPE_MMAP:
                         case MULTIBOOT_TAG_TYPE_SMBIOS:
                         case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-                        #if defined (UEFI)
-                            case MULTIBOOT_TAG_TYPE_EFI_MMAP:
-                            #if defined (__i386__)
-                                case MULTIBOOT_TAG_TYPE_EFI32:
-                                case MULTIBOOT_TAG_TYPE_EFI32_IH:
-                            #elif defined (__x86_64__)
-                                case MULTIBOOT_TAG_TYPE_EFI64:
-                                case MULTIBOOT_TAG_TYPE_EFI64_IH:
-                            #endif
-                        #endif
                             break;
+                        #if defined (UEFI)
+                        case MULTIBOOT_TAG_TYPE_EFI_MMAP:
+                            break;
+                        case MULTIBOOT_TAG_TYPE_EFI32:
+                        case MULTIBOOT_TAG_TYPE_EFI32_IH:
+                        case MULTIBOOT_TAG_TYPE_EFI64:
+                        case MULTIBOOT_TAG_TYPE_EFI64_IH:
+                            if (is_required) {
+                                panic(true, "multiboot2: EFI entry point tag handling is required but Limine does not support it");
+                            }
+                            break;
+                        #endif
                         case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
                         #if defined (UEFI)
                             is_framebuffer_required = is_required;
@@ -214,9 +216,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                 break;
             }
             case MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS_EFI64: {
-                if (entry_point == 0xffffffff /* no alternative entry */) {
-                    panic(true, "multiboot2: required EFI AMD64 entry tag is unsupported and no alternative entry was found\n");
-                }
+                // Ignore EFI64 entry address tag as we do not support it.
                 break;
             }
 
