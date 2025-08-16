@@ -1029,6 +1029,11 @@ part_too_low:
                 goto cleanup;
             }
 
+            if (((ENDSWAP(gpt_entry.ending_lba) - ENDSWAP(gpt_entry.starting_lba)) + 1) * lb_size < 32768) {
+                fprintf(stderr, "%s: error: Partition with index `%s` is smaller than 32KiB.\n", program_name, part_ndx);
+                goto cleanup;
+            }
+
             if (!quiet) {
                 fprintf(stderr, "Installing BIOS boot code to partition %s.\n", part_ndx);
             }
