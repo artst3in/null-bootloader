@@ -458,9 +458,10 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint8_t *kernel = freadall(kernel_file, MEMMAP_BOOTLOADER_RECLAIMABLE);
 
     char *kaslr_s = config_get_value(config, 0, "KASLR");
-    bool kaslr = true;
-    if (kaslr_s != NULL && strcmp(kaslr_s, "no") == 0)
-        kaslr = false;
+    bool kaslr = false;
+    if (kaslr_s != NULL && strcmp(kaslr_s, "yes") == 0) {
+        kaslr = true;
+    }
 
     // ELF loading
     uint64_t entry_point = 0;
@@ -845,7 +846,7 @@ FEAT_START
     if (randomise_hhdm_base_s == NULL) {
         randomise_hhdm_base = kaslr;
     } else {
-        randomise_hhdm_base = strcasecmp(randomise_hhdm_base_s, "no") != 0;
+        randomise_hhdm_base = strcasecmp(randomise_hhdm_base_s, "yes") == 0;
     }
 
     set_paging_mode(randomise_hhdm_base);

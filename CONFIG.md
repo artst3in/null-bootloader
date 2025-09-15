@@ -229,8 +229,8 @@ Editor control options:
   * `resolution` - The resolution to be used. This setting takes the form of
     `<width>x<height>x<bpp>`. If the resolution is not available, Limine will
     pick another one automatically. Omitting `<bpp>` will default to 32.
-  * `kaslr` - For relocatable executables, if set to `no`, disable kernel
-    address space layout randomisation. KASLR is enabled by default.
+  * `kaslr` - For relocatable executables, if set to `yes`, enable kernel
+    address space layout randomisation. KASLR is disabled by default.
   * `randomise_hhdm_base` - If set to `yes`, randomise the base address of the
     higher half direct map. If set to `no`, do not. By default it is `yes` if
     KASLR is supported and enabled, else it is `no`.
