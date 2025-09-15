@@ -36,22 +36,13 @@ either the root, `limine`, `boot`, or `boot/limine` directory of one of the
 partitions, formatted with a supported file system.
 
 ## BIOS/GPT
-If using a GPT formatted device, there are 2 options one can follow for
-installation:
-* Specifying a dedicated stage 2 partition.
-* Letting `limine bios-install` attempt to embed stage 2 within GPT structures.
-
-In case one wants to specify a stage 2 partition, create a partition on the GPT
-device of at least 32KiB in size, and pass the 1-based number of the partition
-to `limine bios-install` as a second argument; such as:
+If using a GPT formatted device, create a partition on the GPT device (usually
+of "BIOS boot" type) of at least 32KiB in size, and pass the 1-based number
+of the partition to `limine bios-install` as a second argument; such as:
 
 ```bash
 limine bios-install <path to device/image> <1-based stage 2 partition number>
 ```
-
-In case one wants to let `limine bios-install` embed stage 2 within GPT's
-structures, simply omit the partition number, and invoke `limine bios-install`
-the same as one would do for an MBR partitioned device.
 
 The boot device must contain the `limine-bios.sys` and `limine.conf` files in
 either the root, `limine`, `boot`, or `boot/limine` directory of one of the
