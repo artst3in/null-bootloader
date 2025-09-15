@@ -73,13 +73,13 @@ are shipped in the `-binary` branches and tags of this repository
 (see [branches](https://codeberg.org/Limine/Limine/branches) and
 [tags](https://codeberg.org/Limine/Limine/tags)).
 
-For example, to clone the latest binary release of the `9.x` branch, one can do:
+For example, to clone the latest binary release of the `10.x` branch, one can do:
 ```bash
-git clone https://codeberg.org/Limine/Limine.git --branch=v9.x-binary --depth=1
+git clone https://codeberg.org/Limine/Limine.git --branch=v10.x-binary --depth=1
 ```
-or, to clone a specific binary point release (for example `9.6.7`):
+or, to clone a specific binary point release (for example `10.0.0`):
 ```bash
-git clone https://codeberg.org/Limine/Limine.git --branch=v9.6.7-binary --depth=1
+git clone https://codeberg.org/Limine/Limine.git --branch=v10.0.0-binary --depth=1
 ```
 
 In order to rebuild host utilities like `limine`, simply run `make` in the binary
