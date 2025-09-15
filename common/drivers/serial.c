@@ -18,7 +18,7 @@ static void serial_initialise(void) {
 
     char *baudrate_s = config_get_value(NULL, 0, "SERIAL_BAUDRATE");
     if (baudrate_s == NULL) {
-        serial_baudrate = 9600;
+        serial_baudrate = 115200;
     } else {
         serial_baudrate = strtoui(baudrate_s, NULL, 10);
     }

@@ -82,7 +82,7 @@ Miscellaneous:
   the menu and disable quiet mode.
 * `serial` - If set to `yes`, enable serial I/O for the bootloader.
 * `serial_baudrate` - If `serial` is set to `yes`, this specifies the baudrate
-  to use for serial I/O. Defaults to `9600`. BIOS only, ignored with Limine
+  to use for serial I/O. Defaults to `115200`. BIOS only, ignored with Limine
   UEFI.
 * `default_entry` - 1-based entry index of the entry which will be
   automatically selected at startup. If unspecified, it is `1`.
