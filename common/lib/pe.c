@@ -117,7 +117,6 @@ typedef struct {
     IMAGE_OPTIONAL_HEADER64 OptionalHeader;
 } IMAGE_NT_HEADERS64;
 
-#define IMAGE_SCN_MEM_DISCARDABLE 0x2000000
 #define IMAGE_SCN_MEM_EXECUTE 0x20000000
 #define IMAGE_SCN_MEM_READ 0x40000000
 #define IMAGE_SCN_MEM_WRITE 0x80000000
@@ -348,10 +347,6 @@ again:
         for (size_t i = 0; i < nt_hdrs->FileHeader.NumberOfSections; i++) {
             IMAGE_SECTION_HEADER *section = &sections[i];
 
-            if (section->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) {
-                continue;
-            }
-
             if (section->VirtualAddress == 0) {
                 headers_within_section = true;
             }
@@ -379,10 +374,6 @@ again:
 
         for (size_t i = 0; i < nt_hdrs->FileHeader.NumberOfSections; i++) {
             IMAGE_SECTION_HEADER *section = &sections[i];
-
-            if (section->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) {
-                continue;
-            }
 
             uintptr_t misalign = section->VirtualAddress % alignment;
 
