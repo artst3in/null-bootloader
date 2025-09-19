@@ -95,7 +95,7 @@ struct boot_param {
 #define LINUX_HEADER_MAGIC2             0x818223cd
 #endif
 
-const char *verify_kernel(struct boot_param *p) {
+static const char *verify_kernel(struct boot_param *p) {
     struct linux_header *header = p->kernel_base;
 
     if (header->magic2 != LINUX_HEADER_MAGIC2) {
@@ -116,7 +116,7 @@ const char *verify_kernel(struct boot_param *p) {
     return NULL;
 }
 
-void load_module(struct boot_param *p, char *config) {
+static void load_module(struct boot_param *p, char *config) {
     char *module_path = config_get_value(config, 0, "MODULE_PATH");
     if (module_path) {
         print("linux: Loading module `%#`...\n", module_path);
@@ -137,7 +137,7 @@ void load_module(struct boot_param *p, char *config) {
     }
 }
 
-void prepare_device_tree_blob(struct boot_param *p) {
+static void prepare_device_tree_blob(struct boot_param *p) {
     void *dtb = p->dtb;
     int ret;
 
@@ -195,7 +195,7 @@ void prepare_device_tree_blob(struct boot_param *p) {
     }
 }
 
-void add_framebuffer(struct fb_info *fb) {
+static void add_framebuffer(struct fb_info *fb) {
     struct screen_info *screen_info = ext_mem_alloc(sizeof(struct screen_info));
 
     screen_info->capabilities   = VIDEO_CAPABILITY_64BIT_BASE | VIDEO_CAPABILITY_SKIP_QUIRKS;
@@ -224,7 +224,7 @@ void add_framebuffer(struct fb_info *fb) {
     }
 }
 
-void prepare_efi_tables(struct boot_param *p, char *config) {
+static void prepare_efi_tables(struct boot_param *p, char *config) {
     (void)p;
     EFI_STATUS ret = 0;
 
@@ -303,7 +303,7 @@ void prepare_efi_tables(struct boot_param *p, char *config) {
     efi_exit_boot_services();
 }
 
-void prepare_mmap(struct boot_param *p) {
+static void prepare_mmap(struct boot_param *p) {
     {
         void *dtb = p->dtb;
         int ret = fdt_set_chosen_uint64(dtb, "linux,uefi-mmap-start", (uint64_t)efi_mmap);
@@ -355,7 +355,7 @@ void prepare_mmap(struct boot_param *p) {
     }
 }
 
-noreturn void jump_to_kernel(struct boot_param *p) {
+noreturn static void jump_to_kernel(struct boot_param *p) {
 #if defined(__riscv)
     printv("linux: bsp hart %d, device tree blob at %x\n", bsp_hartid, p->dtb);
 
@@ -401,7 +401,7 @@ noreturn void jump_to_kernel(struct boot_param *p) {
     __builtin_unreachable();
 }
 
-noreturn void linux_load(char *config, char *cmdline) {
+noreturn void linux_direct_load(char *config, char *cmdline) {
     struct boot_param p;
     memset(&p, 0, sizeof(p));
     p.cmdline = cmdline;

@@ -1203,7 +1203,7 @@ noreturn void boot(char *config) {
     if (!strcmp(proto, "limine")) {
         limine_load(config, cmdline);
     } else if (!strcmp(proto, "linux")) {
-        linux_load(config, cmdline);
+        linux_direct_load(config, cmdline);
     } else if (!strcmp(proto, "multiboot1") || !strcmp(proto, "multiboot")) {
 #if defined (__x86_64__) || defined (__i386__)
         multiboot1_load(config, cmdline);
