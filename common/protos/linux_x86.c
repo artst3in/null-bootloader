@@ -609,7 +609,6 @@ no_fb:;
 
 #if defined (UEFI) && defined (__x86_64__)
     if ((setup_header->xloadflags & 3) == 3) {
-        flush_irqs();
         linux_spinup64((void *)kernel_load_addr + 0x200, boot_params);
     }
 #endif
