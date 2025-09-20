@@ -53,7 +53,7 @@ enum {
 
 extern int irq_flush_type;
 
-void init_flush_irqs(void);
+void idt_init(void);
 void flush_irqs(void);
 
 #endif
