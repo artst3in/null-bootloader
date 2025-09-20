@@ -29,8 +29,6 @@ void init_flush_irqs(void) {
         dummy_idt[i].offset_hi = (uint32_t)((uintptr_t)dummy_isr >> 32);
 #endif
     }
-
-    pmm_free(dummy_idt, dummy_idt_size);
 }
 
 int irq_flush_type = IRQ_NO_FLUSH;
