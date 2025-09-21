@@ -2,7 +2,6 @@
 #define SYS__IDT_H__
 
 #include <stdint.h>
-#include <stddef.h>
 
 #if defined (__i386__)
 
@@ -38,17 +37,23 @@ struct idt_entry {
 
 #endif
 
+#if defined (BIOS)
+
+extern struct idtr idt;
+
+void idt_init_bios(void);
+
+#endif
+
 enum {
     IRQ_NO_FLUSH,
     IRQ_PIC_ONLY_FLUSH,
     IRQ_PIC_APIC_FLUSH
 };
 
-extern struct idt_entry *idt;
 extern int irq_flush_type;
 
 void idt_init(void);
-void idt_register_isr(size_t vec, void *handler, uint8_t type);
 void flush_irqs(void);
 
 #endif
