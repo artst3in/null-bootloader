@@ -90,7 +90,7 @@ noreturn void entry(uint8_t boot_drive, int boot_from) {
     init_e820();
     init_memmap();
 
-    idt_init_bios();
+    idt_init();
 
     disk_create_index();
 
