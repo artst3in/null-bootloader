@@ -25,7 +25,7 @@ static void register_interrupt_handler(size_t vec, void *handler, uint8_t type) 
 
 extern void *exceptions[];
 
-void idt_init_bios(void) {
+void init_idt(void) {
     for (size_t i = 0; i < SIZEOF_ARRAY(idt_entries); i++)
         register_interrupt_handler(i, exceptions[i], 0x8e);
 
