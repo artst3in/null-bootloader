@@ -44,7 +44,13 @@ enum {
     IRQ_PIC_APIC_FLUSH
 };
 
-extern struct idt_entry *idt;
+#if defined (UEFI)
+#  define IDT_ENTRY_COUNT 256
+#elif defined (BIOS)
+#  define IDT_ENTRY_COUNT 32
+#endif
+
+extern struct idt_entry idt[IDT_ENTRY_COUNT];
 extern int irq_flush_type;
 
 void idt_init(void);

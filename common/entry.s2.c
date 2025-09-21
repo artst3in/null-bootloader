@@ -87,10 +87,10 @@ noreturn void entry(uint8_t boot_drive, int boot_from) {
 
     uint64_t usec_at_entry = rdtsc_usec();
 
+    idt_init();
+
     init_e820();
     init_memmap();
-
-    idt_init();
 
     disk_create_index();
 
