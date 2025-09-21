@@ -165,7 +165,7 @@ opened:
 
 noreturn void stage3_common(void) {
 #if defined (__x86_64__) || defined (__i386__)
-    idt_init();
+    init_flush_irqs();
     init_io_apics();
 #endif
 

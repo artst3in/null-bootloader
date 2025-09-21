@@ -13,7 +13,7 @@ static struct idt_entry *dummy_idt = NULL;
 
 void dummy_isr(void);
 
-void idt_init(void) {
+void init_flush_irqs(void) {
     size_t dummy_idt_size = 256 * sizeof(struct idt_entry);
     dummy_idt = ext_mem_alloc(dummy_idt_size);
 
