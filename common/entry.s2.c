@@ -21,7 +21,9 @@
 #include <pxe/pxe.h>
 #include <pxe/tftp.h>
 #include <drivers/disk.h>
-#include <sys/idt.h>
+#if defined (__x86_64__) || defined (__i386__)
+#  include <sys/idt.h>
+#endif
 #include <sys/cpu.h>
 
 struct volume *boot_volume;
