@@ -288,7 +288,7 @@ struct boot_params {
 
 // End of Linux code
 
-noreturn void linux_direct_load(char *config, char *cmdline) {
+noreturn void linux_load(char *config, char *cmdline) {
     struct file_handle *kernel_file;
 
     char *kernel_path = config_get_value(config, 0, "PATH");

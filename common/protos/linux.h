@@ -68,6 +68,6 @@ struct screen_info {
 #define VIDEO_CAPABILITY_SKIP_QUIRKS    (1 << 0)
 #define VIDEO_CAPABILITY_64BIT_BASE    (1 << 1)    /* Frame buffer base is 64-bit */
 
-noreturn void linux_direct_load(char *config, char *cmdline);
+noreturn void linux_load(char *config, char *cmdline);
 
 #endif

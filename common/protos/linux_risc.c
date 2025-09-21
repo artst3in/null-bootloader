@@ -401,7 +401,7 @@ noreturn static void jump_to_kernel(struct boot_param *p) {
     __builtin_unreachable();
 }
 
-noreturn void linux_direct_load(char *config, char *cmdline) {
+noreturn void linux_load(char *config, char *cmdline) {
     struct boot_param p;
     memset(&p, 0, sizeof(p));
     p.cmdline = cmdline;
