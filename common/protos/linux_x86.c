@@ -304,6 +304,8 @@ noreturn void linux_direct_load(char *config, char *cmdline) {
     if ((kernel_file = uri_open(kernel_path)) == NULL)
         panic(true, "linux: Failed to open kernel with path `%#`. Is the path correct?", kernel_path);
 
+    bool use_64_bit_proto = false;
+
     uint32_t signature;
     fread(kernel_file, &signature, 0x202, sizeof(uint32_t));
 
@@ -418,16 +420,6 @@ noreturn void linux_direct_load(char *config, char *cmdline) {
 
     uintptr_t modules_mem_base;
 
-#if defined (UEFI) && defined (__x86_64__)
-    if ((setup_header->xloadflags & 3) == 3) {
-        modules_mem_base = (uintptr_t)ext_mem_alloc_type_aligned_mode(
-            size_of_all_modules,
-            MEMMAP_BOOTLOADER_RECLAIMABLE,
-            0x100000,
-            true
-        );
-    } else {
-#endif
     if (setup_header->version <= 0x202 || setup_header->initrd_addr_max == 0) {
         modules_mem_base = 0x38000000;
     } else {
@@ -439,6 +431,18 @@ noreturn void linux_direct_load(char *config, char *cmdline) {
 
     for (;;) {
         if (modules_mem_base < 0x100000) {
+#if defined (UEFI) && defined (__x86_64__)
+            if ((setup_header->xloadflags & 3) == 3) {
+                modules_mem_base = (uintptr_t)ext_mem_alloc_type_aligned_mode(
+                    size_of_all_modules,
+                    MEMMAP_BOOTLOADER_RECLAIMABLE,
+                    0x100000,
+                    true
+                );
+                use_64_bit_proto = true;
+                break;
+            }
+#endif
             panic(true, "linux: Failed to allocate memory for modules");
         }
 
@@ -448,9 +452,6 @@ noreturn void linux_direct_load(char *config, char *cmdline) {
 
         modules_mem_base -= 0x100000;
     }
-#if defined (UEFI) && defined (__x86_64__)
-    }
-#endif
 
     uintptr_t _modules_mem_base = modules_mem_base;
     for (size_t i = 0; ; i++) {
@@ -608,7 +609,7 @@ no_fb:;
     irq_flush_type = IRQ_PIC_ONLY_FLUSH;
 
 #if defined (UEFI) && defined (__x86_64__)
-    if ((setup_header->xloadflags & 3) == 3) {
+    if (use_64_bit_proto == true && (setup_header->xloadflags & 3) == 3) {
         linux_spinup64((void *)kernel_load_addr + 0x200, boot_params);
     }
 #endif
