@@ -438,7 +438,7 @@ noreturn void linux_load(char *config, char *cmdline) {
                 modules_mem_base = (uintptr_t)ext_mem_alloc_type_aligned_mode(
                     size_of_all_modules,
                     MEMMAP_BOOTLOADER_RECLAIMABLE,
-                    0x100000,
+                    0x200000,
                     true
                 );
                 use_64_bit_proto = true;
