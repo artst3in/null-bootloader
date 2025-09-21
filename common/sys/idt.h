@@ -1,6 +1,8 @@
 #ifndef SYS__IDT_H__
 #define SYS__IDT_H__
 
+#if defined (__x86_64__) || defined (__i386__)
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -56,5 +58,7 @@ extern int irq_flush_type;
 void idt_init(void);
 void idt_register_isr(size_t vec, void *handler, uint8_t type);
 void flush_irqs(void);
+
+#endif
 
 #endif
