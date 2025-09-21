@@ -71,10 +71,6 @@ defer_error:
 
     gST->ConOut->EnableCursor(gST->ConOut, false);
 
-#if defined (__x86_64__) || defined (__i386__)
-    idt_init();
-#endif
-
     init_memmap();
 
     term_fallback();
@@ -169,6 +165,7 @@ opened:
 
 noreturn void stage3_common(void) {
 #if defined (__x86_64__) || defined (__i386__)
+    idt_init();
     init_io_apics();
 #endif
 

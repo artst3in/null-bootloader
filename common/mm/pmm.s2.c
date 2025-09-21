@@ -8,10 +8,6 @@
 #include <lib/libc.h>
 #include <lib/print.h>
 #if defined (UEFI)
-#  if defined (__x86_64__)
-#    include <sys/idt.h>
-#    include <sys/gdt.h>
-#  endif
 #  include <efi.h>
 #endif
 
@@ -301,66 +297,6 @@ static struct memmap_entry *recl;
 
 extern symbol __slide, __image_base, __image_end;
 
-#if defined (__x86_64__)
-
-void dummy_isr(void);
-static volatile bool access_validation_success;
-static volatile void *page_fault_handler_ret;
-
-__attribute__((interrupt)) static void page_fault_handler(void *unused) {
-    (void)unused;
-    access_validation_success = false;
-    asm volatile (
-        "mov %0, (%%esp)\n\t"
-        :
-        : "r"(page_fault_handler_ret)
-        : "memory"
-    );
-}
-
-static bool validate_accessibility(void *addr) {
-    access_validation_success = true;
-
-    asm volatile ("cli");
-
-    struct gdtr original_gdtr;
-    asm volatile ("sgdt %0" : "=m"(original_gdtr) :: "memory");
-
-    asm volatile ("lgdt %0" :: "m"(gdt) : "memory");
-
-    struct idtr original_idtr;
-    asm volatile ("sidt %0" : "=m"(original_idtr) :: "memory");
-
-    struct idtr idtr = {
-        IDT_ENTRY_COUNT * sizeof(struct idt_entry) - 1,
-        (uintptr_t)idt
-    };
-
-    asm volatile ("lidt %0" :: "m"(idtr) : "memory");
-
-    idt_register_isr(0x0e, page_fault_handler, 0x8e);
-
-    page_fault_handler_ret = &&actual_return;
-
-    *(volatile uint8_t *)addr = 0xc3; // 0xc3 = ret
-
-    void (*callback)(void) = addr;
-
-    callback();
-
-actual_return:
-    idt_register_isr(0x0e, dummy_isr, 0x8e);
-    asm volatile ("lidt %0" :: "m"(original_idtr) : "memory");
-
-    asm volatile ("lgdt %0" :: "m"(original_gdtr) : "memory");
-
-    asm volatile ("sti");
-
-    return access_validation_success;
-}
-
-#endif
-
 void init_memmap(void) {
     EFI_STATUS status;
 
@@ -464,27 +400,11 @@ void init_memmap(void) {
 
         status = gBS->AllocatePages(AllocateAddress, EfiLoaderCode,
                                     untouched_memmap[i].length / 4096, &base);
-#if defined (__x86_64__)
-        if (status == 0) {
-            if (!validate_accessibility((void *)base)) {
-                memmap_alloc_range(base, untouched_memmap[i].length, MEMMAP_EFI_RECLAIMABLE, MEMMAP_USABLE, true, false, false);
-            }
-            continue;
-        }
-#endif
 
         if (status) {
             for (size_t j = 0; j < untouched_memmap[i].length; j += 4096) {
                 base = untouched_memmap[i].base + j;
                 status = gBS->AllocatePages(AllocateAddress, EfiLoaderCode, 1, &base);
-#if defined (__x86_64__)
-                if (status == 0) {
-                    if (!validate_accessibility((void *)base)) {
-                        memmap_alloc_range(base, 4096, MEMMAP_EFI_RECLAIMABLE, MEMMAP_USABLE, true, false, false);
-                    }
-                    continue;
-                }
-#endif
                 if (status) {
                     memmap_alloc_range(base, 4096, MEMMAP_EFI_RECLAIMABLE, MEMMAP_USABLE, true, false, false);
                 }

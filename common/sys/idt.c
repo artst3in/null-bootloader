@@ -28,7 +28,7 @@ void flush_irqs(void) {
     asm volatile ("sidt %0" : "=m"(old_idt) :: "memory");
 
     struct idtr new_idt = {
-        IDT_ENTRY_COUNT * sizeof(struct idt_entry) - 1,
+        256 * sizeof(struct idt_entry) - 1,
         (uintptr_t)idt
     };
     asm volatile ("lidt %0" :: "m"(new_idt) : "memory");
