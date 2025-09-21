@@ -41,7 +41,7 @@ struct idt_entry {
 
 extern struct idtr idt;
 
-void init_idt(void);
+void idt_init_bios(void);
 
 #endif
 
