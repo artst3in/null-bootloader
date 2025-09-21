@@ -1,3 +1,17 @@
+2025-09-21  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.0.1 ***
+
+    Noteworthy changes compared to the previous release, 10.0.0:
+
+    Bug fixes:
+        - Fix a potential use-after-free issue when flushing interrupts on x86
+          UEFI systems.
+        - Prefer using the 32-bit Linux protocol unless it is strictly
+          necessary to use the 64-bit protocol due to allocation constraints.
+          This is due to reports of the 32-bit protocol being more reliable
+          on certain rare systems where the 64-bit protocol crashes or hangs.
+
 2025-09-15  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.0.0 ***
