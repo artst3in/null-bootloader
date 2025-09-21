@@ -304,7 +304,9 @@ noreturn void linux_direct_load(char *config, char *cmdline) {
     if ((kernel_file = uri_open(kernel_path)) == NULL)
         panic(true, "linux: Failed to open kernel with path `%#`. Is the path correct?", kernel_path);
 
+#if defined (UEFI) && defined (__x86_64__)
     bool use_64_bit_proto = false;
+#endif
 
     uint32_t signature;
     fread(kernel_file, &signature, 0x202, sizeof(uint32_t));
