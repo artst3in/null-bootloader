@@ -76,7 +76,7 @@ void mtrr_restore(void) {
     }
 
     /* according to the Intel SDM 12.11.7.2 "MemTypeSet() Function",
-       we need to follow this precedure before changing MTRR set up */
+       we need to follow this procedure before changing MTRR set up */
 
     /* save old cr0 and then enable the CD flag and disable the NW flag */
     uintptr_t old_cr0;

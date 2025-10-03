@@ -106,7 +106,7 @@ void *acpi_get_rsdp(void) {
         // We want to return the XSDP if it exists rather then returning
         // the RSDP. We need to add a check for that since the table entries
         // are not in the same order for all EFI systems since it might be the
-        // case where the RSDP ocurs before the XSDP.
+        // case where the RSDP occurs before the XSDP.
         if (is_xsdp) {
             rsdp = (void *)cur_table->VendorTable;
             break; // Found it!.
