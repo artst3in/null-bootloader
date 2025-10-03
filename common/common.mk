@@ -164,16 +164,10 @@ ifeq ($(TARGET),uefi-riscv64)
     endif
     override CFLAGS_FOR_TARGET += \
         -fPIE \
-        -fshort-wchar
-    ifeq ($(CC_FOR_TARGET_IS_CLANG),1)
-        override CFLAGS_FOR_TARGET += -march=rv64imac
-    else
-        override CFLAGS_FOR_TARGET += -march=rv64imac_zicsr_zifencei
-    endif
-    override CFLAGS_FOR_TARGET += \
+        -fshort-wchar \
+        -march=rv64imac_zicsr_zifencei \
         -mabi=lp64 \
         -mno-relax
-
     override CPPFLAGS_FOR_TARGET := \
         -I ../picoefi/inc \
         $(CPPFLAGS_FOR_TARGET) \
@@ -192,7 +186,6 @@ ifeq ($(TARGET),uefi-loongarch64)
         -mabi=lp64s \
         -mfpu=none \
         -msimd=none
-
     override CPPFLAGS_FOR_TARGET := \
         -I ../picoefi/inc \
         $(CPPFLAGS_FOR_TARGET) \
