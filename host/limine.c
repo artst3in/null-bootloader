@@ -996,16 +996,8 @@ part_too_low:
         goto cleanup;
     }
 
-    size_t   stage2_size   = bootloader_file_size - 512;
-
-    size_t   stage2_sects  = DIV_ROUNDUP(stage2_size, 512);
-
-    uint16_t stage2_size_a = (stage2_sects / 2) * 512 + (stage2_sects % 2 ? 512 : 0);
-    uint16_t stage2_size_b = (stage2_sects / 2) * 512;
-
-    // Default split of stage2 for MBR (consecutive in post MBR gap)
-    uint64_t stage2_loc_a = 512;
-    uint64_t stage2_loc_b = stage2_loc_a + stage2_size_a;
+    // Default location of stage2 for MBR (in post MBR gap)
+    uint64_t stage2_loc = 512;
 
     if (gpt) {
         if (part_ndx != NULL) {
@@ -1038,10 +1030,7 @@ part_too_low:
                 fprintf(stderr, "Installing BIOS boot code to partition %s.\n", part_ndx);
             }
 
-            stage2_loc_a = ENDSWAP(gpt_entry.starting_lba) * lb_size;
-            stage2_loc_b = stage2_loc_a + stage2_size_a;
-            if (stage2_loc_b & (lb_size - 1))
-                stage2_loc_b = (stage2_loc_b + lb_size) & ~(lb_size - 1);
+            stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
         } else {
             fprintf(stderr, "%s: error: Installing to a GPT device, but no BIOS boot partition specified.\n", program_name);
             goto cleanup;
@@ -1053,8 +1042,7 @@ part_too_low:
     }
 
     if (!quiet) {
-        fprintf(stderr, "Stage 2 to be located at 0x%" PRIx64 " and 0x%" PRIx64 ".\n",
-                stage2_loc_a, stage2_loc_b);
+        fprintf(stderr, "Stage 2 to be located at byte offset 0x%" PRIx64 ".\n", stage2_loc);
     }
 
     // Save original timestamp
@@ -1067,19 +1055,11 @@ part_too_low:
     device_write(&bootloader_img[0], 0, 512);
 
     // Write the rest of stage 2 to the device
-    device_write(&bootloader_img[512], stage2_loc_a, stage2_size_a);
-    device_write(&bootloader_img[512 + stage2_size_a],
-                 stage2_loc_b, stage2_size - stage2_size_a);
+    device_write(&bootloader_img[512], stage2_loc, bootloader_file_size - 512);
 
-    // Hardcode in the bootsector the location of stage 2 halves
-    stage2_size_a = ENDSWAP(stage2_size_a);
-    device_write(&stage2_size_a, 0x1a4 + 0,  sizeof(uint16_t));
-    stage2_size_b = ENDSWAP(stage2_size_b);
-    device_write(&stage2_size_b, 0x1a4 + 2,  sizeof(uint16_t));
-    stage2_loc_a = ENDSWAP(stage2_loc_a);
-    device_write(&stage2_loc_a,  0x1a4 + 4,  sizeof(uint64_t));
-    stage2_loc_b = ENDSWAP(stage2_loc_b);
-    device_write(&stage2_loc_b,  0x1a4 + 12, sizeof(uint64_t));
+    // Hardcode in the bootsector the location of stage 2
+    stage2_loc = ENDSWAP(stage2_loc);
+    device_write(&stage2_loc, 0x1a4, sizeof(uint64_t));
 
     // Write back timestamp
     device_write(timestamp, 218, 6);

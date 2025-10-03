@@ -67,20 +67,13 @@ start:
 
     push 0x7000
     pop es
-    mov di, stage2_locs
+    mov di, stage2_loc
     mov eax, dword [di]
     mov ebp, dword [di+4]
     xor bx, bx
-    xor ecx, ecx
-    mov cx, word [di-4]
+    mov ecx, 32256 ; 32KiB minus boot sector size
     call read_sectors
     jc err.4
-    mov eax, dword [di+8]
-    mov ebp, dword [di+12]
-    add bx, cx
-    mov cx, word [di-2]
-    call read_sectors
-    jc err.5
 
     lgdt [gdt]
 
@@ -100,8 +93,6 @@ times 6 db 0
 %include '../gdt.asm'
 
 err:
-  .5:
-    inc si
   .4:
     inc si
   .3:
@@ -142,11 +133,7 @@ vector:
     call 0x70000
 
 times 0x1a4-($-$$) db 0
-stage2_size_a: dw 0
-stage2_size_b: dw 0
-stage2_locs:
-stage2_loc_a:  dq 0
-stage2_loc_b:  dq 0
+stage2_loc: dq 0
 
 times 0x1b8-($-$$) db 0
 times 510-($-$$) db 0
