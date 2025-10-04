@@ -70,3 +70,31 @@ jobs:
             ```bash
             gpg --verify <tarball sig file> <associated tarball>
             ```
+
+      - name: GitHub mirror release
+        env:
+          GITHUB_TOKEN: ${{ secrets.MINTSUKI_GH_TOKEN }}
+        run: |
+          set -e
+          cat >release_notes.txt <<EOF
+            Changelog can be found [here](https://github.com/limine-bootloader/limine/blob/${{ forge.ref_name }}/ChangeLog).
+
+            Binary release can be found [here](https://github.com/limine-bootloader/limine/tree/${{ forge.ref_name }}-binary).
+
+            Tarballs are signed using key ID `05D29860D0A0668AAEFB9D691F3C021BECA23821` which can be obtained from a keyserver such as `keyserver.ubuntu.com`.
+
+            Import the public key with:
+            ```bash
+            gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 05D29860D0A0668AAEFB9D691F3C021BECA23821
+            ```
+
+            In order to verify the tarball with the given signature, do:
+            ```bash
+            gpg --verify <tarball sig file> <associated tarball>
+            ```
+          EOF
+          gh release create "${{ forge.ref_name }}" \
+            --repo "limine-bootloader/limine" \
+            --title "${{ forge.ref_name }}" \
+            --notes-file "release_notes.txt" \
+            dist-output/*
