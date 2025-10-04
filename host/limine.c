@@ -554,8 +554,8 @@ static bool uninstall(bool quiet_arg) {
 static void bios_install_usage(void) {
     printf("usage: %s bios-install <device> [GPT partition index]\n", program_name);
     printf("\n");
-    printf("    --force-mbr     Force MBR detection to work even if the\n");
-    printf("                    safety checks fail (DANGEROUS!)\n");
+    printf("    --force         Force installation even if the safety checks fail\n");
+    printf("                    (DANGEROUS!)\n");
     printf("\n");
     printf("    --uninstall     Reverse the entire install procedure\n");
     printf("\n");
@@ -574,9 +574,69 @@ static void bios_install_usage(void) {
     printf("\n");
 }
 
+static bool validate_or_force(uint64_t offset, bool force, bool *err) {
+    *err = false;
+
+    char hintc[64];
+    device_read(hintc, offset + 3, 4);
+    if (memcmp(hintc, "NTFS", 4) == 0) {
+        if (!force) {
+            return false;
+        } else {
+            memset(hintc, 0, 4);
+            device_write(hintc, offset + 3, 4);
+        }
+    }
+    device_read(hintc, offset + 54, 3);
+    if (memcmp(hintc, "FAT", 3) == 0) {
+        if (!force) {
+            return false;
+        } else {
+            memset(hintc, 0, 5);
+            device_write(hintc, offset + 54, 5);
+        }
+    }
+    device_read(hintc, offset + 82, 3);
+    if (memcmp(hintc, "FAT", 3) == 0) {
+        if (!force) {
+            return false;
+        } else {
+            memset(hintc, 0, 5);
+            device_write(hintc, offset + 82, 5);
+        }
+    }
+    device_read(hintc, offset + 3, 5);
+    if (memcmp(hintc, "FAT32", 5) == 0) {
+        if (!force) {
+            return false;
+        } else {
+            memset(hintc, 0, 5);
+            device_write(hintc, offset + 3, 5);
+        }
+    }
+    uint16_t hint16 = 0;
+    device_read(&hint16, offset + 1080, sizeof(uint16_t));
+    hint16 = ENDSWAP(hint16);
+    if (hint16 == 0xef53) {
+        if (!force) {
+            return false;
+        } else {
+            hint16 = 0;
+            hint16 = ENDSWAP(hint16);
+            device_write(&hint16, offset + 1080, sizeof(uint16_t));
+        }
+    }
+
+    return true;
+
+cleanup:
+    *err = true;
+    return false;
+}
+
 static int bios_install(int argc, char *argv[]) {
-    int      ok = EXIT_FAILURE;
-    int      force_mbr = 0;
+    int ok = EXIT_FAILURE;
+    bool force = false;
     bool gpt2mbr_allowed = true;
     bool uninstall_mode = false;
     const uint8_t *bootloader_img = binary_limine_hdd_bin_data;
@@ -604,11 +664,11 @@ static int bios_install(int argc, char *argv[]) {
             return EXIT_SUCCESS;
         } else if (strcmp(argv[i], "--quiet") == 0) {
             quiet = true;
-        } else if (strcmp(argv[i], "--force-mbr") == 0) {
-            if (force_mbr && !quiet) {
-                fprintf(stderr, "%s: warning: --force-mbr already set.\n", program_name);
+        } else if (strcmp(argv[i], "--force") == 0) {
+            if (force && !quiet) {
+                fprintf(stderr, "%s: warning: --force already set.\n", program_name);
             }
-            force_mbr = 1;
+            force = true;
         } else if (strcmp(argv[i], "--no-gpt-to-mbr-isohybrid-conversion") == 0) {
             gpt2mbr_allowed = false;
         } else if (strcmp(argv[i], "--uninstall") == 0) {
@@ -672,7 +732,7 @@ static int bios_install(int argc, char *argv[]) {
         device_read(&gpt_header, lb_guesses[i], sizeof(struct gpt_table_header));
         if (!strncmp(gpt_header.signature, "EFI PART", 8)) {
             lb_size = lb_guesses[i];
-            if (!force_mbr) {
+            if (!force) {
                 gpt = 1;
                 if (!quiet) {
                     fprintf(stderr, "Installing to GPT. Logical block size of %" PRIu64 " bytes.\n",
@@ -836,14 +896,13 @@ no_mbr_conv:;
         mbr = 1;
 
         uint8_t hint8 = 0;
-        uint16_t hint16 = 0;
         uint32_t hint32 = 0;
 
         bool any_active = false;
 
         device_read(&hint8, 446, sizeof(uint8_t));
         if (hint8 != 0x00 && hint8 != 0x80) {
-            if (!force_mbr) {
+            if (!force) {
                 mbr = 0;
             } else {
                 hint8 &= 0x80;
@@ -861,7 +920,7 @@ no_mbr_conv:;
         }
         device_read(&hint8, 462, sizeof(uint8_t));
         if (hint8 != 0x00 && hint8 != 0x80) {
-            if (!force_mbr) {
+            if (!force) {
                 mbr = 0;
             } else {
                 hint8 &= 0x80;
@@ -879,7 +938,7 @@ no_mbr_conv:;
         }
         device_read(&hint8, 478, sizeof(uint8_t));
         if (hint8 != 0x00 && hint8 != 0x80) {
-            if (!force_mbr) {
+            if (!force) {
                 mbr = 0;
             } else {
                 hint8 &= 0x80;
@@ -897,7 +956,7 @@ no_mbr_conv:;
         }
         device_read(&hint8, 494, sizeof(uint8_t));
         if (hint8 != 0x00 && hint8 != 0x80) {
-            if (!force_mbr) {
+            if (!force) {
                 mbr = 0;
             } else {
                 hint8 &= 0x80;
@@ -920,62 +979,10 @@ part_too_low:
             goto cleanup;
         }
 
-        char hintc[64];
-        device_read(hintc, 4, 8);
-        if (memcmp(hintc, "_ECH_FS_", 8) == 0) {
-            if (!force_mbr) {
-                mbr = 0;
-            } else {
-                memset(hintc, 0, 8);
-                device_write(hintc, 4, 8);
-            }
-        }
-        device_read(hintc, 3, 4);
-        if (memcmp(hintc, "NTFS", 4) == 0) {
-            if (!force_mbr) {
-                mbr = 0;
-            } else {
-                memset(hintc, 0, 4);
-                device_write(hintc, 3, 4);
-            }
-        }
-        device_read(hintc, 54, 3);
-        if (memcmp(hintc, "FAT", 3) == 0) {
-            if (!force_mbr) {
-                mbr = 0;
-            } else {
-                memset(hintc, 0, 5);
-                device_write(hintc, 54, 5);
-            }
-        }
-        device_read(hintc, 82, 3);
-        if (memcmp(hintc, "FAT", 3) == 0) {
-            if (!force_mbr) {
-                mbr = 0;
-            } else {
-                memset(hintc, 0, 5);
-                device_write(hintc, 82, 5);
-            }
-        }
-        device_read(hintc, 3, 5);
-        if (memcmp(hintc, "FAT32", 5) == 0) {
-            if (!force_mbr) {
-                mbr = 0;
-            } else {
-                memset(hintc, 0, 5);
-                device_write(hintc, 3, 5);
-            }
-        }
-        device_read(&hint16, 1080, sizeof(uint16_t));
-        hint16 = ENDSWAP(hint16);
-        if (hint16 == 0xef53) {
-            if (!force_mbr) {
-                mbr = 0;
-            } else {
-                hint16 = 0;
-                hint16 = ENDSWAP(hint16);
-                device_write(&hint16, 1080, sizeof(uint16_t));
-            }
+        bool err;
+        mbr = validate_or_force(0, force, &err);
+        if (err) {
+            goto cleanup;
         }
 
         if (mbr && !any_active) {
@@ -991,7 +998,7 @@ part_too_low:
     if (gpt == 0 && mbr == 0) {
         fprintf(stderr, "error: Could not determine if the device has a valid partition table.\n");
         fprintf(stderr, "       Please ensure the device has a valid MBR or GPT.\n");
-        fprintf(stderr, "       Alternatively, pass `--force-mbr` to override these checks.\n");
+        fprintf(stderr, "       Alternatively, pass `--force` to override these checks.\n");
         fprintf(stderr, "       **ONLY DO THIS AT YOUR OWN RISK, DATA LOSS MAY OCCUR!**\n");
         goto cleanup;
     }
@@ -1033,6 +1040,20 @@ part_too_low:
             stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
         } else {
             fprintf(stderr, "%s: error: Installing to a GPT device, but no BIOS boot partition specified.\n", program_name);
+            goto cleanup;
+        }
+
+        bool err;
+        bool valid = validate_or_force(stage2_loc, force, &err);
+        if (err) {
+            goto cleanup;
+        }
+
+        if (!valid) {
+            fprintf(stderr, "error: The partition selected to install the BIOS boot code to contains\n");
+            fprintf(stderr, "       a recognised filesystem.\n");
+            fprintf(stderr, "       Pass `--force` to override these checks.\n");
+            fprintf(stderr, "       **ONLY DO THIS AT YOUR OWN RISK, DATA LOSS MAY OCCUR!**\n");
             goto cleanup;
         }
     } else {
