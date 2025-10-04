@@ -670,6 +670,7 @@ static void menu_init_term(void) {
 #if defined (BIOS)
             vga_textmode_init(true);
 #elif defined (UEFI)
+            serial = true;
             term_fallback();
 #endif
         }
@@ -1121,6 +1122,7 @@ timeout_aborted:
 #if defined (BIOS)
                             vga_textmode_init(true);
 #elif defined (UEFI)
+                            serial = true;
                             term_fallback();
 #endif
                         }
