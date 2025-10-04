@@ -1075,7 +1075,7 @@ part_too_low:
                         "          the root, /boot, /limine, or /boot/limine directories of\n"
                         "          one of the partitions on the device, or boot will fail!\n");
 
-        fprintf(stderr, "Limine BIOS stages installed successfully!\n");
+        fprintf(stderr, "Limine BIOS stages installed successfully.\n");
     }
 
     ok = EXIT_SUCCESS;
@@ -1209,7 +1209,7 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (!quiet) {
-        fprintf(stderr, "Config file BLAKE2B successfully %s!\n", reset ? "reset" : "enrolled");
+        fprintf(stderr, "Config file BLAKE2B successfully %s.\n", reset ? "reset" : "enrolled");
     }
     ret = EXIT_SUCCESS;
 
