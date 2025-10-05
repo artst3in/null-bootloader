@@ -732,15 +732,10 @@ static int bios_install(int argc, char *argv[]) {
         device_read(&gpt_header, lb_guesses[i], sizeof(struct gpt_table_header));
         if (!strncmp(gpt_header.signature, "EFI PART", 8)) {
             lb_size = lb_guesses[i];
-            if (!force) {
-                gpt = 1;
-                if (!quiet) {
-                    fprintf(stderr, "Installing to GPT. Logical block size of %" PRIu64 " bytes.\n",
-                            lb_guesses[i]);
-                }
-            } else {
-                fprintf(stderr, "%s: error: Device has a valid GPT, refusing to force MBR.\n", program_name);
-                goto cleanup;
+            gpt = 1;
+            if (!quiet) {
+                fprintf(stderr, "Installing to GPT. Logical block size of %" PRIu64 " bytes.\n",
+                        lb_guesses[i]);
             }
             break;
         }
@@ -979,10 +974,12 @@ part_too_low:
             goto cleanup;
         }
 
-        bool err;
-        mbr = validate_or_force(0, force, &err);
-        if (err) {
-            goto cleanup;
+        if (mbr) {
+            bool err;
+            mbr = validate_or_force(0, force, &err);
+            if (err) {
+                goto cleanup;
+            }
         }
 
         if (mbr && !any_active) {
@@ -1007,8 +1004,10 @@ part_too_low:
     uint64_t stage2_loc = 512;
 
     if (gpt) {
+        struct gpt_entry gpt_entry;
+        uint32_t partition_num;
+
         if (part_ndx != NULL) {
-            uint32_t partition_num;
             sscanf(part_ndx, "%" SCNu32, &partition_num);
             partition_num--;
             if (partition_num > ENDSWAP(gpt_header.number_of_partition_entries)) {
@@ -1016,7 +1015,6 @@ part_too_low:
                 goto cleanup;
             }
 
-            struct gpt_entry gpt_entry;
             device_read(&gpt_entry,
                 (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
                 + (partition_num * ENDSWAP(gpt_header.size_of_partition_entry)),
@@ -1024,24 +1022,45 @@ part_too_low:
 
             if (gpt_entry.unique_partition_guid[0] == 0 &&
               gpt_entry.unique_partition_guid[1] == 0) {
-                fprintf(stderr, "%s: error: No such partition: `%s`.\n", program_name, part_ndx);
+                fprintf(stderr, "%s: error: No such partition: %" PRIu32 ".\n", program_name, partition_num + 1);
                 goto cleanup;
             }
 
-            if (((ENDSWAP(gpt_entry.ending_lba) - ENDSWAP(gpt_entry.starting_lba)) + 1) * lb_size < 32768) {
-                fprintf(stderr, "%s: error: Partition with index `%s` is smaller than 32KiB.\n", program_name, part_ndx);
+            if (!force && memcmp("Hah!IdontNeedEFI", &gpt_entry.partition_type_guid, 16) != 0) {
+                fprintf(stderr, "error: Chosen partition for BIOS boot code is not of BIOS boot partition type.\n");
+                fprintf(stderr, "       Pass `--force` to override this check.\n");
+                fprintf(stderr, "       **ONLY DO THIS AT YOUR OWN RISK, DATA LOSS MAY OCCUR!**\n");
                 goto cleanup;
             }
-
-            if (!quiet) {
-                fprintf(stderr, "Installing BIOS boot code to partition %s.\n", part_ndx);
-            }
-
-            stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
         } else {
-            fprintf(stderr, "%s: error: Installing to a GPT device, but no BIOS boot partition specified.\n", program_name);
+            // Try to autodetect the BIOS boot partition
+            for (partition_num = 0; partition_num < ENDSWAP(gpt_header.number_of_partition_entries); partition_num++) {
+                device_read(&gpt_entry,
+                    (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
+                    + (partition_num * ENDSWAP(gpt_header.size_of_partition_entry)),
+                    sizeof(struct gpt_entry));
+
+                if (memcmp("Hah!IdontNeedEFI", &gpt_entry.partition_type_guid, 16) == 0) {
+                    stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
+                    if (!quiet) {
+                        fprintf(stderr, "Autodetected partition %" PRIu32 " as BIOS boot partition.\n", partition_num + 1);
+                    }
+                    goto bios_boot_autodetected;
+                }
+            }
+
+            fprintf(stderr, "error: Installing to a GPT device, but no BIOS boot partition specified or\n");
+            fprintf(stderr, "       detected.\n");
             goto cleanup;
         }
+
+bios_boot_autodetected:
+        if (((ENDSWAP(gpt_entry.ending_lba) - ENDSWAP(gpt_entry.starting_lba)) + 1) * lb_size < 32768) {
+            fprintf(stderr, "%s: error: Partition %" PRIu32 " is smaller than 32KiB.\n", program_name, partition_num + 1);
+            goto cleanup;
+        }
+
+        stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
 
         bool err;
         bool valid = validate_or_force(stage2_loc, force, &err);
@@ -1055,6 +1074,10 @@ part_too_low:
             fprintf(stderr, "       Pass `--force` to override these checks.\n");
             fprintf(stderr, "       **ONLY DO THIS AT YOUR OWN RISK, DATA LOSS MAY OCCUR!**\n");
             goto cleanup;
+        }
+
+        if (!quiet) {
+            fprintf(stderr, "Installing BIOS boot code to partition %" PRIu32 ".\n", partition_num + 1);
         }
     } else {
         if (!quiet) {
