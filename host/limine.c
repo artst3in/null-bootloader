@@ -249,7 +249,7 @@ static bool device_init(void) {
         return true;
     }
 
-    fprintf(stderr, "%s: error: device_init(): Couldn't determine block size of device.\n", program_name);
+    fprintf(stderr, "error: device_init(): Couldn't determine block size of device.\n");
     return false;
 }
 
@@ -442,7 +442,7 @@ static bool _device_write(const void *_buffer, uint64_t loc, size_t count) {
     }
 
     if (uninstall_data_i >= UNINSTALL_DATA_MAX) {
-        fprintf(stderr, "%s: error: Too many uninstall data entries! Please report this bug upstream.\n", program_name);
+        fprintf(stderr, "error: Too many uninstall data entries! Please report this bug upstream.\n");
         return false;
     }
 
@@ -502,12 +502,12 @@ static bool uninstall(bool quiet_arg) {
         bool retry = false;
         while (!_device_write(ud->data, ud->loc, ud->count)) {
             if (retry) {
-                fprintf(stderr, "%s: warning: Retry failed.\n", program_name);
+                fprintf(stderr, "warning: Retry failed.\n");
                 print_write_fail = true;
                 break;
             }
             if (!quiet) {
-                fprintf(stderr, "%s: warning: Uninstall data index %zu failed to write, retrying...\n", program_name, i);
+                fprintf(stderr, "warning: Uninstall data index %zu failed to write, retrying...\n", i);
             }
             if (!device_flush_cache()) {
                 print_cache_flush_fail = true;
@@ -523,12 +523,12 @@ static bool uninstall(bool quiet_arg) {
     }
 
     if (print_write_fail) {
-        fprintf(stderr, "%s: error: Some data failed to be uninstalled correctly.\n", program_name);
+        fprintf(stderr, "error: Some data failed to be uninstalled correctly.\n");
         ret = false;
     }
 
     if (print_cache_flush_fail) {
-        fprintf(stderr, "%s: error: Device cache flush failure. Uninstall may be incomplete.\n", program_name);
+        fprintf(stderr, "error: Device cache flush failure. Uninstall may be incomplete.\n");
         ret = false;
     }
 
@@ -666,23 +666,23 @@ static int bios_install(int argc, char *argv[]) {
             quiet = true;
         } else if (strcmp(argv[i], "--force") == 0) {
             if (force && !quiet) {
-                fprintf(stderr, "%s: warning: --force already set.\n", program_name);
+                fprintf(stderr, "warning: --force already set.\n");
             }
             force = true;
         } else if (strcmp(argv[i], "--no-gpt-to-mbr-isohybrid-conversion") == 0) {
             gpt2mbr_allowed = false;
         } else if (strcmp(argv[i], "--uninstall") == 0) {
             if (uninstall_mode && !quiet) {
-                fprintf(stderr, "%s: warning: --uninstall already set.\n", program_name);
+                fprintf(stderr, "warning: --uninstall already set.\n");
             }
             uninstall_mode = true;
         } else if (memcmp(argv[i], "--uninstall-data-file=", 21) == 0) {
             if (uninstall_file != NULL && !quiet) {
-                fprintf(stderr, "%s: warning: --uninstall-data-file already set. Overriding...\n", program_name);
+                fprintf(stderr, "warning: --uninstall-data-file already set. Overriding...\n");
             }
             uninstall_file = argv[i] + 21;
             if (strlen(uninstall_file) == 0) {
-                fprintf(stderr, "%s: error: Uninstall data file has a zero-length name!\n", program_name);
+                fprintf(stderr, "error: Uninstall data file has a zero-length name!\n");
                 return EXIT_FAILURE;
             }
         } else {
@@ -696,7 +696,7 @@ static int bios_install(int argc, char *argv[]) {
     }
 
     if (device == NULL) {
-        fprintf(stderr, "%s: error: No device specified\n", program_name);
+        fprintf(stderr, "error: No device specified\n");
         bios_install_usage();
         return EXIT_FAILURE;
     }
@@ -707,7 +707,7 @@ static int bios_install(int argc, char *argv[]) {
 
     if (uninstall_mode) {
         if (uninstall_file == NULL) {
-            fprintf(stderr, "%s: error: Uninstall mode set but no --uninstall-data-file=... passed.\n", program_name);
+            fprintf(stderr, "error: Uninstall mode set but no --uninstall-data-file=... passed.\n");
             goto uninstall_mode_cleanup;
         }
 
@@ -754,7 +754,7 @@ static int bios_install(int argc, char *argv[]) {
                 fprintf(stderr, "Secondary header valid.\n");
             }
         } else {
-            fprintf(stderr, "%s: error: Secondary header not valid, aborting.\n", program_name);
+            fprintf(stderr, "error: Secondary header not valid, aborting.\n");
             goto cleanup;
         }
     }
@@ -970,7 +970,7 @@ no_mbr_conv:;
 
         if (0) {
 part_too_low:
-            fprintf(stderr, "%s: error: A partition's start sector is less than 63, aborting.\n", program_name);
+            fprintf(stderr, "error: A partition's start sector is less than 63, aborting.\n");
             goto cleanup;
         }
 
@@ -1011,7 +1011,7 @@ part_too_low:
             sscanf(part_ndx, "%" SCNu32, &partition_num);
             partition_num--;
             if (partition_num > ENDSWAP(gpt_header.number_of_partition_entries)) {
-                fprintf(stderr, "%s: error: Partition number is too large.\n", program_name);
+                fprintf(stderr, "error: Partition number is too large.\n");
                 goto cleanup;
             }
 
@@ -1022,7 +1022,7 @@ part_too_low:
 
             if (gpt_entry.unique_partition_guid[0] == 0 &&
               gpt_entry.unique_partition_guid[1] == 0) {
-                fprintf(stderr, "%s: error: No such partition: %" PRIu32 ".\n", program_name, partition_num + 1);
+                fprintf(stderr, "error: No such partition: %" PRIu32 ".\n", partition_num + 1);
                 goto cleanup;
             }
 
@@ -1055,7 +1055,7 @@ part_too_low:
 
 bios_boot_autodetected:
         if (((ENDSWAP(gpt_entry.ending_lba) - ENDSWAP(gpt_entry.starting_lba)) + 1) * lb_size < 32768) {
-            fprintf(stderr, "%s: error: Partition %" PRIu32 " is smaller than 32KiB.\n", program_name, partition_num + 1);
+            fprintf(stderr, "error: Partition %" PRIu32 " is smaller than 32KiB.\n", partition_num + 1);
             goto cleanup;
         }
 
@@ -1127,7 +1127,7 @@ cleanup:
     reverse_uninstall_data();
     if (ok != EXIT_SUCCESS) {
         // If we failed, attempt to reverse install process
-        fprintf(stderr, "%s: Install failed, undoing work...\n", program_name);
+        fprintf(stderr, "Install failed, undoing work...\n");
         uninstall(true);
     } else if (uninstall_file != NULL) {
         store_uninstall_data(uninstall_file);
@@ -1186,7 +1186,7 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (!reset && strlen(argv[2]) != 128) {
-        fprintf(stderr, "%s: error: BLAKE2B specified is not 128 characters long.\n", program_name);
+        fprintf(stderr, "error: BLAKE2B specified is not 128 characters long.\n");
         goto cleanup;
     }
 
@@ -1232,7 +1232,7 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (checksum_loc == NULL) {
-        fprintf(stderr, "%s: error: Checksum location not found in provided executable.\n", program_name);
+        fprintf(stderr, "error: Checksum location not found in provided executable.\n");
         goto cleanup;
     }
 
@@ -1315,7 +1315,7 @@ static int print_datadir(void) {
     puts(LIMINE_DATADIR);
     return EXIT_SUCCESS;
 #else
-    fprintf(stderr, "%s: error: Cannot print datadir for `limine` built out-of-tree.\n", program_name);
+    fprintf(stderr, "error: Cannot print datadir for `limine` built standalone.\n");
     return EXIT_FAILURE;
 #endif
 }
@@ -1337,7 +1337,7 @@ int main(int argc, char *argv[]) {
 #ifndef LIMINE_NO_BIOS
         return bios_install(argc - 1, &argv[1]);
 #else
-        fprintf(stderr, "%s: error: Limine has been compiled without BIOS support.\n", program_name);
+        fprintf(stderr, "error: Limine has been compiled without BIOS support.\n");
         return EXIT_FAILURE;
 #endif
     } else if (strcmp(argv[1], "enroll-config") == 0) {
