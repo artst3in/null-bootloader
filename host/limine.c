@@ -1041,7 +1041,6 @@ part_too_low:
                     sizeof(struct gpt_entry));
 
                 if (memcmp("Hah!IdontNeedEFI", &gpt_entry.partition_type_guid, 16) == 0) {
-                    stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
                     if (!quiet) {
                         fprintf(stderr, "Autodetected partition %" PRIu32 " as BIOS boot partition.\n", partition_num + 1);
                     }
