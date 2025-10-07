@@ -166,7 +166,12 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             EFI_CONFIGURATION_TABLE *cur_table = &gST->ConfigurationTable[i];
             if (memcmp(&cur_table->VendorGuid, &dtb_guid, sizeof(EFI_GUID)))
                 continue;
-            dtb = cur_table->VendorTable;
+            size_t s = fdt_totalsize(cur_table->VendorTable);
+            dtb = ext_mem_alloc(s);
+            ret = fdt_open_into(cur_table->VendorTable, dtb, s);
+            if (ret < 0) {
+                panic(true, "dtb: failed to resize new DTB");
+            }
             printv("dtb: found dtb at %p via EFI\n", cur_table->VendorTable);
             break;
         }
