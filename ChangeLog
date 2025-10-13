@@ -1,3 +1,15 @@
+2025-10-13  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.1.1 ***
+
+    Noteworthy changes compared to the previous release, 10.1.0:
+
+    Bug fixes:
+        - DTBs: Always reallocate DTBs to bootloader-reclaimable memory. This
+          is to prevent pointers to EFI/reserved memory from being leaked to
+          Limine protocol executables, which is against said protocol, which
+          mandates that DTBs have to be in bootloader-reclaimable memory.
+
 2025-10-05  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.1.0 ***

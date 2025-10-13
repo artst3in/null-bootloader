@@ -77,9 +77,9 @@ For example, to clone the latest binary release of the `10.x` branch, one can do
 ```bash
 git clone https://codeberg.org/Limine/Limine.git --branch=v10.x-binary --depth=1
 ```
-or, to clone a specific binary point release (for example `10.1.0`):
+or, to clone a specific binary point release (for example `10.1.1`):
 ```bash
-git clone https://codeberg.org/Limine/Limine.git --branch=v10.1.0-binary --depth=1
+git clone https://codeberg.org/Limine/Limine.git --branch=v10.1.1-binary --depth=1
 ```
 
 In order to rebuild host utilities like `limine`, simply run `make` in the binary
