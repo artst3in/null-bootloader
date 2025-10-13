@@ -228,6 +228,7 @@ void init_riscv(const char *config) {
     void *fdt = get_device_tree_blob(config, 0);
     if (fdt != NULL) {
         init_riscv_fdt(fdt);
+        pmm_free(fdt, fdt_totalsize(fdt));
     } else if (acpi_get_rsdp()) {
         init_riscv_acpi();
     } else {
