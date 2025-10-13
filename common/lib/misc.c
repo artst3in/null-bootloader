@@ -166,9 +166,9 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             EFI_CONFIGURATION_TABLE *cur_table = &gST->ConfigurationTable[i];
             if (memcmp(&cur_table->VendorGuid, &dtb_guid, sizeof(EFI_GUID)))
                 continue;
-            size_t s = fdt_totalsize(cur_table->VendorTable);
-            dtb = ext_mem_alloc(s);
-            ret = fdt_open_into(cur_table->VendorTable, dtb, s);
+            size = fdt_totalsize(cur_table->VendorTable);
+            dtb = ext_mem_alloc(size);
+            ret = fdt_open_into(cur_table->VendorTable, dtb, size);
             if (ret < 0) {
                 panic(true, "dtb: failed to resize new DTB");
             }
@@ -183,21 +183,16 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
     }
 
     if (dtb) {
-        size_t s = fdt_totalsize(dtb);
+        printv("dtb: dtb has size %x\n", size);
 
-        printv("efi: dtb has size %x\n", s);
+        void *new_tab = ext_mem_alloc(size + extra_size);
 
-        void *new_tab = ext_mem_alloc(s + extra_size);
-
-        ret = fdt_open_into(dtb, new_tab, s + extra_size);
+        ret = fdt_open_into(dtb, new_tab, size + extra_size);
         if (ret < 0) {
             panic(true, "dtb: failed to resize new DTB");
         }
 
-        if (size) {
-            pmm_free(dtb, size);
-        }
-
+        pmm_free(dtb, size);
         return new_tab;
     }
 
