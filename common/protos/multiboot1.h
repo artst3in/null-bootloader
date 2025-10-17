@@ -71,6 +71,7 @@ struct multiboot1_info {
     uint32_t fb_height;
     uint8_t fb_bpp;
     uint8_t fb_type;
+    uint16_t fb_reserved;
 
     uint8_t fb_red_mask_shift;
     uint8_t fb_red_mask_size;
