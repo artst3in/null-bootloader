@@ -240,7 +240,7 @@ void *acpi_get_table(const char *signature, int index) {
     return NULL;
 }
 
-void map_single_table(uint64_t addr, uint32_t len) {
+static void map_single_table(uint64_t addr, uint32_t len) {
 #if defined (__i386__)
     if (addr >= 0x100000000) {
         print("acpi: warning: Cannot get length of ACPI table above 4GiB\n");
