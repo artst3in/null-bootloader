@@ -186,7 +186,7 @@ bits 64
 %ifdef UEFI
     lgdt [ebx + old_gdt_ptr wrt ..gotoff]
 %else
-    lgdt [old_gdt_ptr]
+    lgdt [abs old_gdt_ptr]
 %endif
 
     ; Restore old segments
@@ -197,18 +197,18 @@ bits 64
     mov gs, [ebx + old_gs wrt ..gotoff]
     mov ss, [ebx + old_ss wrt ..gotoff]
 %else
-    mov ds, [old_ds]
-    mov es, [old_es]
-    mov fs, [old_fs]
-    mov gs, [old_gs]
-    mov ss, [old_ss]
+    mov ds, [abs old_ds]
+    mov es, [abs old_es]
+    mov fs, [abs old_fs]
+    mov gs, [abs old_gs]
+    mov ss, [abs old_ss]
 %endif
 
     ; Go 32
 %ifdef UEFI
     push qword [ebx + old_cs wrt ..gotoff]
 %else
-    push qword [old_cs]
+    push qword [abs old_cs]
 %endif
     call .p2
   .p2:
