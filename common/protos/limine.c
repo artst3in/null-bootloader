@@ -50,7 +50,7 @@ static enum executable_format detect_kernel_format(uint8_t *kernel) {
     }
 }
 
-#define SUPPORTED_BASE_REVISION 3
+#define SUPPORTED_BASE_REVISION 4
 
 #define MAX_REQUESTS 128
 
@@ -61,13 +61,13 @@ static int paging_mode;
 static uint64_t get_hhdm_span_top(int base_revision) {
     uint64_t ret = base_revision >= 3 ? 0 : 0x100000000;
     for (size_t i = 0; i < memmap_entries; i++) {
-        if (base_revision >= 1 && base_revision < 3 && (
+        if (((base_revision >= 1 && base_revision < 3) || base_revision >= 4) && (
             memmap[i].type == MEMMAP_RESERVED
          || memmap[i].type == MEMMAP_BAD_MEMORY)) {
             continue;
         }
 
-        if (base_revision >= 3 && (
+        if (base_revision == 3 && (
             memmap[i].type != MEMMAP_USABLE
          && memmap[i].type != MEMMAP_BOOTLOADER_RECLAIMABLE
          && memmap[i].type != MEMMAP_KERNEL_AND_MODULES
@@ -202,13 +202,13 @@ static pagemap_t build_pagemap(int base_revision,
 
     // Map all free memory regions to the higher half direct map offset
     for (size_t i = 0; i < _memmap_entries; i++) {
-        if (base_revision >= 1 && base_revision < 3 && (
+        if (((base_revision >= 1 && base_revision < 3) || base_revision >= 4) && (
             _memmap[i].type == MEMMAP_RESERVED
          || _memmap[i].type == MEMMAP_BAD_MEMORY)) {
             continue;
         }
 
-        if (base_revision >= 3 && (
+        if (base_revision == 3 && (
             _memmap[i].type != MEMMAP_USABLE
          && _memmap[i].type != MEMMAP_BOOTLOADER_RECLAIMABLE
          && _memmap[i].type != MEMMAP_KERNEL_AND_MODULES
@@ -995,7 +995,7 @@ FEAT_START
     struct limine_rsdp_response *rsdp_response =
         ext_mem_alloc(sizeof(struct limine_rsdp_response));
 
-    rsdp_response->address = base_revision <= 2 ? reported_addr(rsdp) : (uintptr_t)rsdp;
+    rsdp_response->address = (base_revision <= 2 || base_revision >= 4) ? reported_addr(rsdp) : (uintptr_t)rsdp;
 
     rsdp_request->response = reported_addr(rsdp_response);
 FEAT_END
@@ -1446,6 +1446,11 @@ FEAT_END
         pmm_sanitise_entries(memmap, &memmap_entries, true);
     }
 
+    if (base_revision >= 4) {
+        acpi_map_tables();
+        pmm_sanitise_entries(memmap, &memmap_entries, true);
+    }
+
     pagemap_t pagemap = {0};
     pagemap = build_pagemap(base_revision, nx_available, ranges, ranges_count,
                             physical_base, virtual_base, direct_map_offset);
@@ -1576,6 +1581,9 @@ FEAT_START
         switch (mmap[i].type) {
             case MEMMAP_USABLE:
                 _memmap[i].type = LIMINE_MEMMAP_USABLE;
+                break;
+            case MEMMAP_ACPI_TABLES:
+                _memmap[i].type = LIMINE_MEMMAP_ACPI_TABLES;
                 break;
             case MEMMAP_ACPI_RECLAIMABLE:
                 _memmap[i].type = LIMINE_MEMMAP_ACPI_RECLAIMABLE;

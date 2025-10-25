@@ -20,6 +20,7 @@ struct memmap_entry {
 #define MEMMAP_BOOTLOADER_RECLAIMABLE 0x1000
 #define MEMMAP_KERNEL_AND_MODULES     0x1001
 #define MEMMAP_FRAMEBUFFER            0x1002
+#define MEMMAP_ACPI_TABLES            0x1003
 #define MEMMAP_EFI_RECLAIMABLE        0x2000
 
 struct meminfo {
@@ -48,6 +49,7 @@ void init_memmap(void);
 struct memmap_entry *get_memmap(size_t *entries);
 struct memmap_entry *get_raw_memmap(size_t *entry_count);
 void print_memmap(struct memmap_entry *mm, size_t size);
+uint64_t pmm_check_type(uint64_t addr);
 bool memmap_alloc_range_in(struct memmap_entry *m, size_t *_count,
                            uint64_t base, uint64_t length, uint32_t type, uint32_t overlay_type, bool do_panic, bool simulation, bool new_entry);
 bool memmap_alloc_range(uint64_t base, uint64_t length, uint32_t type, uint32_t overlay_type, bool panic, bool simulation, bool new_entry);

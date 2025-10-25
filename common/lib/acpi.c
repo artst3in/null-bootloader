@@ -5,6 +5,7 @@
 #include <lib/misc.h>
 #include <lib/libc.h>
 #include <lib/print.h>
+#include <mm/pmm.h>
 
 // Following function based on https://github.com/managarm/lai/blob/master/helpers/pc-bios.c's function lai_bios_calc_checksum()
 uint8_t acpi_checksum(void *ptr, size_t size) {
@@ -237,4 +238,96 @@ void *acpi_get_table(const char *signature, int index) {
 
     printv("acpi: \"%s\" not found\n", signature);
     return NULL;
+}
+
+void map_single_table(uint64_t addr, uint32_t len) {
+#if defined (__i386__)
+    if (addr >= 0x100000000) {
+        print("acpi: warning: Cannot get length of ACPI table above 4GiB\n");
+        return;
+    }
+#endif
+
+    uint32_t length = len != (uint32_t)-1 ? len : *(uint32_t *)(uintptr_t)(addr + 4);
+
+    uint64_t memmap_type = pmm_check_type(addr);
+
+    if (memmap_type != MEMMAP_ACPI_RECLAIMABLE && memmap_type != MEMMAP_ACPI_NVS) {
+        memmap_alloc_range(addr, length, MEMMAP_ACPI_TABLES, 0, true, false, true);
+    }
+}
+
+
+void acpi_map_tables(void) {
+    struct rsdp *rsdp = acpi_get_rsdp();
+    if (rsdp == NULL)
+        return;
+
+    uint64_t rsdp_length;
+    if (rsdp->rev < 2) {
+        rsdp_length = 20;
+    } else {
+        rsdp_length = rsdp->length;
+    }
+
+    map_single_table((uintptr_t)rsdp, rsdp_length);
+
+    if (!(rsdp->rev >= 2 && rsdp->xsdt_addr)) {
+        goto no_xsdt;
+    }
+
+    struct rsdt *xsdt = (void *)(uintptr_t)rsdp->xsdt_addr;
+    size_t xsdt_entry_count = (xsdt->header.length - sizeof(struct sdt)) / 8;
+
+    map_single_table((uintptr_t)xsdt, (uint32_t)-1);
+
+    for (size_t i = 0; i < xsdt_entry_count; i++) {
+        struct sdt *sdt = (void *)(uintptr_t)((uint64_t *)xsdt->ptrs_start)[i];
+
+        map_single_table((uintptr_t)sdt, (uint32_t)-1);
+    }
+
+no_xsdt:;
+    struct rsdt *rsdt = (void *)(uintptr_t)rsdp->rsdt_addr;
+    size_t rsdt_entry_count = (rsdt->header.length - sizeof(struct sdt)) / 4;
+
+    map_single_table((uintptr_t)rsdt, (uint32_t)-1);
+
+    for (size_t i = 0; i < rsdt_entry_count; i++) {
+        struct sdt *sdt = (void *)(uintptr_t)((uint32_t *)rsdt->ptrs_start)[i];
+
+        map_single_table((uintptr_t)sdt, (uint32_t)-1);
+    }
+
+    uint8_t *fadt = acpi_get_table("FACP", 0);
+    if (fadt == NULL) {
+        return;
+    }
+    uint32_t fadt_length = *(uint32_t *)(fadt + 4);
+
+    // Read the single fields from the FADT without defining a struct for the whole table
+    if (fadt_length >= 132 + 8) {
+        uint64_t x_facs = *(uint64_t *)(fadt + 132);
+        if (x_facs != 0) {
+            map_single_table(x_facs, (uint32_t)-1);
+        }
+    }
+    if (fadt_length >= 140 + 8) {
+        uint64_t x_dsdt = *(uint64_t *)(fadt + 140);
+        if (x_dsdt != 0) {
+            map_single_table(x_dsdt, (uint32_t)-1);
+        }
+    }
+    if (fadt_length >= 36 + 4) {
+        uint32_t facs = *(uint32_t *)(fadt + 36);
+        if (facs != 0) {
+            map_single_table(facs, (uint32_t)-1);
+        }
+    }
+    if (fadt_length >= 40 + 4) {
+        uint32_t dsdt = *(uint32_t *)(fadt + 40);
+        if (dsdt != 0) {
+            map_single_table(dsdt, (uint32_t)-1);
+        }
+    }
 }

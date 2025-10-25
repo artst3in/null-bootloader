@@ -69,6 +69,8 @@ static const char *memmap_type(uint32_t type) {
             return "Usable RAM";
         case MEMMAP_RESERVED:
             return "Reserved";
+        case MEMMAP_ACPI_TABLES:
+            return "ACPI tables";
         case MEMMAP_ACPI_RECLAIMABLE:
             return "ACPI reclaimable";
         case MEMMAP_ACPI_NVS:
@@ -208,9 +210,10 @@ del_mm1:
         m[p] = min_e;
     }
 
-    // Merge contiguous bootloader-reclaimable and usable entries
+    // Merge contiguous bootloader-reclaimable, ACPI tables, usable entries
     for (size_t i = 0; i < count - 1; i++) {
         if (m[i].type != MEMMAP_BOOTLOADER_RECLAIMABLE
+         && m[i].type != MEMMAP_ACPI_TABLES
          && m[i].type != MEMMAP_USABLE)
             continue;
 
@@ -749,6 +752,19 @@ static bool pmm_new_entry(struct memmap_entry *m, size_t *_count,
 
     *_count = count;
     return true;
+}
+
+uint64_t pmm_check_type(uint64_t addr) {
+    for (size_t i = 0; i < memmap_entries; i++) {
+        uint64_t entry_base = memmap[i].base;
+        uint64_t entry_top  = memmap[i].base + memmap[i].length;
+
+        if (addr >= entry_base && addr < entry_top) {
+            return memmap[i].type;
+        }
+    }
+
+    return (uint64_t)-1;
 }
 
 bool memmap_alloc_range_in(struct memmap_entry *m, size_t *_count,

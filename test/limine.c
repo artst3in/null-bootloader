@@ -7,7 +7,7 @@
 #include <flanterm_backends/fb.h>
 
 __attribute__((section(".limine_requests")))
-static volatile LIMINE_BASE_REVISION(3);
+static volatile LIMINE_BASE_REVISION(4);
 
 static void limine_main(void);
 
@@ -181,6 +181,8 @@ static char *get_memmap_type(uint64_t type) {
             return "Usable";
         case LIMINE_MEMMAP_RESERVED:
             return "Reserved";
+        case LIMINE_MEMMAP_ACPI_TABLES:
+            return "ACPI tables";
         case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
             return "ACPI reclaimable";
         case LIMINE_MEMMAP_ACPI_NVS:
