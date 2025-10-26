@@ -1,3 +1,16 @@
+2025-10-26  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.2.0 ***
+
+    Noteworthy changes compared to the previous release, 10.1.1:
+
+    New features:
+        - Implement base revision 4 of the Limine boot protocol as per
+          documentation (read documentation for specific details).
+    Bug fixes:
+        - "Fix" multiboot1 framebuffer structure to match GRUB instead of the
+          multiboot1 specification.
+
 2025-10-13  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.1.1 ***
