@@ -1,4 +1,4 @@
-# Limine [![Discord Server](https://img.shields.io/discord/706151776247873636?color=5865F2&label=Discord&logo=discord&logoColor=white)](https://discord.gg/Z93u2ZUNZs)
+# Limine [![Matrix Server](https://img.shields.io/matrix/limine:matrix.org?color=000000&label=Matrix&logo=matrix)](https://matrix.to/#/#limine:matrix.org) [![Discord Server](https://img.shields.io/discord/706151776247873636?color=5865F2&label=Discord&logo=discord&logoColor=white)](https://discord.gg/Z93u2ZUNZs)
 
 <p align="center">
     <img src="https://codeberg.org/Limine/Limine/raw/branch/trunk/logo.png" alt="Limine's logo"/>
