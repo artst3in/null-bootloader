@@ -408,6 +408,47 @@ static struct volume *volume_by_unique_sector(void *b2b) {
     return NULL;
 }
 
+static bool is_efi_handle_to_skip(EFI_HANDLE efi_handle) {
+    EFI_STATUS status;
+
+    EFI_GUID dp_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
+    EFI_DEVICE_PATH_PROTOCOL *dp = NULL;
+
+    EFI_GUID guids_to_skip[] = {
+        // skip 7CCE9C94-983F-4D0A-8143-B6C05545B223 since it is apparently used by exposed
+        // ROM devices that we do not want to touch
+        // (see https://github.com/limine-bootloader/limine/issues/521#issuecomment-3160168795)
+        {0x7CCE9C94, 0x983F, 0x4D0A, {0x81, 0x43, 0xB6, 0xC0, 0x55, 0x45, 0xB2, 0x23}},
+    };
+
+    status = gBS->HandleProtocol(efi_handle, &dp_guid, (void **)&dp);
+    if (status) {
+        return false;
+    }
+
+    for (;; dp = (void *)dp + *(uint16_t *)dp->Length) {
+        if (dp->Type == END_DEVICE_PATH_TYPE && dp->SubType == END_ENTIRE_DEVICE_PATH_SUBTYPE) {
+            break;
+        }
+
+        if (dp->Type != HARDWARE_DEVICE_PATH) {
+            continue;
+        }
+
+        if (dp->SubType == HW_VENDOR_DP) {
+            EFI_GUID *vendor_guid = (void *)dp + sizeof(EFI_DEVICE_PATH_PROTOCOL);
+
+            for (size_t i = 0; i < SIZEOF_ARRAY(guids_to_skip); i++) {
+                if (memcmp(vendor_guid, &guids_to_skip[i], sizeof(EFI_GUID)) == 0) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 static bool is_efi_handle_hdd(EFI_HANDLE efi_handle) {
     EFI_STATUS status;
 
@@ -444,6 +485,10 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
 
     EFI_GUID block_io_guid = BLOCK_IO_PROTOCOL;
     EFI_BLOCK_IO *block_io = NULL;
+
+    if (is_efi_handle_to_skip(efi_handle)) {
+        return NULL;
+    }
 
     status = gBS->HandleProtocol(efi_handle, &block_io_guid, (void **)&block_io);
     if (status) {
@@ -654,6 +699,10 @@ fail:
 
     for (size_t i = 0; i < handle_count; i++) {
         EFI_BLOCK_IO *drive = NULL;
+
+        if (is_efi_handle_to_skip(handles[i])) {
+            continue;
+        }
 
         status = gBS->HandleProtocol(handles[i], &block_io_guid, (void **)&drive);
 
