@@ -1,3 +1,14 @@
+2025-10-29  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.2.1 ***
+
+    Noteworthy changes compared to the previous release, 10.2.0:
+
+    Bug fixes:
+        - Add workaround for skipping SPI flash devices exposed as EFI volumes.
+          This fixes the hanging issues on many ARM laptops, without breaking
+          U-Boot unlike the previous workaround.
+
 2025-10-26  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.2.0 ***
