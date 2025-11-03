@@ -10,10 +10,8 @@ the `/EFI/BOOT` directory of a FAT formatted EFI system partition. These files
 can be installed there and coexist with a BIOS installation of Limine
 (see below) so that the disk will be bootable on both BIOS and UEFI systems.
 
-The boot device must contain the `limine.conf` files in
-either the root, `limine`, `boot`, or `boot/limine` directory of one of the
-partitions, formatted with a supported file system (the ESP partition is
-recommended).
+A valid config file should also be provided as described in
+[CONFIG.md](CONFIG.md).
 
 ## Secure Boot
 Limine can be booted with secure boot if the executable is signed and the key
@@ -32,8 +30,8 @@ limine bios-install <path to device/image>
 ```
 
 The boot device must contain the `limine-bios.sys` and `limine.conf` files in
-either the root, `limine`, `boot`, or `boot/limine` directory of one of the
-partitions, formatted with a supported file system.
+either a `boot/limine`, `boot`, `limine`, or root directory of one of the
+partitions, formatted with a supported file system. See [CONFIG.md](CONFIG.md).
 
 ## BIOS/GPT
 If using a GPT formatted device, create a partition on the GPT device (usually
@@ -45,8 +43,8 @@ limine bios-install <path to device/image> <1-based stage 2 partition number>
 ```
 
 The boot device must contain the `limine-bios.sys` and `limine.conf` files in
-either the root, `limine`, `boot`, or `boot/limine` directory of one of the
-partitions, formatted with a supported file system.
+either a `boot/limine`, `boot`, `limine`, or root directory of one of the
+partitions, formatted with a supported file system. See [CONFIG.md](CONFIG.md).
 
 ## BIOS/UEFI hybrid ISO creation
 In order to create a hybrid ISO with Limine, place the

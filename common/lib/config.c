@@ -27,19 +27,104 @@ no_unwind bool bad_config = false;
 
 static char *config_addr;
 
+#if defined (UEFI)
+
+#define EFI_APP_PATH_LEN 128
+static char efi_app_path[128] = {0};
+
+static bool init_efi_app_path(size_t *len_out) {
+    EFI_STATUS status;
+    EFI_LOADED_IMAGE_PROTOCOL *loaded_image;
+    EFI_DEVICE_PATH_PROTOCOL *path;
+    CHAR16 *file_path, *p, *last_slash;
+
+    EFI_GUID loaded_image_protocol_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+
+    status = gBS->HandleProtocol(efi_image_handle, &loaded_image_protocol_guid,
+                                 (void **)&loaded_image);
+    if (status != 0) {
+        return false;
+    }
+
+    path = loaded_image->FilePath;
+
+    while (!(path->Type == END_DEVICE_PATH_TYPE && path->SubType == END_ENTIRE_DEVICE_PATH_SUBTYPE)) {
+        if (path->Type == MEDIA_DEVICE_PATH && path->SubType == MEDIA_FILEPATH_DP) {
+            goto found;
+        }
+
+        path = (void *)path + *((uint16_t *)&path->Length[0]);
+    }
+
+    return false;
+
+found:
+    file_path = (CHAR16 *)((void *)path + 4);
+
+    last_slash = NULL;
+    for (p = file_path; *p; p++) {
+        if (*p == L'\\') {
+            last_slash = p;
+        }
+    }
+
+    if (last_slash) {
+        size_t len = (last_slash - file_path) + 1;
+        if (len >= EFI_APP_PATH_LEN) {
+            len = EFI_APP_PATH_LEN - 1;
+        }
+
+        for (size_t i = 0; i < len; i++) {
+            efi_app_path[i] = (char)(file_path[i] & 0xff);
+            if (efi_app_path[i] == '\\') {
+                efi_app_path[i] = '/';
+            }
+        }
+        efi_app_path[len] = 0;
+        if (len_out != NULL) {
+            *len_out = len;
+        }
+    } else {
+        efi_app_path[0] = '/';
+        efi_app_path[1] = 0;
+        if (len_out != NULL) {
+            *len_out = 1;
+        }
+    }
+
+    return true;
+}
+#endif
+
 int init_config_disk(struct volume *part) {
+#if defined (UEFI)
+    bool use_default_efi_search_path = false;
+
+    size_t len;
+    if (!init_efi_app_path(&len)) {
+        use_default_efi_search_path = true;
+    } else {
+        if (len + sizeof("limine.conf") >= EFI_APP_PATH_LEN) {
+            use_default_efi_search_path = true;
+        } else {
+            strcpy(efi_app_path + len, "limine.conf");
+        }
+    }
+#endif
+
     struct file_handle *f;
 
     bool old_cif = case_insensitive_fopen;
     case_insensitive_fopen = true;
-    if ((f = fopen(part, "/limine.conf")) != NULL
-     || (f = fopen(part, "/limine/limine.conf")) != NULL
-     || (f = fopen(part, "/boot/limine.conf")) != NULL
-     || (f = fopen(part, "/boot/limine/limine.conf")) != NULL
+    if (
+     false
 #if defined (UEFI)
-     || (f = fopen(part, "/EFI/BOOT/limine.conf")) != NULL
-     || (f = fopen(part, "/EFI/limine/limine.conf")) != NULL
+     || (f = fopen(part, use_default_efi_search_path ? "/EFI/BOOT/limine.conf" : efi_app_path)) != NULL
 #endif
+     || (f = fopen(part, "/boot/limine/limine.conf")) != NULL
+     || (f = fopen(part, "/boot/limine.conf")) != NULL
+     || (f = fopen(part, "/limine/limine.conf")) != NULL
+     || (f = fopen(part, "/limine.conf")) != NULL
     ) {
         goto opened;
     }

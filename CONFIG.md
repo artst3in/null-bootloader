@@ -2,28 +2,29 @@
 
 ## Location of the config file
 
-First, Limine considers configurations supplied to it as SMBIOS OEM String
-entries (Type 11). Such configurations are accepted if the first string of such
-an entry starts with the prefix of `limine:config:`. The rest of the string is
-taken as the config file. If such a configuration is found, no further scanning
-for config files is done. As such, the `boot():` drive is undefined on BIOS,
-and set to the boot device of Limine on UEFI.
-
-Next, Limine scans for a config file on *the boot drive*. Every partition on
-the boot drive is scanned sequentially - first partition first (or, on UEFI,
-the partition containing the EFI executable of the booted Limine is scanned
-first), last partition last - for the presence of either a `/limine.conf`,
-`/limine/limine.conf`, `/boot/limine.conf`, or a `/boot/limine/limine.conf`
-file, in that order.
-
-For EFI-booted Limine, `/EFI/BOOT/limine.conf` and `/EFI/limine/limine.conf`
-are also scanned, after the aforementioned paths, in that order.
+For EFI-booted Limine, `<EFI app path>/limine.conf` is taken into account
+first. On BIOS, or on EFI if that file is not found, Limine scans for the
+config file on *the boot drive*. Every partition of the boot drive is scanned
+sequentially - first partition first (or, on EFI, the partition containing the
+EFI executable of the booted Limine is scanned first), last partition last -
+for the presence of either a `/boot/limine/limine.conf`, `/boot/limine.conf`,
+`/limine/limine.conf`, or a `/limine.conf` file, in that order.
 
 Once the file is located, Limine will use it as its config file. Other possible
 candidates in subsequent partitions or directories are ignored.
 
 It is thus imperative that the intended config file is placed in a location
 that will not be shadowed by another candidate config file.
+
+### Config via SMBIOS
+
+Alternatively, if present, Limine considers first and foremost configurations
+supplied to it as SMBIOS OEM String entries (Type 11). Such configurations are
+accepted if the first string of such an entry starts with the prefix of
+`limine:config:`. The rest of the string is taken as the config file. If such a
+configuration is found, no further scanning for config files is done. As such,
+in this SMBIOS-provided config file scenario, the `boot():` drive is undefined
+on BIOS, and set to the boot device of Limine on UEFI.
 
 ## Structure of the config file
 

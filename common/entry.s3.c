@@ -98,20 +98,31 @@ defer_error:
 could_not_match:
             print("WARNING: Could not meaningfully match the boot device handle with a volume.\n");
             print("         Using the first volume containing a Limine configuration!\n");
+            print("\n");
+            print("THIS IS A BUG! Please report this issue upstream.\n");
+            print("Press any key to continue...\n");
+            for (;;) {
+                int ret = pit_sleep_and_quit_on_keypress(65535);
+                if (ret != 0) {
+                    break;
+                }
+            }
 
             for (size_t i = 0; i < volume_index_i; i++) {
                 struct file_handle *f;
 
                 bool old_cif = case_insensitive_fopen;
                 case_insensitive_fopen = true;
-                if ((f = fopen(volume_index[i], "/limine.conf")) != NULL
-                 || (f = fopen(volume_index[i], "/limine/limine.conf")) != NULL
-                 || (f = fopen(volume_index[i], "/boot/limine.conf")) != NULL
-                 || (f = fopen(volume_index[i], "/boot/limine/limine.conf")) != NULL
+                if (
+                 false
 #if defined (UEFI)
-                 || (f = fopen(volume_index[i], "/EFI/BOOT/limine.conf")) != NULL
                  || (f = fopen(volume_index[i], "/EFI/limine/limine.conf")) != NULL
+                 || (f = fopen(volume_index[i], "/EFI/BOOT/limine.conf")) != NULL
 #endif
+                 || (f = fopen(volume_index[i], "/boot/limine/limine.conf")) != NULL
+                 || (f = fopen(volume_index[i], "/boot/limine.conf")) != NULL
+                 || (f = fopen(volume_index[i], "/limine/limine.conf")) != NULL
+                 || (f = fopen(volume_index[i], "/limine.conf")) != NULL
                 ) {
                     goto opened;
                 }
