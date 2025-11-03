@@ -7,16 +7,16 @@
 #include <flanterm_backends/fb.h>
 
 __attribute__((section(".limine_requests")))
-static volatile LIMINE_BASE_REVISION(4);
+static volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(4);
 
 static void limine_main(void);
 
 __attribute__((used, section(".limine_requests_start_marker")))
-static volatile LIMINE_REQUESTS_START_MARKER;
+static volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
 
 __attribute__((used, section(".limine_requests")))
 static volatile struct limine_entry_point_request entry_point_request = {
-    .id = LIMINE_ENTRY_POINT_REQUEST,
+    .id = LIMINE_ENTRY_POINT_REQUEST_ID,
     .revision = 0, .response = NULL,
 
     .entry = limine_main
@@ -24,43 +24,43 @@ static volatile struct limine_entry_point_request entry_point_request = {
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_framebuffer_request framebuffer_request = {
-    .id = LIMINE_FRAMEBUFFER_REQUEST,
+    .id = LIMINE_FRAMEBUFFER_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_bootloader_info_request bootloader_info_request = {
-    .id = LIMINE_BOOTLOADER_INFO_REQUEST,
+    .id = LIMINE_BOOTLOADER_INFO_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_executable_cmdline_request executable_cmdline_request = {
-    .id = LIMINE_EXECUTABLE_CMDLINE_REQUEST,
+    .id = LIMINE_EXECUTABLE_CMDLINE_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_firmware_type_request firmware_type_request = {
-    .id = LIMINE_FIRMWARE_TYPE_REQUEST,
+    .id = LIMINE_FIRMWARE_TYPE_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_hhdm_request hhdm_request = {
-    .id = LIMINE_HHDM_REQUEST,
+    .id = LIMINE_HHDM_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_memmap_request memmap_request = {
-    .id = LIMINE_MEMMAP_REQUEST,
+    .id = LIMINE_MEMMAP_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_executable_file_request exec_file_request = {
-    .id = LIMINE_EXECUTABLE_FILE_REQUEST,
+    .id = LIMINE_EXECUTABLE_FILE_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
@@ -87,7 +87,7 @@ struct limine_internal_module *internal_modules[] = {
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_module_request module_request = {
-    .id = LIMINE_MODULE_REQUEST,
+    .id = LIMINE_MODULE_REQUEST_ID,
     .revision = 1, .response = NULL,
 
     .internal_module_count = 3,
@@ -96,57 +96,57 @@ static volatile struct limine_module_request module_request = {
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_rsdp_request rsdp_request = {
-    .id = LIMINE_RSDP_REQUEST,
+    .id = LIMINE_RSDP_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_smbios_request smbios_request = {
-    .id = LIMINE_SMBIOS_REQUEST,
+    .id = LIMINE_SMBIOS_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_efi_system_table_request est_request = {
-    .id = LIMINE_EFI_SYSTEM_TABLE_REQUEST,
+    .id = LIMINE_EFI_SYSTEM_TABLE_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_efi_memmap_request efi_memmap_request = {
-    .id = LIMINE_EFI_MEMMAP_REQUEST,
+    .id = LIMINE_EFI_MEMMAP_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_date_at_boot_request date_at_boot_request = {
-    .id = LIMINE_DATE_AT_BOOT_REQUEST,
+    .id = LIMINE_DATE_AT_BOOT_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_executable_address_request executable_address_request = {
-    .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST,
+    .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 #ifndef __loongarch__
 __attribute__((section(".limine_requests")))
 static volatile struct limine_mp_request _mp_request = {
-    .id = LIMINE_MP_REQUEST,
+    .id = LIMINE_MP_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 #endif
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_dtb_request _dtb_request = {
-    .id = LIMINE_DTB_REQUEST,
+    .id = LIMINE_DTB_REQUEST_ID,
     .revision = 0, .response = NULL
 };
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_paging_mode_request _pm_request = {
-    .id = LIMINE_PAGING_MODE_REQUEST,
+    .id = LIMINE_PAGING_MODE_REQUEST_ID,
     .revision = 1, .response = NULL,
 #if defined (__x86_64__)
     .mode = LIMINE_PAGING_MODE_X86_64_5LVL,
@@ -161,19 +161,19 @@ static volatile struct limine_paging_mode_request _pm_request = {
 #ifdef __riscv
 __attribute__((section(".limine_requests")))
 static volatile struct limine_riscv_bsp_hartid_request _bsp_request = {
-    .id = LIMINE_RISCV_BSP_HARTID_REQUEST,
+    .id = LIMINE_RISCV_BSP_HARTID_REQUEST_ID,
     .revision = 0, .response = NULL,
 };
 #endif
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_bootloader_performance_request _perf_request = {
-    .id = LIMINE_BOOTLOADER_PERFORMANCE_REQUEST,
+    .id = LIMINE_BOOTLOADER_PERFORMANCE_REQUEST_ID,
     .revision = 0, .response = NULL,
 };
 
 __attribute__((used, section(".limine_requests_end_marker")))
-static volatile LIMINE_REQUESTS_END_MARKER;
+static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
 static char *get_memmap_type(uint64_t type) {
     switch (type) {
@@ -204,10 +204,10 @@ static char *firmware_type_str(uint64_t t) {
     switch (t) {
         case LIMINE_FIRMWARE_TYPE_X86BIOS:
             return "x86 BIOS";
-        case LIMINE_FIRMWARE_TYPE_UEFI32:
-            return "32-bit UEFI";
-        case LIMINE_FIRMWARE_TYPE_UEFI64:
-            return "64-bit UEFI";
+        case LIMINE_FIRMWARE_TYPE_EFI32:
+            return "32-bit EFI";
+        case LIMINE_FIRMWARE_TYPE_EFI64:
+            return "64-bit EFI";
         default:
             return "???";
     }
@@ -275,11 +275,12 @@ struct flanterm_context *ft_ctx = NULL;
 static void limine_main(void) {
     e9_printf("\nWe're alive");
 
-    if (LIMINE_LOADED_BASE_REV_VALID == true) {
-        e9_printf("Bootloader has loaded us using base revision %d", LIMINE_LOADED_BASE_REVISION);
+    if (LIMINE_LOADED_BASE_REVISION_VALID(limine_base_revision) == true) {
+        e9_printf("Bootloader has loaded us using base revision %d",
+                  LIMINE_LOADED_BASE_REVISION(limine_base_revision));
     }
 
-    if (LIMINE_BASE_REVISION_SUPPORTED == false) {
+    if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         e9_printf("Limine base revision not supported");
         for (;;);
     }
