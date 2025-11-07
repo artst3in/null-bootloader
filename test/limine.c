@@ -151,11 +151,20 @@ static volatile struct limine_paging_mode_request _pm_request = {
 #if defined (__x86_64__)
     .mode = LIMINE_PAGING_MODE_X86_64_5LVL,
     .max_mode = LIMINE_PAGING_MODE_X86_64_5LVL,
-#else
-    .mode = LIMINE_PAGING_MODE_DEFAULT,
-    .max_mode = LIMINE_PAGING_MODE_DEFAULT,
+    .min_mode = LIMINE_PAGING_MODE_X86_64_MIN
+#elif defined (__aarch64__)
+    .mode = LIMINE_PAGING_MODE_AARCH64_5LVL,
+    .max_mode = LIMINE_PAGING_MODE_AARCH64_5LVL,
+    .min_mode = LIMINE_PAGING_MODE_AARCH64_MIN
+#elif defined (__riscv)
+    .mode = LIMINE_PAGING_MODE_RISCV_SV57,
+    .max_mode = LIMINE_PAGING_MODE_RISCV_SV57,
+    .min_mode = LIMINE_PAGING_MODE_RISCV_MIN,
+#elif defined (__loongarch__)
+    .mode = LIMINE_PAGING_MODE_LOONGARCH_DEFAULT,
+    .max_mode = LIMINE_PAGING_MODE_LOONGARCH_DEFAULT,
+    .min_mode = LIMINE_PAGING_MODE_LOONGARCH_MIN
 #endif
-    .min_mode = LIMINE_PAGING_MODE_MIN
 };
 
 #ifdef __riscv

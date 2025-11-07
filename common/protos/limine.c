@@ -1468,7 +1468,7 @@ FEAT_START
     uint32_t bsp_lapic_id;
     mp_info = init_smp(&cpu_count, &bsp_lapic_id,
                         paging_mode,
-                        pagemap, mp_request->flags & LIMINE_MP_X2APIC, nx_available,
+                        pagemap, mp_request->flags & LIMINE_MP_REQUEST_X86_64_X2APIC, nx_available,
                         direct_map_offset, true);
 #elif defined (__aarch64__)
     uint64_t bsp_mpidr;
@@ -1515,7 +1515,8 @@ FEAT_START
         ext_mem_alloc(sizeof(struct limine_mp_response));
 
 #if defined (__x86_64__) || defined (__i386__)
-    mp_response->flags |= (mp_request->flags & LIMINE_MP_X2APIC) && x2apic_check();
+    mp_response->flags |=
+        (mp_request->flags & LIMINE_MP_REQUEST_X86_64_X2APIC) && x2apic_check() ? LIMINE_MP_RESPONSE_X86_64_X2APIC : 0;
     mp_response->bsp_lapic_id = bsp_lapic_id;
 #elif defined (__aarch64__)
     mp_response->bsp_mpidr = bsp_mpidr;
