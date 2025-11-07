@@ -288,6 +288,10 @@ void acpi_map_tables(void) {
     }
 
 no_xsdt:;
+    if (rsdp->rsdt_addr == 0) {
+        goto no_rsdt;
+    }
+
     struct rsdt *rsdt = (void *)(uintptr_t)rsdp->rsdt_addr;
     size_t rsdt_entry_count = (rsdt->header.length - sizeof(struct sdt)) / 4;
 
@@ -299,6 +303,7 @@ no_xsdt:;
         map_single_table((uintptr_t)sdt, (uint32_t)-1);
     }
 
+no_rsdt:;
     uint8_t *fadt = acpi_get_table("FACP", 0);
     if (fadt == NULL) {
         return;
