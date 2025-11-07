@@ -1,3 +1,30 @@
+2025-11-07  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.3.0 ***
+
+    Noteworthy changes compared to the previous release, 10.2.1:
+
+    **Special notes:**
+        Despite there being breaking changes in this release, no major version
+        bump is done; this is because the changes are minor enough, there are
+        no big new features, and version 10.x was not released long enough ago.
+        This is technically in violation of Semantic Versioning, but considered
+        to be an acceptable exception.
+
+    Breaking changes:
+        - Change default paths and default path ordering for configuration file
+          search. Mainly, search first for a configuration file in the same
+          directory as the EFI application file of Limine, on EFI ports.
+        - Change default path ordering for stage 3 file search on BIOS ports.
+        - No longer install the limine.h header file on the host.
+        - No longer install PROTOCOL.md (Limine Boot Protocol specification) on
+          the host.
+
+    Bug fixes:
+        - Fix an issue where code assumed that the RSDT address in the RSDP was
+          always non-NULL, which could cause crashes or hangs when using base
+          revision 4 of the Limine Boot Protocol.
+
 2025-10-29  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.2.1 ***
@@ -18,6 +45,7 @@
     New features:
         - Implement base revision 4 of the Limine boot protocol as per
           documentation (read documentation for specific details).
+
     Bug fixes:
         - "Fix" multiboot1 framebuffer structure to match GRUB instead of the
           multiboot1 specification.
