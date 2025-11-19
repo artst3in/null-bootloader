@@ -33,7 +33,7 @@ and a [Discord server](https://discord.gg/Z93u2ZUNZs) if you need support, info,
 * x86-64
 * aarch64 (arm64)
 * riscv64
-* loongarch64
+* loongarch64 (experimental support!)
 
 ### Supported boot protocols
 * Linux
