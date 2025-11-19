@@ -26,7 +26,7 @@ and a [Discord server](https://discord.gg/Z93u2ZUNZs) if you need support, info,
 
 ![Reference screenshot](screenshot.png?raw=true "Reference screenshot")
 
-[Photo by Gundula Vogel](https://www.pexels.com/photo/ginger-cat-sitting-on-grass-25189639/)
+[Photo by Pixabay](https://www.pexels.com/photo/brown-leafed-tree-on-open-field-under-white-clouds-and-blue-sky-35857/)
 
 ### Supported architectures
 * IA-32 (32-bit x86)
