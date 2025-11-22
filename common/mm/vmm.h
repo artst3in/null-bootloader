@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <lib/print.h>
 
 #if defined (__x86_64__) || defined (__i386__)
 
@@ -123,11 +124,22 @@ void map_page(pagemap_t pagemap, uint64_t virt_addr, uint64_t phys_addr, uint64_
 
 #elif defined (__loongarch64)
 
-#define paging_mode_va_bits(mode) 49
+#define paging_mode_va_bits(mode) ({ \
+    (void)(mode); \
+    uint32_t cpucfg_val; \
+    uint32_t cfg_num = 1; \
+    \
+    asm volatile ( \
+        "cpucfg %0, %1" \
+        : "=r"(cpucfg_val) \
+        : "r"(cfg_num) \
+    ); \
+    \
+    ((cpucfg_val >> 12) & 0xff) + 1; \
+})
 
 static inline uint64_t paging_mode_higher_half(int paging_mode) {
-    (void)paging_mode;
-    return 0xffff000000000000;
+    return ~(((uintptr_t)1 << (paging_mode_va_bits(paging_mode) - 1)) - 1);
 }
 
 // We use fake flags here because these don't properly map onto the
