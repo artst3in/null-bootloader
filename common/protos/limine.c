@@ -359,7 +359,7 @@ static struct limine_file get_file(struct file_handle *file, char *cmdline, bool
 
         ret.partition_index = vol->partition;
 
-        ret.mbr_disk_id = mbr_get_id(vol);
+        ret.mbr_disk_id = mbr_get_id(vol->backing_dev ?: vol);
 
         if (vol->guid_valid) {
             memcpy(&ret.part_uuid, &vol->guid, sizeof(struct limine_uuid));
