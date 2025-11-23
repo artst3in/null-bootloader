@@ -1,3 +1,15 @@
+2025-11-23  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.3.1 ***
+
+    Noteworthy changes compared to the previous release, 10.3.0:
+
+    Bug fixes:
+        - Fix wrong virtual address related constants, for the loongarch64
+          port, that made Limine-protocol kernels fail to boot.
+        - Fix issue that caused the MBR ID in the Limine boot protocol
+          limine_file structure to always be 0.
+
 2025-11-07  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.3.0 ***
