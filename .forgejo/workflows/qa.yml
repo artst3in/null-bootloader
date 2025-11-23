@@ -18,7 +18,7 @@ jobs:
         run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S nodejs git typos
 
       - name: Checkout code
-        uses: https://code.forgejo.org/actions/checkout@v5
+        uses: https://code.forgejo.org/actions/checkout@v6
 
       - name: Run spellchecker
         run: typos

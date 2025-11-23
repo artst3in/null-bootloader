@@ -19,7 +19,7 @@ jobs:
         run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S nodejs base-devel git autoconf automake nasm curl mtools llvm clang lld
 
       - name: Checkout code
-        uses: https://code.forgejo.org/actions/checkout@v5
+        uses: https://code.forgejo.org/actions/checkout@v6
 
       - name: Build the bootloader (LLVM, default)
         run: ./bootstrap && ./configure --enable-werror --enable-all && make all && make distclean
