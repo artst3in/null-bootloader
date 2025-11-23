@@ -262,9 +262,6 @@ bool is_valid_mbr(struct volume *volume) {
         return false;
 
     char hintc[64];
-    volume_read(volume, hintc, 4, 8);
-    if (memcmp(hintc, "_ECH_FS_", 8) == 0)
-        return false;
     volume_read(volume, hintc, 3, 4);
     if (memcmp(hintc, "NTFS", 4) == 0)
         return false;
