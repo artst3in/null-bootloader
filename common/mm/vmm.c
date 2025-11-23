@@ -467,6 +467,21 @@ static uint64_t pt_to_vmm_flags_internal(pt_entry_t entry) {
 
 pagemap_t new_pagemap(int paging_mode) {
     (void)paging_mode;
+
+    uint32_t cpucfg_val;
+
+    asm volatile (
+        "cpucfg %0, %1"
+        : "=r"(cpucfg_val)
+        : "r"(1)
+    );
+
+    uint32_t valen = ((cpucfg_val >> 12) & 0xff) + 1;
+    if (valen < 48) {
+        panic(true, "vmm: VALEN values < 48 not currently supported");
+    }
+
+    (void)paging_mode;
     pagemap_t pagemap;
     pagemap.pgd[0] = ext_mem_alloc(PT_SIZE);
     pagemap.pgd[1] = ext_mem_alloc(PT_SIZE);
