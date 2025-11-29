@@ -260,6 +260,13 @@ static inline size_t dcache_line_size(void) {
     return ((ctr >> 16) & 0b1111) << 4;
 }
 
+static inline bool is_icache_pipt(void) {
+    uint64_t ctr;
+    asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
+
+    return ((ctr >> 14) & 0b11) == 0b11;
+}
+
 // Clean D-Cache to Point of Coherency
 static inline void clean_dcache_poc(uintptr_t start, uintptr_t end) {
     size_t dsz = dcache_line_size();
@@ -275,6 +282,12 @@ static inline void clean_dcache_poc(uintptr_t start, uintptr_t end) {
 
 // Invalidate I-Cache to Point of Unification
 static inline void inval_icache_pou(uintptr_t start, uintptr_t end) {
+    if (!is_icache_pipt()) {
+        asm volatile ("ic ialluis" ::: "memory");
+        asm volatile ("dsb sy\n\tisb");
+        return;
+    }
+
     size_t isz = icache_line_size();
 
     uintptr_t addr = start & ~(isz - 1);
