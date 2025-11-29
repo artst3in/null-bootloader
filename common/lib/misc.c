@@ -146,8 +146,14 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
     void *dtb = NULL;
 
     {
-        char *dtb_path = config_get_value(config, 0, config ? "dtb_path" : "global_dtb");
-        if (dtb_path) {
+        char *dtb_path = NULL;
+        if (config != NULL) {
+            dtb_path = config_get_value(config, 0, "dtb_path");
+        }
+        if (dtb_path == NULL) {
+            dtb_path = config_get_value(NULL, 0, "global_dtb");
+        }
+        if (dtb_path != NULL) {
             struct file_handle *dtb_file;
             if ((dtb_file = uri_open(dtb_path)) == NULL)
                 panic(true, "dtb: Failed to open device tree blob with path `%#`. Is the path correct?", dtb_path);
