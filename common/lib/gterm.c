@@ -469,6 +469,10 @@ static void riscv_flush_callback(volatile void *base, size_t length) {
         asm volatile("cbo.flush (%0)" :: "r"(ptr) : "memory");
     }
 }
+#elif defined (__aarch64__)
+static void aarch64_flush_callback(volatile void *base, size_t length) {
+    clean_dcache_poc((uintptr_t)base, (uintptr_t)base + length);
+}
 #endif
 
 bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
@@ -806,6 +810,8 @@ no_load_font:;
         if (riscv_check_isa_extension("zicbom", NULL, NULL)) {
             flanterm_fb_set_flush_callback(term, riscv_flush_callback);
         }
+#elif defined (__aarch64__)
+        flanterm_fb_set_flush_callback(term, aarch64_flush_callback);
 #endif
     }
 
