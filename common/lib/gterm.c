@@ -13,6 +13,7 @@
 #include <flanterm.h>
 #include <flanterm_backends/fb.h>
 #include <lib/term.h>
+#include <sys/cpu.h>
 
 // Builtin font originally taken from:
 // https://github.com/viler-int10h/vga-text-mode-fonts/raw/master/FONTS/PC-OTHER/TOSH-SAT.F16
@@ -458,6 +459,18 @@ static void generate_canvas(struct fb_info *fb) {
     }
 }
 
+#if defined (__riscv)
+__attribute__((target("arch=+zicbom")))
+static void riscv_flush_callback(volatile void *base, size_t length) {
+    const size_t cbom_block_size = 0x40;
+    uintptr_t start = ALIGN_DOWN((uintptr_t)base, cbom_block_size);
+    uintptr_t end = ALIGN_UP((uintptr_t)(base + length), cbom_block_size);
+    for (uintptr_t ptr = start; ptr < end; ptr += cbom_block_size) {
+        asm volatile("cbo.flush (%0)" :: "r"(ptr) : "memory");
+    }
+}
+#endif
+
 bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
                 char *config, size_t width, size_t height) {
     static struct fb_info *fbs;
@@ -789,6 +802,11 @@ no_load_font:;
         term->rows = min_rows;
 
         flanterm_context_reinit(term);
+#if defined (__riscv)
+        if (riscv_check_isa_extension("zicbom", NULL, NULL)) {
+            flanterm_fb_set_flush_callback(term, riscv_flush_callback);
+        }
+#endif
     }
 
     term_backend = GTERM;
