@@ -85,6 +85,9 @@ Miscellaneous:
 * `serial_baudrate` - If `serial` is set to `yes`, this specifies the baudrate
   to use for serial I/O. Defaults to `115200`. BIOS only, ignored with Limine
   UEFI.
+* `global_dtb` - If set, use this DTB instead of the firmware-provided DTB for
+  Limine itself, as well as for any booted entry whose protocol supports DTBs
+  and the DTB is not locally overridden with `dtb_path`.
 * `default_entry` - 1-based entry index of the entry which will be
   automatically selected at startup. If unspecified, it is `1`.
 * `remember_last_entry` - If set to `yes`, remember last booted entry.

@@ -146,7 +146,7 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
     void *dtb = NULL;
 
     {
-        char *dtb_path = config_get_value(config, 0, config ? "dtb_path" : "loader_dtb_path");
+        char *dtb_path = config_get_value(config, 0, config ? "dtb_path" : "global_dtb");
         if (dtb_path) {
             struct file_handle *dtb_file;
             if ((dtb_file = uri_open(dtb_path)) == NULL)
