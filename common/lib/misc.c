@@ -147,16 +147,19 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
 
     {
         char *dtb_path = NULL;
+        bool soft_panic;
         if (config != NULL) {
             dtb_path = config_get_value(config, 0, "dtb_path");
+            soft_panic = true;
         }
         if (dtb_path == NULL) {
             dtb_path = config_get_value(NULL, 0, "global_dtb");
+            soft_panic = false;
         }
         if (dtb_path != NULL) {
             struct file_handle *dtb_file;
             if ((dtb_file = uri_open(dtb_path)) == NULL)
-                panic(true, "dtb: Failed to open device tree blob with path `%#`. Is the path correct?", dtb_path);
+                panic(soft_panic, "dtb: Failed to open device tree blob with path `%#`. Is the path correct?", dtb_path);
 
             dtb = freadall(dtb_file, MEMMAP_BOOTLOADER_RECLAIMABLE);
             size = dtb_file->size;
