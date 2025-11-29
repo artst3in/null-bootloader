@@ -779,6 +779,10 @@ noreturn void _menu(bool first_run) {
         }
     }
 
+#if defined (__riscv)
+    init_riscv(NULL);
+#endif
+
     char *quiet_str = config_get_value(NULL, 0, "QUIET");
     quiet = quiet_str != NULL && strcmp(quiet_str, "yes") == 0;
 
