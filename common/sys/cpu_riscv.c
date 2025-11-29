@@ -57,6 +57,8 @@ struct rhct_mmu {
     uint8_t mmu_type;
 } __attribute__((packed));
 
+void *riscv_fdt = NULL;
+
 size_t bsp_hartid;
 struct riscv_hart *hart_list = NULL;
 static struct riscv_hart *bsp_hart;
@@ -232,10 +234,14 @@ void init_riscv(const char *config) {
         pmm_free(cur_hart, sizeof(struct riscv_hart));
     }
 
-    void *fdt = get_device_tree_blob(config, 0);
-    if (fdt != NULL) {
-        init_riscv_fdt(fdt);
-        pmm_free(fdt, fdt_totalsize(fdt));
+    if (riscv_fdt != NULL) {
+        pmm_free(riscv_fdt, fdt_totalsize(riscv_fdt));
+        riscv_fdt = NULL;
+    }
+
+    riscv_fdt = get_device_tree_blob(config, 0);
+    if (riscv_fdt != NULL) {
+        init_riscv_fdt(riscv_fdt);
     } else if (acpi_get_rsdp()) {
         init_riscv_acpi();
     } else {
