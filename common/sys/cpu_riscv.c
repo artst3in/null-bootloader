@@ -4,6 +4,7 @@
 #include <lib/acpi.h>
 #include <lib/misc.h>
 #include <lib/print.h>
+#include <lib/config.h>
 #include <sys/cpu.h>
 #include <mm/pmm.h>
 #include <stddef.h>
@@ -239,13 +240,30 @@ void init_riscv(const char *config) {
         riscv_fdt = NULL;
     }
 
-    riscv_fdt = get_device_tree_blob(config, 0);
-    if (riscv_fdt != NULL) {
-        init_riscv_fdt(riscv_fdt);
-    } else if (acpi_get_rsdp()) {
+    bool prioritise_dtb = false;
+    if (config != NULL) {
+        prioritise_dtb = config_get_value(config, 0, "dtb_path");
+    }
+    if (!prioritise_dtb) {
+        prioritise_dtb = config_get_value(NULL, 0, "global_dtb");
+    }
+
+    if (!prioritise_dtb && acpi_get_rsdp()) {
         init_riscv_acpi();
     } else {
-        panic(false, "riscv: requires DTB or ACPI");
+        riscv_fdt = get_device_tree_blob(config, 0);
+        if (riscv_fdt == NULL) {
+            if (prioritise_dtb) { // AKA if we did not try ACPI yet
+                if (!acpi_get_rsdp()) {
+                    goto fail;
+                }
+                init_riscv_acpi();
+            } else {
+                goto fail;
+            }
+        } else {
+            init_riscv_fdt(riscv_fdt);
+        }
     }
 
     if (bsp_hart == NULL) {
@@ -263,6 +281,11 @@ void init_riscv(const char *config) {
     }
 
     current_config = config;
+
+    return;
+
+fail:
+    panic(false, "riscv: requires DTB or ACPI");
 }
 
 struct isa_extension {
