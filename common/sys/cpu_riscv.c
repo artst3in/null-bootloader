@@ -58,8 +58,9 @@ struct rhct_mmu {
 } __attribute__((packed));
 
 size_t bsp_hartid;
-struct riscv_hart *hart_list;
+struct riscv_hart *hart_list = NULL;
 static struct riscv_hart *bsp_hart;
+static const char *current_config = NULL;
 
 static struct riscv_hart *riscv_get_hart(size_t hartid) {
     for (struct riscv_hart *hart = hart_list; hart != NULL; hart = hart->next) {
@@ -225,6 +226,12 @@ static void init_riscv_fdt(const void *fdt) {
 }
 
 void init_riscv(const char *config) {
+    while (hart_list != NULL && current_config != config) {
+        void *cur_hart = hart_list;
+        hart_list = hart_list->next;
+        pmm_free(cur_hart, sizeof(struct riscv_hart));
+    }
+
     void *fdt = get_device_tree_blob(config, 0);
     if (fdt != NULL) {
         init_riscv_fdt(fdt);
@@ -248,6 +255,8 @@ void init_riscv(const char *config) {
             hart->flags |= RISCV_HART_COPROC;
         }
     }
+
+    current_config = config;
 }
 
 struct isa_extension {

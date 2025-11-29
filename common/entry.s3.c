@@ -186,6 +186,8 @@ noreturn void stage3_common(void) {
     if (rv_proto == NULL || rv_proto->GetBootHartId(rv_proto, &bsp_hartid) != EFI_SUCCESS) {
         panic(false, "failed to get BSP's hartid");
     }
+
+    init_riscv(NULL);
 #else
 #error riscv: only UEFI is supported
 #endif
