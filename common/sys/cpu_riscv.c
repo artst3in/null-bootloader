@@ -252,17 +252,10 @@ void init_riscv(const char *config) {
         init_riscv_acpi();
     } else {
         riscv_fdt = get_device_tree_blob(config, 0);
-        if (riscv_fdt == NULL) {
-            if (prioritise_dtb) { // AKA if we did not try ACPI yet
-                if (!acpi_get_rsdp()) {
-                    goto fail;
-                }
-                init_riscv_acpi();
-            } else {
-                goto fail;
-            }
-        } else {
+        if (riscv_fdt != NULL) {
             init_riscv_fdt(riscv_fdt);
+        } else {
+            panic(false, "riscv: requires DTB or ACPI");
         }
     }
 
@@ -281,11 +274,6 @@ void init_riscv(const char *config) {
     }
 
     current_config = config;
-
-    return;
-
-fail:
-    panic(false, "riscv: requires DTB or ACPI");
 }
 
 struct isa_extension {
