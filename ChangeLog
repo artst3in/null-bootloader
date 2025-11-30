@@ -1,3 +1,27 @@
+2025-11-30  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.4.0 ***
+
+    Noteworthy changes compared to the previous release, 10.3.2:
+
+    New features:
+        - Add new configuration file option "global_dtb" to allow overriding
+          the device tree used by Limine itself as well as for all boot entries
+          (unless overridden by entry-local "dtb_path" option).
+
+    Bug fixes:
+        - Flush entire I-Cache if it is not PIPT on aarch64.
+        - Fix use-after-free bug in riscv64 initialisation code related to
+          device tree handling.
+
+    Miscellaneous:
+        - Framebuffer-related caching improvements for riscv64 and aarch64.
+          This should fix a long standing issue where, on a lot of riscv64
+          boards, the Limine interface would look mangled due to missing cache
+          flushing.
+        - Prioritise using ACPI for riscv64 initialisation code if available
+          and if a DTB is not manually specified.
+
 2025-11-23  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.3.2 ***
