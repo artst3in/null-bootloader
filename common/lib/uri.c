@@ -28,7 +28,7 @@ bool uri_resolve(char *uri, char **resource, char **root, char **path, char **ha
         if (strlen(uri + i) < 1)
             return false;
 
-        if (!memcmp(uri + i, "(", 1)) {
+        if (!strncmp(uri + i, "(", 1)) {
             *resource = uri;
             uri[i] = 0;
             uri += i + 1;
@@ -41,7 +41,7 @@ bool uri_resolve(char *uri, char **resource, char **root, char **path, char **ha
         if (strlen(uri + i) < 3)
             return false;
 
-        if (!memcmp(uri + i, "):/", 3)) {
+        if (!strncmp(uri + i, "):/", 3)) {
             *root = uri;
             uri[i] = 0;
             uri += i + 3;
