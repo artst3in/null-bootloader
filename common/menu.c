@@ -35,6 +35,9 @@ EFI_GUID limine_efi_vendor_guid =
 #define TOK_BADKEY 3
 #define TOK_COMMENT 4
 
+static char interface_help_colour[] = "\e[32m";
+static char interface_help_colour_bright[] = "\e[92m";
+
 static char *menu_branding = NULL;
 static char *menu_branding_colour = NULL;
 no_unwind bool booting_from_editor = false;
@@ -234,7 +237,7 @@ refresh:
         print("\n\n");
     }
 
-    print("    \e[32mESC\e[0m Discard and Exit    \e[32mF10\e[0m Boot\n\n");
+    print("    %sESC\e[0m Discard and Exit    %sF10\e[0m Boot\n\n", interface_help_colour, interface_help_colour);
 
     print(serial ? "/" : "┌");
     for (size_t i = 0; i < terms[0]->cols - 2; i++) {
@@ -817,6 +820,16 @@ noreturn void _menu(bool first_run) {
         help_hidden = strcmp(help_hidden_str, "yes") == 0;
     }
 
+    char *interface_help_colour_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOUR");
+    if (interface_help_colour_str == NULL) {
+        interface_help_colour_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOR");
+    }
+    if (interface_help_colour_str != NULL) {
+        interface_help_colour[3] = interface_help_colour_str[0];
+        interface_help_colour_bright[3] = interface_help_colour_str[0];
+        pmm_free(interface_help_colour_str, strlen(interface_help_colour_str));
+    }
+
     menu_branding = config_get_value(NULL, 0, "INTERFACE_BRANDING");
     if (menu_branding == NULL) {
 #if defined (BIOS)
@@ -1004,22 +1017,24 @@ refresh:
             set_cursor_pos_helper(0, 3);
             if (max_entries != 0) {
                 if (selected_menu_entry->sub == NULL) {
-                    print("    \e[32mARROWS\e[0m Select    \e[32mENTER\e[0m Boot    %s",
-                          editor_enabled ? "\e[32mE\e[0m Edit" : "");
+                    print("    %sARROWS\e[0m Select    %sENTER\e[0m Boot    %s%s",
+                          interface_help_colour, interface_help_colour, interface_help_colour,
+                          editor_enabled ? "E\e[0m Edit" : "\e[0m");
                 } else {
-                    print("    \e[32mARROWS\e[0m Select    \e[32mENTER\e[0m %s",
+                    print("    %sARROWS\e[0m Select    %sENTER\e[0m %s",
+                          interface_help_colour, interface_help_colour,
                           selected_menu_entry->expanded ? "Collapse" : "Expand");
                 }
             }
 #if defined(UEFI)
             if (reboot_to_firmware_supported) {
                 set_cursor_pos_helper(terms[0]->cols - (editor_enabled ? 37 : 20), 3);
-                print("\e[32mS\e[0m Firmware Setup");
+                print("%sS\e[0m Firmware Setup", interface_help_colour);
             }
 #endif
             if (editor_enabled) {
                 set_cursor_pos_helper(terms[0]->cols - 17, 3);
-                print("\e[32mB\e[0m Blank Entry");
+                print("%sB\e[0m Blank Entry", interface_help_colour);
             }
         }
         set_cursor_pos_helper(x, y);
@@ -1035,7 +1050,8 @@ refresh:
         for (size_t i = timeout; i; i--) {
             set_cursor_pos_helper(0, terms[0]->rows - 1);
             FOR_TERM(TERM->scroll_enabled = false);
-            print("\e[2K\e[32mBooting automatically in \e[92m%u\e[32m, press any key to stop the countdown...\e[0m", i);
+            print("\e[2K%sBooting automatically in %s%u%s, press any key to stop the countdown...\e[0m",
+                  interface_help_colour, interface_help_colour_bright, i, interface_help_colour);
             FOR_TERM(TERM->scroll_enabled = true);
             FOR_TERM(TERM->double_buffer_flush(TERM));
             if ((c = pit_sleep_and_quit_on_keypress(1))) {
