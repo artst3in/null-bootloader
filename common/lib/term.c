@@ -295,7 +295,8 @@ void term_fallback(void) {
             NULL, NULL,
             NULL, 0, 0, 1,
             0, 0,
-            0
+            0,
+            FLANTERM_FB_ROTATE_0
         );
     }
 
