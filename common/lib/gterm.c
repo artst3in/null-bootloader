@@ -525,6 +525,18 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
     margin = 64;
     margin_gradient = 4;
 
+    int fb_rotation = FLANTERM_FB_ROTATE_0;
+    char *rotation_str = config_get_value(config, 0, "INTERFACE_ROTATION");
+    if (rotation_str != NULL) {
+        int rotation_val = strtoui(rotation_str, NULL, 10);
+        switch (rotation_val) {
+            case 90: fb_rotation = FLANTERM_FB_ROTATE_90; break;
+            case 180: fb_rotation = FLANTERM_FB_ROTATE_180; break;
+            case 270: fb_rotation = FLANTERM_FB_ROTATE_270; break;
+        }
+        pmm_free(rotation_str, strlen(rotation_str) + 1);
+    }
+
     uint32_t ansi_colours[8];
 
     ansi_colours[0] = 0x00000000; // black
@@ -713,6 +725,12 @@ no_load_font:;
             continue;
         }
 
+        if (fb_rotation == FLANTERM_FB_ROTATE_90 || fb_rotation == FLANTERM_FB_ROTATE_270) {
+            uint64_t tmp = fb->framebuffer_width;
+            fb->framebuffer_width = fb->framebuffer_height;
+            fb->framebuffer_height = tmp;
+        }
+
         if (background != NULL) {
             char *background_layout = config_get_value(config, 0, "WALLPAPER_STYLE");
             if (background_layout != NULL && strcmp(background_layout, "centered") == 0) {
@@ -740,6 +758,12 @@ no_load_font:;
             }
         }
 
+        if (fb_rotation == FLANTERM_FB_ROTATE_90 || fb_rotation == FLANTERM_FB_ROTATE_270) {
+            uint64_t tmp = fb->framebuffer_width;
+            fb->framebuffer_width = fb->framebuffer_height;
+            fb->framebuffer_height = tmp;
+        }
+
         terms[terms_i] = flanterm_fb_init(ext_mem_alloc,
                             pmm_free,
                             (void *)(uintptr_t)fb->framebuffer_addr,
@@ -753,7 +777,7 @@ no_load_font:;
                             &default_bg_bright, &default_fg_bright,
                             font, font_width, font_height, font_spacing,
                             font_scale_x, font_scale_y,
-                            margin);
+                            margin, fb_rotation);
 
         if (terms[terms_i] != NULL) {
             terms_i++;

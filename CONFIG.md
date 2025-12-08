@@ -120,6 +120,8 @@ Limine interface control options:
   Limine will pick a resolution automatically. If the resolution is not
   available, Limine will pick another one automatically. Ignored if using text
   mode.
+* `interface_rotation` - Specifies the rotation of the Limine interface.
+  It can be any of the following values: `0`, `90`, `180`, `270`. Default is `0`.
 * `interface_branding` - A string that will be displayed on top of the Limine
   interface.
 * `interface_branding_colour` - A value between 0 and 7 specifying the colour

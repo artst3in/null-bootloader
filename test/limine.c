@@ -311,7 +311,8 @@ static void limine_main(void) {
         NULL, NULL,
         NULL, 0, 0, 1,
         0, 0,
-        0
+        0,
+        FLANTERM_FB_ROTATE_0
     );
 
     uint64_t executable_slide = (uint64_t)executable_start - 0xffffffff80000000;
