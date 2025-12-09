@@ -36,7 +36,7 @@
 /decompressor/cc-runtime.c
 /libfdt
 /tinf
-/ovmf*
+/edk2-ovmf
 /bochsout.txt
 /bx_enh_dbg.ini
 /test_image
