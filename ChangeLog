@@ -1,3 +1,15 @@
+2025-12-11  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.5.0 ***
+
+    Noteworthy changes compared to the previous release, 10.4.0:
+
+    New features:
+        - Add new `interface_help_colour` global configuration file option to
+          allow changing the colour of "helper" messages in the interface.
+        - Add new `interface_rotation` global configuration option to allow
+          rotating the output interface be 0, 90, 180, or 270 degrees.
+
 2025-11-30  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.4.0 ***
