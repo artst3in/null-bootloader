@@ -45,8 +45,9 @@ struct file_handle *fopen(struct volume *part, const char *filename) {
 
     if (part->pxe) {
         if ((ret = tftp_open(part, "", filename)) == NULL) {
-            return NULL;
+            goto err;
         }
+        pmm_free(filename_new, filename_new_len);
         return ret;
     }
 
@@ -57,6 +58,8 @@ struct file_handle *fopen(struct volume *part, const char *filename) {
         goto success;
     }
 
+err:
+    pmm_free(filename_new, filename_new_len);
     return NULL;
 
 success:
