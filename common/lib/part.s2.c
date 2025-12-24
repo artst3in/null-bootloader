@@ -500,11 +500,6 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
         return NO_PARTITION;
     }
 
-    // Check for overflow: first_sect + sect_count must not overflow
-    if ((uint64_t)entry.first_sect > UINT64_MAX - entry.sect_count) {
-        return NO_PARTITION;  // Partition would overflow
-    }
-
 #if defined (UEFI)
     ret->efi_handle  = volume->efi_handle;
     ret->block_io    = volume->block_io;
