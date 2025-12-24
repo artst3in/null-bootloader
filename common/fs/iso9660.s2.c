@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <stddef.h>
 #include <fs/iso9660.h>
 #include <lib/misc.h>
 #include <lib/libc.h>
@@ -93,9 +95,17 @@ struct iso9660_contexts_node {
 
 static struct iso9660_contexts_node *contexts = NULL;
 
+// Maximum number of volume descriptors to scan before giving up
+#define ISO9660_MAX_VOLUME_DESCRIPTORS 256
+
+// Maximum directory size to prevent memory exhaustion (64MB)
+#define ISO9660_MAX_DIR_SIZE (64 * 1024 * 1024)
+
 static void iso9660_find_PVD(struct iso9660_primary_volume *desc, struct volume *vol) {
     uint32_t lba = ISO9660_FIRST_VOLUME_DESCRIPTOR;
-    while (true) {
+    uint32_t max_lba = ISO9660_FIRST_VOLUME_DESCRIPTOR + ISO9660_MAX_VOLUME_DESCRIPTORS;
+
+    while (lba < max_lba) {
         volume_read(vol, desc, lba * ISO9660_SECTOR_SIZE, sizeof(struct iso9660_primary_volume));
 
         switch (desc->volume_descriptor.type) {
@@ -108,6 +118,8 @@ static void iso9660_find_PVD(struct iso9660_primary_volume *desc, struct volume 
 
         ++lba;
     }
+
+    panic(false, "ISO9660: exceeded maximum volume descriptor search limit");
 }
 
 static void iso9660_cache_root(struct volume *vol,
@@ -117,8 +129,15 @@ static void iso9660_cache_root(struct volume *vol,
     iso9660_find_PVD(&pv, vol);
 
     *root_size = pv.root.extent_size.little;
+
+    // Validate root directory size to prevent memory exhaustion
+    if (*root_size == 0 || *root_size > ISO9660_MAX_DIR_SIZE) {
+        panic(false, "ISO9660: Invalid root directory size");
+    }
+
     *root = ext_mem_alloc(*root_size);
-    volume_read(vol, *root, pv.root.extent.little * ISO9660_SECTOR_SIZE, *root_size);
+    uint64_t offset = (uint64_t)pv.root.extent.little * ISO9660_SECTOR_SIZE;
+    volume_read(vol, *root, offset, *root_size);
 }
 
 static struct iso9660_context *iso9660_get_context(struct volume *vol) {
@@ -141,16 +160,39 @@ static struct iso9660_context *iso9660_get_context(struct volume *vol) {
 
 static bool load_name(char *buf, size_t limit, struct iso9660_directory_entry *entry) {
     unsigned char* sysarea = ((unsigned char*)entry) + sizeof(struct iso9660_directory_entry) + entry->filename_size;
-    int sysarea_len = entry->length - sizeof(struct iso9660_directory_entry) - entry->filename_size;
+
+    // Validate entry->length is large enough
+    if (entry->length < sizeof(struct iso9660_directory_entry) + entry->filename_size) {
+        goto use_iso_name;
+    }
+
+    size_t sysarea_len = entry->length - sizeof(struct iso9660_directory_entry) - entry->filename_size;
     if ((entry->filename_size & 0x1) == 0) {
+        if (sysarea_len == 0) {
+            goto use_iso_name;
+        }
         sysarea++;
         sysarea_len--;
     }
 
     int rrnamelen = 0;
+    unsigned char *nm_entry = NULL;
     while ((sysarea_len >= 4) && ((sysarea[3] == 1) || (sysarea[2] == 2))) {
+        // Validate entry length doesn't exceed remaining sysarea
+        if (sysarea[2] > sysarea_len) {
+            break;
+        }
         if (sysarea[0] == 'N' && sysarea[1] == 'M') {
-            rrnamelen = sysarea[2] - 5;
+            // Validate Rock Ridge NM entry length
+            // sysarea[2] is total entry length, must be >= 5 (header) and within sysarea bounds
+            if (sysarea[2] >= 5 && sysarea[2] <= sysarea_len) {
+                rrnamelen = sysarea[2] - 5;
+                nm_entry = sysarea;
+            }
+            break;
+        }
+        // Prevent infinite loop from zero-length entry
+        if (sysarea[2] == 0) {
             break;
         }
         sysarea_len -= sysarea[2];
@@ -158,31 +200,43 @@ static bool load_name(char *buf, size_t limit, struct iso9660_directory_entry *e
     }
 
     size_t name_len = 0;
-    if (rrnamelen) {
+    if (rrnamelen > 0 && nm_entry != NULL) {
         /* rock ridge naming scheme */
         name_len = rrnamelen;
         if (name_len >= limit) {
             panic(false, "iso9660: Filename size exceeded");
         }
-        memcpy(buf, sysarea + 5, name_len);
+        memcpy(buf, nm_entry + 5, name_len);
         buf[name_len] = 0;
         return true;
-    } else {
-        name_len = entry->filename_size;
-        if (name_len >= limit) {
-            panic(false, "iso9660: Filename size exceeded");
-        }
-        size_t j;
-        for (j = 0; j < name_len; j++) {
-            if (entry->name[j] == ';')
-                break;
-            if (entry->name[j] == '.' && entry->name[j+1] == ';')
-                break;
-            buf[j] = entry->name[j];
-        }
-        buf[j] = 0;
-        return false;
     }
+
+use_iso_name:
+    name_len = entry->filename_size;
+    if (name_len >= limit) {
+        panic(false, "iso9660: Filename size exceeded");
+    }
+    // Validate that entry->length can actually hold the filename
+    // entry->length must be >= sizeof(struct) + filename_size for safe access
+    if (entry->length < sizeof(struct iso9660_directory_entry) + name_len) {
+        // Corrupted entry: claimed filename_size exceeds actual entry data
+        // Clamp name_len to what's actually available
+        if (entry->length <= sizeof(struct iso9660_directory_entry)) {
+            name_len = 0;
+        } else {
+            name_len = entry->length - sizeof(struct iso9660_directory_entry);
+        }
+    }
+    size_t j;
+    for (j = 0; j < name_len; j++) {
+        if (entry->name[j] == ';')
+            break;
+        if (entry->name[j] == '.' && j + 1 < name_len && entry->name[j+1] == ';')
+            break;
+        buf[j] = entry->name[j];
+    }
+    buf[j] = 0;
+    return false;
 }
 
 static struct iso9660_directory_entry *iso9660_find(void *buffer, uint32_t size, const char *filename) {
@@ -194,8 +248,26 @@ static struct iso9660_directory_entry *iso9660_find(void *buffer, uint32_t size,
                 return NULL;
             size_t prev_size = size;
             size = ALIGN_DOWN(size, ISO9660_SECTOR_SIZE);
-            buffer += prev_size - size;
+            // If size didn't change (was already aligned), force move to next sector
+            if (prev_size == size) {
+                if (size <= ISO9660_SECTOR_SIZE)
+                    return NULL;
+                size -= ISO9660_SECTOR_SIZE;
+                buffer += ISO9660_SECTOR_SIZE;
+            } else {
+                buffer += prev_size - size;
+            }
             continue;
+        }
+
+        // Validate entry->length doesn't exceed remaining buffer
+        if (entry->length > size) {
+            return NULL;  // Corrupted directory entry
+        }
+
+        // Minimum valid directory entry size
+        if (entry->length < sizeof(struct iso9660_directory_entry)) {
+            return NULL;  // Corrupted directory entry
         }
 
         char entry_filename[256];
@@ -247,13 +319,40 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
 
     char filename[ROCK_RIDGE_MAX_FILENAME];
     while (true) {
+        // Skip any consecutive slashes
+        while (*path == '/') {
+            path++;
+        }
+
+        // Check if we've reached the end of the path (handles trailing slashes)
+        if (*path == '\0') {
+            // Use the current directory's extent info
+            // For root, this was set from ret->context->root
+            // For subdirs, it was set from the last matched entry
+            if (first) {
+                // Still at root - return NULL as we can't return root as a file
+                pmm_free(ret, sizeof(struct iso9660_file_handle));
+                return NULL;
+            }
+            // Otherwise next_sector/next_size already set from last entry
+            break;
+        }
+
         char *aux = filename;
-        while (!(*path == '/' || *path == '\0'))
+        char *aux_end = filename + ROCK_RIDGE_MAX_FILENAME - 1;
+        while (!(*path == '/' || *path == '\0')) {
+            if (aux >= aux_end) {
+                panic(false, "iso9660: Path component exceeds maximum length");
+            }
             *aux++ = *path++;
+        }
         *aux = '\0';
 
         struct iso9660_directory_entry *entry = iso9660_find(current, current_size, filename);
         if (!entry) {
+            if (!first) {
+                pmm_free(current, current_size);
+            }
             pmm_free(ret, sizeof(struct iso9660_file_handle));
             return NULL;    // Not found :(
         }
@@ -261,11 +360,19 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
         next_sector = entry->extent.little;
         next_size = entry->extent_size.little;
 
-        if (*path++ == '\0')
+        if (*path == '\0')
             break;    // Found :)
+
+        path++;  // Skip the '/' separator
 
         if (!first) {
             pmm_free(current, current_size);
+        }
+
+        // Validate directory size to prevent memory exhaustion
+        if (next_size == 0 || next_size > ISO9660_MAX_DIR_SIZE) {
+            pmm_free(ret, sizeof(struct iso9660_file_handle));
+            return NULL;
         }
 
         current_size = next_size;
@@ -273,7 +380,13 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
 
         first = false;
 
-        volume_read(vol, current, next_sector * ISO9660_SECTOR_SIZE, current_size);
+        uint64_t dir_offset = (uint64_t)next_sector * ISO9660_SECTOR_SIZE;
+        volume_read(vol, current, dir_offset, current_size);
+    }
+
+    // Free the last directory buffer if we allocated one (not the cached root)
+    if (!first) {
+        pmm_free(current, current_size);
     }
 
     ret->LBA = next_sector;
@@ -295,7 +408,8 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
 
 static void iso9660_read(struct file_handle *file, void *buf, uint64_t loc, uint64_t count) {
     struct iso9660_file_handle *f = file->fd;
-    volume_read(f->context->vol, buf, f->LBA * ISO9660_SECTOR_SIZE + loc, count);
+    uint64_t offset = (uint64_t)f->LBA * ISO9660_SECTOR_SIZE + loc;
+    volume_read(f->context->vol, buf, offset, count);
 }
 
 static void iso9660_close(struct file_handle *file) {
