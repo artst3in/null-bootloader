@@ -164,7 +164,7 @@ void pmm_sanitise_entries(struct memmap_entry *m, size_t *_count, bool align_ent
         if (!m[i].length
          || (align_entries && !align_entry(&m[i].base, &m[i].length))) {
             // Remove i from memmap
-            if (i < count) {
+            if (i < count - 1) {
                 m[i] = m[count - 1];
             }
             count--; i--;
