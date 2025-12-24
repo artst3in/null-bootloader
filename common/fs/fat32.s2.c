@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <limits.h>
 #include <fs/fat32.h>
 #include <lib/misc.h>
 #include <drivers/disk.h>
@@ -147,12 +149,26 @@ sector_per_cluster_valid:;
 
 bytes_per_sector_valid:;
 
+    // Validate fats_count (typically 1 or 2, but allow up to 4)
+    if (bpb.fats_count == 0 || bpb.fats_count > 4) {
+        return 1;
+    }
+
     // The following mess to identify the FAT type is from the FAT spec
     // at paragraph 3.5
     size_t root_dir_sects = ((bpb.root_entries_count * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector;
 
-    size_t data_sects = (bpb.sectors_count_16 ?: bpb.sectors_count_32) - (bpb.reserved_sectors + (bpb.fats_count * (bpb.sectors_per_fat_16 ?: bpb.sectors_per_fat_32)) + root_dir_sects);
+    // Calculate total sectors and metadata sectors separately to check for underflow
+    uint64_t total_sects = bpb.sectors_count_16 ? bpb.sectors_count_16 : bpb.sectors_count_32;
+    uint64_t sectors_per_fat = bpb.sectors_per_fat_16 ? bpb.sectors_per_fat_16 : bpb.sectors_per_fat_32;
+    uint64_t metadata_sects = (uint64_t)bpb.reserved_sectors + ((uint64_t)bpb.fats_count * sectors_per_fat) + root_dir_sects;
 
+    // Check for underflow before subtraction
+    if (metadata_sects >= total_sects) {
+        return 1;  // Invalid filesystem: metadata exceeds total size
+    }
+
+    size_t data_sects = total_sects - metadata_sects;
     size_t clusters_count = data_sects / bpb.sectors_per_cluster;
 
     if (clusters_count < 4085) {
@@ -169,14 +185,27 @@ bytes_per_sector_valid:;
     context->number_of_fats = bpb.fats_count;
     context->hidden_sectors = bpb.hidden_sectors_count;
     context->sectors_per_fat = context->type == 32 ? bpb.sectors_per_fat_32 : bpb.sectors_per_fat_16;
+    if (context->sectors_per_fat == 0) {
+        return 1;
+    }
     context->root_directory_cluster = bpb.root_directory_cluster;
     context->fat_start_lba = bpb.reserved_sectors;
     context->root_entries = bpb.root_entries_count;
-    context->root_start = context->reserved_sectors + context->number_of_fats * context->sectors_per_fat;
+
+    // Calculate root_start with overflow check
+    uint64_t root_start_64 = (uint64_t)context->reserved_sectors + (uint64_t)context->number_of_fats * context->sectors_per_fat;
+    if (root_start_64 > UINT32_MAX) {
+        return 1;  // Overflow in root_start calculation
+    }
+    context->root_start = (uint32_t)root_start_64;
     context->root_size = DIV_ROUNDUP(context->root_entries * sizeof(struct fat32_directory_entry), context->bytes_per_sector);
     switch (context->type) {
         case 12:
         case 16:
+            // Check for overflow in data_start_lba calculation
+            if (context->root_start > UINT32_MAX - context->root_size) {
+                return 1;  // Overflow in data_start_lba
+            }
             context->data_start_lba = context->root_start + context->root_size;
             break;
         case 32:
@@ -215,11 +244,14 @@ bytes_per_sector_valid:;
 }
 
 static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster, uint32_t *out) {
+    uint64_t fat_base = (uint64_t)context->fat_start_lba * context->bytes_per_sector;
+
     switch (context->type) {
         case 12: {
             *out = 0;
             uint16_t tmp = 0;
-            volume_read(context->part, &tmp, context->fat_start_lba * context->bytes_per_sector + (cluster + cluster / 2), sizeof(uint16_t));
+            uint64_t offset = fat_base + (uint64_t)cluster + (uint64_t)(cluster / 2);
+            volume_read(context->part, &tmp, offset, sizeof(uint16_t));
             if (cluster % 2 == 0) {
                 *out = tmp & 0xfff;
             } else {
@@ -229,10 +261,10 @@ static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster
         }
         case 16:
             *out = 0;
-            volume_read(context->part, out, context->fat_start_lba * context->bytes_per_sector + cluster * sizeof(uint16_t), sizeof(uint16_t));
+            volume_read(context->part, out, fat_base + (uint64_t)cluster * sizeof(uint16_t), sizeof(uint16_t));
             break;
         case 32:
-            volume_read(context->part, out, context->fat_start_lba * context->bytes_per_sector + cluster * sizeof(uint32_t), sizeof(uint32_t));
+            volume_read(context->part, out, fat_base + (uint64_t)cluster * sizeof(uint32_t), sizeof(uint32_t));
             *out &= 0x0fffffff;
             break;
         default:
@@ -242,6 +274,9 @@ static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster
     return 0;
 }
 
+// Maximum cluster chain length to prevent memory exhaustion (64MB of cluster chain data)
+#define FAT32_MAX_CHAIN_LENGTH (64 * 1024 * 1024 / sizeof(uint32_t))
+
 static uint32_t *cache_cluster_chain(struct fat32_context *context,
                                      uint32_t initial_cluster,
                                      size_t *_chain_length) {
@@ -250,13 +285,26 @@ static uint32_t *cache_cluster_chain(struct fat32_context *context,
                            | (context->type == 32 ? 0xfffffef : 0);
     if (initial_cluster < 0x2 || initial_cluster > cluster_limit)
         return NULL;
+
+    // Limit chain length to prevent memory exhaustion from malicious filesystems
+    size_t max_clusters = cluster_limit - 1;
+    if (max_clusters > FAT32_MAX_CHAIN_LENGTH) {
+        max_clusters = FAT32_MAX_CHAIN_LENGTH;
+    }
+
     uint32_t cluster = initial_cluster;
     size_t chain_length;
-    for (chain_length = 1; ; chain_length++) {
+    for (chain_length = 1; chain_length <= max_clusters; chain_length++) {
         read_cluster_from_map(context, cluster, &cluster);
         if (cluster < 0x2 || cluster > cluster_limit)
             break;
     }
+
+    if (chain_length > max_clusters) {
+        // Circular or corrupted cluster chain detected
+        return NULL;
+    }
+
     uint32_t *cluster_chain = ext_mem_alloc(chain_length * sizeof(uint32_t));
     cluster = initial_cluster;
     for (size_t i = 0; i < chain_length; i++) {
@@ -269,17 +317,29 @@ static uint32_t *cache_cluster_chain(struct fat32_context *context,
 
 static bool read_cluster_chain(struct fat32_context *context,
                                uint32_t *cluster_chain,
+                               size_t chain_len,
                                void *buf, uint64_t loc, uint64_t count) {
-    size_t block_size = context->sectors_per_cluster * context->bytes_per_sector;
+    uint64_t block_size = (uint64_t)context->sectors_per_cluster * (uint64_t)context->bytes_per_sector;
     for (uint64_t progress = 0; progress < count;) {
         uint64_t block = (loc + progress) / block_size;
+
+        // Bounds check: ensure block index is within cluster chain
+        if (block >= chain_len) {
+            return false;
+        }
+
+        // Validate cluster number before arithmetic to prevent underflow
+        uint32_t cluster = cluster_chain[block];
+        if (cluster < 2) {
+            return false;
+        }
 
         uint64_t chunk = count - progress;
         uint64_t offset = (loc + progress) % block_size;
         if (chunk > block_size - offset)
             chunk = block_size - offset;
 
-        uint64_t base = ((uint64_t)context->data_start_lba + (cluster_chain[block] - 2) * context->sectors_per_cluster) * context->bytes_per_sector;
+        uint64_t base = ((uint64_t)context->data_start_lba + (uint64_t)(cluster - 2) * context->sectors_per_cluster) * context->bytes_per_sector;
         volume_read(context->part, buf + progress, base + offset, chunk);
 
         progress += chunk;
@@ -288,11 +348,15 @@ static bool read_cluster_chain(struct fat32_context *context,
     return true;
 }
 
-// Copy ucs-2 characters to char*
-static void fat32_lfncpy(char* destination, const void* source, unsigned int size) {
+// Copy ucs-2 characters to char*, with bounds checking
+static void fat32_lfncpy(char* destination, size_t dest_size, size_t dest_offset,
+                         const void* source, unsigned int size) {
     for (unsigned int i = 0; i < size; i++) {
+        if (dest_offset + i >= dest_size) {
+            return;  // Prevent buffer overflow
+        }
         // ignore high bytes
-        *(((uint8_t*) destination) + i) = *(((uint8_t*) source) + (i * 2));
+        *(((uint8_t*) destination) + dest_offset + i) = *(((uint8_t*) source) + (i * 2));
     }
 }
 
@@ -341,17 +405,35 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
         if (directory_cluster_chain == NULL)
             return -1;
 
-        directory_entries = ext_mem_alloc(dir_chain_len * block_size);
+        // Check for integer overflow in allocation size
+        uint64_t alloc_size = (uint64_t)dir_chain_len * block_size;
+        if (alloc_size > SIZE_MAX || alloc_size > 256 * 1024 * 1024) {
+            // Limit directory size to 256MB to prevent memory exhaustion
+            pmm_free(directory_cluster_chain, dir_chain_len * sizeof(uint32_t));
+            return -1;
+        }
 
-        read_cluster_chain(context, directory_cluster_chain, directory_entries, 0, dir_chain_len * block_size);
+        directory_entries = ext_mem_alloc((size_t)alloc_size);
+
+        if (!read_cluster_chain(context, directory_cluster_chain, dir_chain_len, directory_entries, 0, (size_t)alloc_size)) {
+            pmm_free(directory_entries, (size_t)alloc_size);
+            pmm_free(directory_cluster_chain, dir_chain_len * sizeof(uint32_t));
+            return -1;
+        }
 
         pmm_free(directory_cluster_chain, dir_chain_len * sizeof(uint32_t));
     } else {
         dir_chain_len = DIV_ROUNDUP(context->root_entries * sizeof(struct fat32_directory_entry), block_size);
 
-        directory_entries = ext_mem_alloc(dir_chain_len * block_size);
+        // Check for overflow
+        uint64_t alloc_size = (uint64_t)dir_chain_len * block_size;
+        if (alloc_size > SIZE_MAX || alloc_size > 256 * 1024 * 1024) {
+            return -1;
+        }
 
-        volume_read(context->part, directory_entries, context->root_start * context->bytes_per_sector, context->root_entries * sizeof(struct fat32_directory_entry));
+        directory_entries = ext_mem_alloc((size_t)alloc_size);
+
+        volume_read(context->part, directory_entries, (uint64_t)context->root_start * context->bytes_per_sector, context->root_entries * sizeof(struct fat32_directory_entry));
     }
 
     int ret;
@@ -389,14 +471,18 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
                 memset(current_lfn, ' ', sizeof(current_lfn));
             }
 
-            const unsigned int lfn_index = ((lfn->sequence_number & 0b00011111) - 1U) * 13U;
+            const unsigned int seq_num = lfn->sequence_number & 0b00011111;
+            if (seq_num == 0) {
+                continue;  // Invalid sequence number, skip
+            }
+            const unsigned int lfn_index = (seq_num - 1U) * 13U;
             if (lfn_index >= FAT32_LFN_MAX_ENTRIES * 13) {
                 continue;
             }
 
-            fat32_lfncpy(current_lfn + lfn_index + 00, lfn->name1, 5);
-            fat32_lfncpy(current_lfn + lfn_index + 05, lfn->name2, 6);
-            fat32_lfncpy(current_lfn + lfn_index + 11, lfn->name3, 2);
+            fat32_lfncpy(current_lfn, sizeof(current_lfn), lfn_index + 0, lfn->name1, 5);
+            fat32_lfncpy(current_lfn, sizeof(current_lfn), lfn_index + 5, lfn->name2, 6);
+            fat32_lfncpy(current_lfn, sizeof(current_lfn), lfn_index + 11, lfn->name3, 2);
 
             if (lfn_index != 0)
                 continue;
@@ -412,7 +498,21 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
             int (*strcmpfn)(const char *, const char *) = case_insensitive_fopen ? strcasecmp : strcmp;
 
             if (strcmpfn(current_lfn, name) == 0) {
-                *file = directory_entries[i+1];
+                // Ensure i+1 is within bounds before accessing
+                if (i + 1 >= (dir_chain_len * block_size) / sizeof(struct fat32_directory_entry)) {
+                    ret = -1;
+                    goto out;
+                }
+                // Validate that the next entry is a valid SFN entry (not LFN, deleted, or end-of-dir)
+                struct fat32_directory_entry *sfn_entry = &directory_entries[i+1];
+                if (sfn_entry->file_name_and_ext[0] == 0x00 ||
+                    (uint8_t)sfn_entry->file_name_and_ext[0] == 0xE5 ||
+                    sfn_entry->attribute == FAT32_LFN_ATTRIBUTE) {
+                    // Corrupted LFN sequence - expected SFN entry not found
+                    ret = -1;
+                    goto out;
+                }
+                *file = *sfn_entry;
                 ret = 0;
                 goto out;
             }
@@ -490,22 +590,40 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
 
     for (;;) {
         bool expect_directory = false;
+        bool found_terminator = false;
 
-        for (unsigned int i = 0; i < SIZEOF_ARRAY(current_part); i++) {
-            if (path[i + current_index] == 0) {
+        for (unsigned int i = 0; i < SIZEOF_ARRAY(current_part) - 1; i++) {
+            // Check for overflow before computing path index
+            if (current_index > UINT_MAX - i) {
+                return NULL;  // Path index would overflow
+            }
+            unsigned int path_idx = i + current_index;
+
+            if (path[path_idx] == 0) {
                 memcpy(current_part, path + current_index, i);
                 current_part[i] = 0;
                 expect_directory = false;
+                found_terminator = true;
                 break;
             }
 
-            if (path[i + current_index] == '/') {
+            if (path[path_idx] == '/') {
                 memcpy(current_part, path + current_index, i);
                 current_part[i] = 0;
+                // Check for overflow before updating current_index
+                if (current_index > UINT_MAX - i - 1) {
+                    return NULL;  // current_index would overflow
+                }
                 current_index += i + 1;
                 expect_directory = true;
+                found_terminator = true;
                 break;
             }
+        }
+
+        // If loop completed without finding terminator, path component is too long
+        if (!found_terminator) {
+            return NULL;
         }
 
         if ((r = fat32_open_in(&context, current_directory, &current_file, current_part)) != 0) {
@@ -525,7 +643,16 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
                 ret->first_cluster |= (uint64_t)current_file.cluster_num_high << 16;
             ret->size_clusters = DIV_ROUNDUP(current_file.file_size_bytes, context.bytes_per_sector);
             ret->size_bytes = current_file.file_size_bytes;
+            // Initialize chain_len before calling cache_cluster_chain
+            // (cache_cluster_chain may return NULL without setting it for empty files)
+            ret->chain_len = 0;
             ret->cluster_chain = cache_cluster_chain(&context, ret->first_cluster, &ret->chain_len);
+
+            if (ret->cluster_chain == NULL && ret->size_bytes != 0) {
+                pmm_free(ret, sizeof(struct fat32_file_handle));
+                pmm_free(handle, sizeof(struct file_handle));
+                return NULL;
+            }
 
             handle->fd = (void *)ret;
             handle->read = (void *)fat32_read;
@@ -543,7 +670,9 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
 
 static void fat32_read(struct file_handle *file, void *buf, uint64_t loc, uint64_t count) {
     struct fat32_file_handle *f = file->fd;
-    read_cluster_chain(&f->context, f->cluster_chain, buf, loc, count);
+    if (!read_cluster_chain(&f->context, f->cluster_chain, f->chain_len, buf, loc, count)) {
+        panic(false, "fat32: cluster chain read failed (corrupted filesystem?)");
+    }
 }
 
 static void fat32_close(struct file_handle *file) {
