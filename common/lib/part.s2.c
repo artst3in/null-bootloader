@@ -34,9 +34,19 @@ static bool cache_block(struct volume *volume, uint64_t block) {
 
     uint64_t xfer_size = volume->fastest_xfer_size;
 
+    // Check for overflow in sector offset calculation
+    uint64_t block_offset;
+    if (__builtin_mul_overflow(block, volume->fastest_xfer_size, &block_offset)) {
+        return false;
+    }
+    if (first_sect > UINT64_MAX - block_offset) {
+        return false;
+    }
+    uint64_t read_sector = first_sect + block_offset;
+
     for (;;) {
         int ret = disk_read_sectors(volume, volume->cache,
-                           first_sect + block * volume->fastest_xfer_size,
+                           read_sector,
                            xfer_size);
 
         switch (ret) {
@@ -189,14 +199,57 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
     if ((uint32_t)partition >= header.number_of_partition_entries)
         return END_OF_TABLE;
 
+    // Validate partition entry size (must be at least as large as our struct)
+    uint32_t entry_size = header.size_of_partition_entry;
+    if (entry_size < sizeof(struct gpt_entry)) {
+        return INVALID_TABLE;
+    }
+
+    // Check for potential integer overflow in offset calculation
+    uint64_t entry_offset;
+    if (__builtin_mul_overflow((uint64_t)header.partition_entry_lba, (uint64_t)lb_size, &entry_offset)) {
+        return INVALID_TABLE;  // Multiplication overflow
+    }
+    // Use actual entry size from header for offset calculation
+    uint64_t partition_offset = (uint64_t)partition * entry_size;
+    if (entry_offset > UINT64_MAX - partition_offset) {
+        return INVALID_TABLE;  // Addition overflow would occur
+    }
+    entry_offset += partition_offset;
+
     struct gpt_entry entry = {0};
-    volume_read(volume, &entry,
-         (header.partition_entry_lba * lb_size) + (partition * sizeof(entry)),
-         sizeof(entry));
+    volume_read(volume, &entry, entry_offset, sizeof(entry));
 
     struct guid empty_guid = {0};
     if (!memcmp(&entry.unique_partition_guid, &empty_guid, sizeof(struct guid)))
         return NO_PARTITION;
+
+    // Validate that ending_lba >= starting_lba to prevent underflow
+    if (entry.ending_lba < entry.starting_lba) {
+        return NO_PARTITION;  // Invalid partition geometry
+    }
+
+    // Calculate sector multiplier for lb_size conversion
+    uint64_t sect_multiplier = lb_size / 512;
+
+    // Check for overflow in first_sect calculation
+    uint64_t first_sect_result;
+    if (__builtin_mul_overflow(entry.starting_lba, sect_multiplier, &first_sect_result)) {
+        return NO_PARTITION;  // Overflow in first_sect
+    }
+
+    // Check for overflow in sect_count calculation
+    // First compute partition size in logical blocks
+    // Check if +1 would overflow (ending_lba == UINT64_MAX)
+    uint64_t partition_size = entry.ending_lba - entry.starting_lba;
+    if (partition_size == UINT64_MAX) {
+        return NO_PARTITION;  // Partition size +1 would overflow
+    }
+    uint64_t partition_blocks = partition_size + 1;
+    uint64_t sect_count_result;
+    if (__builtin_mul_overflow(partition_blocks, sect_multiplier, &sect_count_result)) {
+        return NO_PARTITION;  // Overflow in sect_count
+    }
 
 #if defined (UEFI)
     ret->efi_handle  = volume->efi_handle;
@@ -209,8 +262,8 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
     ret->is_optical  = volume->is_optical;
     ret->partition   = partition + 1;
     ret->sector_size = volume->sector_size;
-    ret->first_sect  = entry.starting_lba * (lb_size / 512);
-    ret->sect_count  = ((entry.ending_lba - entry.starting_lba) + 1) * (lb_size / 512);
+    ret->first_sect  = first_sect_result;
+    ret->sect_count  = sect_count_result;
     ret->backing_dev = volume;
 
     struct guid guid;
@@ -292,11 +345,20 @@ uint32_t mbr_get_id(struct volume *volume) {
     return ret;
 }
 
+// Maximum number of logical partitions to prevent infinite loops from circular EBR chains
+#define MAX_LOGICAL_PARTITIONS 256
+
 static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part,
                                 int partition) {
     struct mbr_entry entry;
 
+    // Limit partition index to prevent excessive iteration
+    if (partition >= MAX_LOGICAL_PARTITIONS) {
+        return END_OF_TABLE;
+    }
+
     uint64_t ebr_sector = 0;
+    uint64_t prev_ebr_sector = 0;
 
     for (int i = 0; i < partition; i++) {
         uint64_t entry_offset = ebr_sector * 512 + 0x1ce;
@@ -307,7 +369,19 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
             return END_OF_TABLE;
         }
 
+        prev_ebr_sector = ebr_sector;
         ebr_sector = entry.first_sect;
+
+        // Detect circular chain: if new sector points to 0 or backwards, it's invalid
+        // (EBR sectors should always increase within the extended partition)
+        if (ebr_sector == 0 || (i > 0 && ebr_sector <= prev_ebr_sector)) {
+            return END_OF_TABLE;  // Circular or corrupted EBR chain
+        }
+
+        // Also check that ebr_sector is within the extended partition bounds
+        if (ebr_sector >= extended_part->sect_count) {
+            return END_OF_TABLE;  // EBR points outside extended partition
+        }
     }
 
     uint64_t entry_offset = ebr_sector * 512 + 0x1be;
@@ -316,6 +390,23 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
 
     if (entry.type == 0)
         return NO_PARTITION;
+
+    // Validate sect_count is non-zero
+    if (entry.sect_count == 0) {
+        return NO_PARTITION;
+    }
+
+    // Check for overflow in first_sect calculation
+    uint64_t first_sect_64;
+    if (__builtin_add_overflow(extended_part->first_sect, ebr_sector, &first_sect_64)) {
+        return NO_PARTITION;  // Addition overflow
+    }
+    if (__builtin_add_overflow(first_sect_64, (uint64_t)entry.first_sect, &first_sect_64)) {
+        return NO_PARTITION;  // Addition overflow
+    }
+    if (first_sect_64 > UINT64_MAX - entry.sect_count) {
+        return NO_PARTITION;  // Partition would overflow
+    }
 
 #if defined (UEFI)
     ret->efi_handle  = extended_part->efi_handle;
@@ -328,7 +419,7 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
     ret->is_optical  = extended_part->is_optical;
     ret->partition   = partition + 4 + 1;
     ret->sector_size = extended_part->sector_size;
-    ret->first_sect  = extended_part->first_sect + ebr_sector + entry.first_sect;
+    ret->first_sect  = first_sect_64;
     ret->sect_count  = entry.sect_count;
     ret->backing_dev = extended_part->backing_dev;
 
@@ -369,6 +460,11 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
             if (entry.type != 0x0f && entry.type != 0x05)
                 continue;
 
+            // Validate extended partition has non-zero size
+            if (entry.sect_count == 0) {
+                continue;
+            }
+
             struct volume extended_part = {0};
 
 #if defined (UEFI)
@@ -398,6 +494,16 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
 
     if (entry.type == 0)
         return NO_PARTITION;
+
+    // Validate sect_count is non-zero
+    if (entry.sect_count == 0) {
+        return NO_PARTITION;
+    }
+
+    // Check for overflow: first_sect + sect_count must not overflow
+    if ((uint64_t)entry.first_sect > UINT64_MAX - entry.sect_count) {
+        return NO_PARTITION;  // Partition would overflow
+    }
 
 #if defined (UEFI)
     ret->efi_handle  = volume->efi_handle;
@@ -437,6 +543,11 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
 
 int part_get(struct volume *part, struct volume *volume, int partition) {
     int ret;
+
+    // Validate partition index is non-negative
+    if (partition < 0) {
+        return NO_PARTITION;
+    }
 
     ret = gpt_get_part(part, volume, partition);
     if (ret != INVALID_TABLE)
