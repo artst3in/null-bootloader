@@ -150,7 +150,7 @@ void *freadall_mode(struct file_handle *fd, uint32_t type, bool allow_high_alloc
                 goto low_ret;
             }
             void *pool = ext_mem_alloc(0x100000);
-            for (size_t i = 0; i < fd->size; i += 0x100000) {
+            for (uint64_t i = 0; i < fd->size; i += 0x100000) {
                 size_t count;
                 if (fd->size - i < 0x100000) {
                     count = fd->size - i;
