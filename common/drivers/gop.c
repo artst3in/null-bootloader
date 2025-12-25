@@ -312,11 +312,11 @@ fallback:
         }
 
         if (current_fallback < SIZEOF_ARRAY(fallback_resolutions)) {
-            current_fallback++;
-
             _target_width = fallback_resolutions[current_fallback].width;
             _target_height = fallback_resolutions[current_fallback].height;
             _target_bpp = fallback_resolutions[current_fallback].bpp;
+
+            current_fallback++;
             goto retry;
         }
 
