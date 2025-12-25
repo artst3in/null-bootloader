@@ -36,7 +36,7 @@ static size_t get_multiboot1_info_size(
     return ALIGN_UP(sizeof(struct multiboot1_info), 16) +                   // base structure
            ALIGN_UP(strlen(cmdline) + 1, 16) +                              // cmdline
            ALIGN_UP(sizeof(LIMINE_BRAND), 16) +                             // bootloader brand
-           ALIGN_UP(sizeof(section_entry_size * section_num), 16) +         // ELF info
+           ALIGN_UP(section_entry_size * section_num, 16) +                 // ELF info
            ALIGN_UP(sizeof(struct multiboot1_module) * modules_count, 16) + // modules count
            ALIGN_UP(modules_cmdlines_size, 16) +                            // modules command lines
            ALIGN_UP(sizeof(struct multiboot1_mmap_entry) * MEMMAP_MAX, 16);        // memory map
