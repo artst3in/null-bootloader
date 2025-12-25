@@ -195,7 +195,7 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     handle->is_memfile = true;
 
     handle->pxe = true;
-    handle->pxe_ip = *(uint32_t *)&ip;
+    handle->pxe_ip = *(uint32_t *)ip->Addr;
     handle->pxe_port = 69;
 
     size_t name_len = strlen(name);
