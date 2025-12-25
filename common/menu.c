@@ -572,7 +572,6 @@ static size_t print_tree(size_t offset, size_t window, const char *shift, size_t
 #endif
                     skip_entry = true;
                 }
-                pmm_free(cur_entry_protocol, strlen(cur_entry_protocol) + 1);
                 if (skip_entry) {
                     current_entry = current_entry->next;
                     continue;
