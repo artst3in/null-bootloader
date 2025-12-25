@@ -534,7 +534,6 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
             case 180: fb_rotation = FLANTERM_FB_ROTATE_180; break;
             case 270: fb_rotation = FLANTERM_FB_ROTATE_270; break;
         }
-        pmm_free(rotation_str, strlen(rotation_str) + 1);
     }
 
     uint32_t ansi_colours[8];

@@ -827,10 +827,16 @@ noreturn void _menu(bool first_run) {
     if (interface_help_colour_str != NULL) {
         interface_help_colour[3] = interface_help_colour_str[0];
         interface_help_colour_bright[3] = interface_help_colour_str[0];
-        pmm_free(interface_help_colour_str, strlen(interface_help_colour_str) + 1);
     }
 
-    menu_branding = config_get_value(NULL, 0, "INTERFACE_BRANDING");
+    {
+        char *tmp = config_get_value(NULL, 0, "INTERFACE_BRANDING");
+        if (tmp != NULL) {
+            size_t len = strlen(tmp) + 1;
+            menu_branding = ext_mem_alloc(len);
+            memcpy(menu_branding, tmp, len);
+        }
+    }
     if (menu_branding == NULL) {
 #if defined (BIOS)
         {
@@ -867,11 +873,18 @@ noreturn void _menu(bool first_run) {
 #endif
     }
 
-    menu_branding_colour = config_get_value(NULL, 0, "INTERFACE_BRANDING_COLOUR");
-    if (menu_branding_colour == NULL)
-        menu_branding_colour = config_get_value(NULL, 0, "INTERFACE_BRANDING_COLOR");
-    if (menu_branding_colour == NULL)
-        menu_branding_colour = "6";
+    {
+        char *tmp = config_get_value(NULL, 0, "INTERFACE_BRANDING_COLOUR");
+        if (tmp == NULL)
+            tmp = config_get_value(NULL, 0, "INTERFACE_BRANDING_COLOR");
+        if (tmp != NULL) {
+            size_t len = strlen(tmp) + 1;
+            menu_branding_colour = ext_mem_alloc(len);
+            memcpy(menu_branding_colour, tmp, len);
+        } else {
+            menu_branding_colour = "6";
+        }
+    }
 
     bool skip_timeout = false;
     struct menu_entry *selected_menu_entry = NULL;
@@ -1209,12 +1222,19 @@ noreturn void boot(char *config) {
     init_riscv(config);
 #endif
 
-    char *cmdline = config_get_value(config, 0, "KERNEL_CMDLINE");
-    if (!cmdline) {
-        cmdline = config_get_value(config, 0, "CMDLINE");
-    }
-    if (!cmdline) {
-        cmdline = "";
+    char *cmdline;
+    {
+        char *tmp = config_get_value(config, 0, "KERNEL_CMDLINE");
+        if (!tmp) {
+            tmp = config_get_value(config, 0, "CMDLINE");
+        }
+        if (tmp) {
+            size_t len = strlen(tmp) + 1;
+            cmdline = ext_mem_alloc(len);
+            memcpy(cmdline, tmp, len);
+        } else {
+            cmdline = "";
+        }
     }
 
     char *proto = config_get_value(config, 0, "PROTOCOL");
