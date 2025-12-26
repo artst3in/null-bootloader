@@ -71,6 +71,15 @@ bool uri_resolve(char *uri, char **resource, char **root, char **path, char **ha
             return false;
         }
 
+        // Validate all 128 characters are valid hexadecimal
+        for (size_t j = 0; j < 128; j++) {
+            char c = uri[i + j];
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                panic(true, "Blake2b hash contains invalid character at position %d", (int)j);
+                return false;
+            }
+        }
+
         break;
     }
 
