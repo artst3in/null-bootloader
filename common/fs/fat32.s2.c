@@ -245,13 +245,20 @@ bytes_per_sector_valid:;
 
 static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster, uint32_t *out) {
     uint64_t fat_base = (uint64_t)context->fat_start_lba * context->bytes_per_sector;
+    uint64_t fat_size = (uint64_t)context->sectors_per_fat * context->bytes_per_sector;
 
     switch (context->type) {
         case 12: {
             *out = 0;
             uint16_t tmp = 0;
-            uint64_t offset = fat_base + (uint64_t)cluster + (uint64_t)(cluster / 2);
-            volume_read(context->part, &tmp, offset, sizeof(uint16_t));
+            uint64_t offset = (uint64_t)cluster + (uint64_t)(cluster / 2);
+
+            // Ensure 2-byte reads won't exceed FAT table bounds
+            if (offset + sizeof(uint16_t) > fat_size) {
+                return -1;
+            }
+
+            volume_read(context->part, &tmp, fat_base + offset, sizeof(uint16_t));
             if (cluster % 2 == 0) {
                 *out = tmp & 0xfff;
             } else {
