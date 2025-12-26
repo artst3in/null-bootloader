@@ -230,10 +230,34 @@ static bool detect_sector_size(struct volume *volume) {
         }
     }
 
-    volume->sector_size = sector_size_a > sector_size_b ? sector_size_a : sector_size_b;
+    size_t detected_size = sector_size_a > sector_size_b ? sector_size_a : sector_size_b;
 
-    if (volume->sector_size == 0) {
+    if (detected_size == 0) {
         return false;
+    }
+
+    // Validate detected sector size is a power of 2 and within reasonable bounds
+    // Valid sector sizes are typically 512, 1024, 2048, or 4096 bytes
+    static const size_t valid_sector_sizes[] = { 512, 1024, 2048, 4096 };
+    bool valid = false;
+    for (size_t i = 0; i < SIZEOF_ARRAY(valid_sector_sizes); i++) {
+        if (detected_size == valid_sector_sizes[i]) {
+            valid = true;
+            break;
+        }
+    }
+
+    if (!valid) {
+        // Round down to nearest valid sector size
+        volume->sector_size = 512;  // Default fallback
+        for (size_t i = SIZEOF_ARRAY(valid_sector_sizes); i > 0; i--) {
+            if (detected_size >= valid_sector_sizes[i - 1]) {
+                volume->sector_size = valid_sector_sizes[i - 1];
+                break;
+            }
+        }
+    } else {
+        volume->sector_size = detected_size;
     }
 
     return true;
@@ -426,24 +450,31 @@ static bool is_efi_handle_to_skip(EFI_HANDLE efi_handle) {
         return false;
     }
 
-    for (;; dp = (void *)dp + *(uint16_t *)dp->Length) {
+    for (;;) {
         if (dp->Type == END_DEVICE_PATH_TYPE && dp->SubType == END_ENTIRE_DEVICE_PATH_SUBTYPE) {
             break;
         }
 
-        if (dp->Type != HARDWARE_DEVICE_PATH) {
-            continue;
+        uint16_t len = *(uint16_t *)dp->Length;
+
+        // Validate minimum device path node size before accessing type-specific data
+        if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
+            break;  // Malformed device path node
         }
 
-        if (dp->SubType == HW_VENDOR_DP) {
-            EFI_GUID *vendor_guid = (void *)dp + sizeof(EFI_DEVICE_PATH_PROTOCOL);
+        if (dp->Type == HARDWARE_DEVICE_PATH && dp->SubType == HW_VENDOR_DP) {
+            // Vendor device path must be large enough to contain a GUID
+            if (len >= sizeof(EFI_DEVICE_PATH_PROTOCOL) + sizeof(EFI_GUID)) {
+                EFI_GUID *vendor_guid = (void *)dp + sizeof(EFI_DEVICE_PATH_PROTOCOL);
 
-            for (size_t i = 0; i < SIZEOF_ARRAY(guids_to_skip); i++) {
-                if (memcmp(vendor_guid, &guids_to_skip[i], sizeof(EFI_GUID)) == 0) {
-                    return true;
+                for (size_t i = 0; i < SIZEOF_ARRAY(guids_to_skip); i++) {
+                    if (memcmp(vendor_guid, &guids_to_skip[i], sizeof(EFI_GUID)) == 0) {
+                        return true;
+                    }
                 }
             }
         }
+        dp = (void *)dp + len;
     }
 
     return false;
@@ -460,19 +491,23 @@ static bool is_efi_handle_hdd(EFI_HANDLE efi_handle) {
         return false;
     }
 
-    for (;; dp = (void *)dp + *(uint16_t *)dp->Length) {
+    for (;;) {
         if (dp->Type == END_DEVICE_PATH_TYPE && dp->SubType == END_ENTIRE_DEVICE_PATH_SUBTYPE) {
             break;
         }
 
-        if (dp->Type != MEDIA_DEVICE_PATH) {
-            continue;
+        if (dp->Type == MEDIA_DEVICE_PATH) {
+            switch (dp->SubType) {
+                case MEDIA_HARDDRIVE_DP:
+                    return true;
+            }
         }
 
-        switch (dp->SubType) {
-            case MEDIA_HARDDRIVE_DP:
-                return true;
+        uint16_t len = *(uint16_t *)dp->Length;
+        if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
+            break;  // Malformed device path node
         }
+        dp = (void *)dp + len;
     }
 
     return false;
