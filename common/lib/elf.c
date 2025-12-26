@@ -265,7 +265,9 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
 
     uint64_t symtab_offset = 0;
     uint64_t symtab_ent = 0;
+    uint64_t symtab_size = 0;  // Size of symbol table (if known)
     uint64_t strtab_offset = 0;
+    uint64_t strtab_size = 0;  // Size of string table (if known)
 
     uint64_t dt_pltrel = 0;
     uint64_t dt_pltrelsz = 0;
@@ -369,6 +371,8 @@ end_of_pt_segment:
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= symtab_offset && _phdr->p_vaddr + _phdr->p_filesz > symtab_offset) {
+                // Calculate size as remaining bytes in segment from symtab start
+                symtab_size = _phdr->p_filesz - (symtab_offset - _phdr->p_vaddr);
                 symtab_offset -= _phdr->p_vaddr;
                 symtab_offset += _phdr->p_offset;
                 break;
@@ -381,6 +385,8 @@ end_of_pt_segment:
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= strtab_offset && _phdr->p_vaddr + _phdr->p_filesz > strtab_offset) {
+                // Calculate size as remaining bytes in segment from strtab start
+                strtab_size = _phdr->p_filesz - (strtab_offset - _phdr->p_vaddr);
                 strtab_offset -= _phdr->p_vaddr;
                 strtab_offset += _phdr->p_offset;
                 break;
@@ -425,6 +431,9 @@ end_of_pt_segment:
     if (dt_pltrelsz != 0) {
         if (dt_pltrel != DT_RELA) {
             panic(true, "elf: dt_pltrel != DT_RELA");
+        }
+        if (rela_ent == 0) {
+            panic(true, "elf: dt_pltrelsz != 0 but rela_ent == 0");
         }
         relocs_i += dt_pltrelsz / rela_ent;
     }
@@ -527,11 +536,23 @@ end_of_pt_segment:
             case R_LARCH_JUMP_SLOT:
 #endif
             {
-                struct elf64_sym *s = (void *)elf + symtab_offset + symtab_ent * relocation->r_symbol;
+                if (symtab_offset == 0 || symtab_ent == 0) {
+                    panic(true, "elf: Relocation requires symbol table but none present");
+                }
+                // Validate symbol index is within bounds
+                uint64_t sym_offset = symtab_ent * (uint64_t)relocation->r_symbol;
+                if (symtab_size != 0 && sym_offset + sizeof(struct elf64_sym) > symtab_size) {
+                    panic(true, "elf: Symbol index %u out of bounds", relocation->r_symbol);
+                }
+                struct elf64_sym *s = (void *)elf + symtab_offset + sym_offset;
                 if (s->st_shndx == SHN_UNDEF) {
                     if ((s->st_info >> 4) == STB_WEAK) {
                         *ptr = 0;
                         break;
+                    }
+                    // Validate string table access
+                    if (strtab_size != 0 && s->st_name >= strtab_size) {
+                        panic(true, "elf: Symbol name offset out of bounds");
                     }
                     panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
                 }
@@ -552,11 +573,23 @@ end_of_pt_segment:
             case R_LARCH_64:
 #endif
             {
-                struct elf64_sym *s = (void *)elf + symtab_offset + symtab_ent * relocation->r_symbol;
+                if (symtab_offset == 0 || symtab_ent == 0) {
+                    panic(true, "elf: Relocation requires symbol table but none present");
+                }
+                // Validate symbol index is within bounds
+                uint64_t sym_offset = symtab_ent * (uint64_t)relocation->r_symbol;
+                if (symtab_size != 0 && sym_offset + sizeof(struct elf64_sym) > symtab_size) {
+                    panic(true, "elf: Symbol index %u out of bounds", relocation->r_symbol);
+                }
+                struct elf64_sym *s = (void *)elf + symtab_offset + sym_offset;
                 if (s->st_shndx == SHN_UNDEF) {
                     if ((s->st_info >> 4) == STB_WEAK) {
                         *ptr = 0;
                         break;
+                    }
+                    // Validate string table access
+                    if (strtab_size != 0 && s->st_name >= strtab_size) {
+                        panic(true, "elf: Symbol name offset out of bounds");
                     }
                     panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
                 }
@@ -746,6 +779,18 @@ bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t 
         panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
     }
 
+    // Validate program header count is reasonable (max 256 segments)
+    if (hdr->ph_num > 256) {
+        panic(true, "elf: Too many program headers (%u)", hdr->ph_num);
+    }
+
+    // Validate program header offset and size don't overflow
+    uint64_t phdr_table_end;
+    if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
+        __builtin_add_overflow(phdr_table_end, hdr->phoff, &phdr_table_end)) {
+        panic(true, "elf: Program header table size overflow");
+    }
+
     bool lower_to_higher = false;
 
     uint64_t min_vaddr = (uint64_t)-1;
@@ -862,6 +907,11 @@ again:
         // Sanity checks
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
+        }
+
+        // Validate p_offset + p_filesz doesn't overflow
+        if (phdr->p_offset > UINT64_MAX - phdr->p_filesz) {
+            panic(true, "elf: p_offset + p_filesz overflow");
         }
 
         uint64_t load_addr = *physical_base + (phdr->p_vaddr - *virtual_base);
