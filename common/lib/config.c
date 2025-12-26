@@ -152,10 +152,25 @@ struct smbios_struct_header {
     uint16_t handle;
 } __attribute__((packed));
 
-static size_t smbios_struct_size(struct smbios_struct_header *hdr) {
+static size_t smbios_struct_size(struct smbios_struct_header *hdr, size_t remaining) {
+    // Validate minimum structure header size
+    if (remaining < sizeof(struct smbios_struct_header)) {
+        return 0;
+    }
+    if (hdr->length < sizeof(struct smbios_struct_header)) {
+        return 0;  // Invalid structure
+    }
+    if (hdr->length > remaining) {
+        return 0;  // Structure header claims more than remaining
+    }
+
     const char *string_data = (void *)((uintptr_t)hdr + hdr->length);
+    size_t string_area_max = remaining - hdr->length;
     size_t i = 1;
-    for (; string_data[i - 1] != '\0' || string_data[i] != '\0'; i++);
+    for (; i < string_area_max && (string_data[i - 1] != '\0' || string_data[i] != '\0'); i++);
+    if (i >= string_area_max) {
+        return 0;  // Unterminated string area
+    }
     return hdr->length + i + 1;
 }
 
@@ -169,38 +184,56 @@ bool init_config_smbios(void) {
 
     struct smbios_struct_header *hdr = NULL;
     size_t struct_count = 0;
-    size_t struct_max_length = 0;
+    size_t table_length = 0;
 
     if (smbios_entry_64) {
         hdr = (void *)(uintptr_t) smbios_entry_64->table_address;
-        struct_max_length = smbios_entry_64->max_structure_size;
+        table_length = smbios_entry_64->max_structure_size;
     } else {
         hdr = (void *)(uintptr_t) smbios_entry_32->table_address;
         struct_count = smbios_entry_32->number_of_structures;
+        table_length = smbios_entry_32->table_length;
+    }
+
+    if (hdr == NULL || table_length == 0) {
+        return false;
     }
 
     size_t structure_bytes_processed = 0;
     for (size_t struct_num = 0; hdr && (!struct_count || struct_num < struct_count); struct_num++) {
+        size_t remaining = table_length - structure_bytes_processed;
+        if (remaining < sizeof(struct smbios_struct_header)) {
+            return false;
+        }
+
         if (hdr->type == 127)
             return false;
 
-        if (hdr->type == 11) {
+        size_t struct_size = smbios_struct_size(hdr, remaining);
+        if (struct_size == 0) {
+            return false;  // Invalid structure
+        }
+
+        if (hdr->type == 11 && hdr->length >= sizeof(struct smbios_struct_header)) {
             const char *string_data = (void *)((uintptr_t) hdr + hdr->length);
+            size_t string_area_size = struct_size - hdr->length;
 
             size_t prefix_len = sizeof("limine:config:") - 1;
-            if (!strncmp(string_data, "limine:config:", prefix_len)) {
-                size_t config_size = strlen(string_data) - prefix_len + 1;
+            if (string_area_size > prefix_len && !strncmp(string_data, "limine:config:", prefix_len)) {
+                size_t config_size = strnlen(string_data, string_area_size) - prefix_len + 1;
                 config_addr = ext_mem_alloc(config_size);
-                memcpy(config_addr, &string_data[prefix_len], config_size);
+                memcpy(config_addr, &string_data[prefix_len], config_size - 1);
+                config_addr[config_size - 1] = '\0';
                 return !init_config(config_size);
             }
         }
 
-        if (struct_max_length && structure_bytes_processed + smbios_struct_size(hdr) >= struct_max_length)
+        structure_bytes_processed += struct_size;
+        if (structure_bytes_processed >= table_length) {
             return false;
+        }
 
-        structure_bytes_processed += smbios_struct_size(hdr);
-        hdr = (void *)((uintptr_t) hdr + smbios_struct_size(hdr));
+        hdr = (void *)((uintptr_t) hdr + struct_size);
     }
 
     return false;
@@ -268,7 +301,12 @@ static struct menu_entry *create_menu_tree(struct menu_entry *parent,
             n++;
         }
 
-        strcpy(entry->name, n);
+        size_t n_len = strlen(n);
+        if (n_len >= sizeof(entry->name)) {
+            n_len = sizeof(entry->name) - 1;
+        }
+        memcpy(entry->name, n, n_len);
+        entry->name[n_len] = 0;
         entry->parent = parent;
 
         size_t entry_size;
@@ -394,6 +432,10 @@ skip_loop:
             i += i ? 3 : 2;
             size_t j;
             for (j = 0; config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
+                if (j >= sizeof(macro->name) - 1) {
+                    bad_config = true;
+                    panic(true, "config: Macro name too long (max %u)", sizeof(macro->name) - 1);
+                }
                 macro->name[j] = config_addr[i];
             }
 
@@ -405,6 +447,10 @@ skip_loop:
             macro->name[j] = 0;
 
             for (j = 0; config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
+                if (j >= sizeof(macro->value) - 1) {
+                    bad_config = true;
+                    panic(true, "config: Macro value too long (max %u)", sizeof(macro->value) - 1);
+                }
                 macro->value[j] = config_addr[i];
             }
             macro->value[j] = 0;
@@ -420,6 +466,11 @@ skip_loop:
 
     // Expand macros
     if (macros != NULL) {
+        // Check for overflow before multiplication
+        if (config_size > SIZE_MAX / 4) {
+            bad_config = true;
+            panic(true, "config: Config file too large for macro expansion");
+        }
         size_t new_config_size = config_size * 4;
         char *new_config = ext_mem_alloc(new_config_size);
 
@@ -517,10 +568,10 @@ overflow:
     size_t s;
     char *c = config_get_entry(&s, 0);
     if (c != NULL) {
-        while (*c != '/') {
+        while (*c != '/' && c > config_addr) {
             c--;
         }
-        if (c > config_addr) {
+        if (*c == '/' && c > config_addr) {
             c[-1] = 0;
         }
     }
