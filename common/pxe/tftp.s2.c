@@ -19,7 +19,10 @@ bool cached_dhcp_ack_valid = false;
 static uint32_t get_boot_server_info(void) {
     struct pxenv_get_cached_info cachedinfo = { 0 };
     cachedinfo.packet_type = PXENV_PACKET_TYPE_CACHED_REPLY;
-    pxe_call(PXENV_GET_CACHED_INFO, ((uint16_t)rm_seg(&cachedinfo)), (uint16_t)rm_off(&cachedinfo));
+    int ret = pxe_call(PXENV_GET_CACHED_INFO, ((uint16_t)rm_seg(&cachedinfo)), (uint16_t)rm_off(&cachedinfo));
+    if (ret || cachedinfo.buffer == 0) {
+        panic(false, "tftp: Failed to get DHCP cached info");
+    }
     struct bootph *ph = (struct bootph*)(void *) (((((uint32_t)cachedinfo.buffer) >> 16) << 4) + (((uint32_t)cachedinfo.buffer) & 0xFFFF));
     if (!cached_dhcp_ack_valid) {
         memcpy(cached_dhcp_packet, ph, DHCP_ACK_PACKET_LEN);
@@ -56,15 +59,31 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     }
 
     //TODO figure out a more proper way to do this.
+    if (undi_info.MaxTranUnit < 48) {
+        print("tftp: Invalid MTU (%u), too small for TFTP headers\n", undi_info.MaxTranUnit);
+        return NULL;
+    }
     uint16_t mtu = undi_info.MaxTranUnit - 48;
+
+    size_t name_len = strlen(name);
+    if (name_len >= 128) {
+        print("tftp: Filename too long (max 127 chars)\n");
+        return NULL;
+    }
 
     struct pxenv_get_file_size fsize = {
         .status = 0,
         .sip = server_ip,
     };
-    strcpy((char*)fsize.name, name);
+    memcpy(fsize.name, name, name_len + 1);
     ret = pxe_call(TFTP_GET_FILE_SIZE, ((uint16_t)rm_seg(&fsize)), (uint16_t)rm_off(&fsize));
     if (ret) {
+        return NULL;
+    }
+
+    // Validate file size from TFTP server (max 1GB)
+    if (fsize.file_size == 0 || fsize.file_size > (1024 * 1024 * 1024)) {
+        print("tftp: Invalid file size from server: %u\n", fsize.file_size);
         return NULL;
     }
 
@@ -77,7 +96,6 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     handle->pxe_ip = server_ip;
     handle->pxe_port = server_port;
 
-    size_t name_len = strlen(name);
     handle->path = ext_mem_alloc(1 + name_len + 1);
     handle->path[0] = '/';
     memcpy(&handle->path[1], name, name_len);
@@ -89,18 +107,20 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
         .port = (server_port) << 8,
         .packet_size = mtu
     };
-    strcpy((char*)open.name, name);
+    memcpy(open.name, name, name_len + 1);
 
     ret = pxe_call(TFTP_OPEN, ((uint16_t)rm_seg(&open)), (uint16_t)rm_off(&open));
     if (ret) {
         print("tftp: Failed to open file %x or bad packet size", open.status);
+        pmm_free(handle->path, handle->path_len);
         pmm_free(handle, sizeof(struct file_handle));
         return NULL;
     }
 
-    mtu = open.packet_size;
+    uint16_t alloc_mtu = mtu;  // Save original MTU for allocation/free
+    uint8_t *buf = conv_mem_alloc(alloc_mtu);
 
-    uint8_t *buf = conv_mem_alloc(mtu);
+    mtu = open.packet_size;
     handle->fd = ext_mem_alloc(handle->size);
 
     size_t progress = 0;
@@ -115,6 +135,16 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
         ret = pxe_call(TFTP_READ, ((uint16_t)rm_seg(&read)), (uint16_t)rm_off(&read));
         if (ret) {
             panic(false, "tftp: Read failure");
+        }
+
+        // Validate read size doesn't overflow the buffer
+        if (read.bsize > mtu || progress + read.bsize > handle->size) {
+            panic(false, "tftp: Server sent more data than expected");
+        }
+
+        // Prevent infinite loop from zero-byte reads
+        if (read.bsize == 0 && progress < handle->size) {
+            panic(false, "tftp: Server returned zero bytes before transfer complete");
         }
 
         memcpy(handle->fd + progress, buf, read.bsize);
@@ -133,7 +163,7 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
         panic(false, "tftp: Close failure");
     }
 
-    pmm_free(buf, mtu);
+    pmm_free(buf, alloc_mtu);
 
     return handle;
 }
@@ -163,7 +193,7 @@ static EFI_IP_ADDRESS *parse_ip_addr(struct volume *part, const char *server_add
 }
 
 struct file_handle *tftp_open(struct volume *part, const char *server_addr, const char *name) {
-    if (!part->pxe_base_code) {
+    if (part == NULL || !part->pxe_base_code) {
         return NULL;
     }
 
@@ -185,6 +215,12 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
             false);
 
     if (status) {
+        return NULL;
+    }
+
+    // Validate file size from TFTP server (max 1GB)
+    if (file_size == 0 || file_size > (1024 * 1024 * 1024)) {
+        print("tftp: Invalid file size from server: %llu\n", (unsigned long long)file_size);
         return NULL;
     }
 
@@ -219,6 +255,9 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
             false);
 
     if (status) {
+        pmm_free(handle->fd, handle->size);
+        pmm_free(handle->path, handle->path_len);
+        pmm_free(handle, sizeof(struct file_handle));
         return NULL;
     }
 
