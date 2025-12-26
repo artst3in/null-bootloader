@@ -106,7 +106,11 @@ static void iso9660_find_PVD(struct iso9660_primary_volume *desc, struct volume 
     uint32_t max_lba = ISO9660_FIRST_VOLUME_DESCRIPTOR + ISO9660_MAX_VOLUME_DESCRIPTORS;
 
     while (lba < max_lba) {
-        volume_read(vol, desc, lba * ISO9660_SECTOR_SIZE, sizeof(struct iso9660_primary_volume));
+        uint64_t offset;
+        if (__builtin_mul_overflow((uint64_t)lba, (uint64_t)ISO9660_SECTOR_SIZE, &offset)) {
+            panic(false, "ISO9660: volume descriptor offset overflow");
+        }
+        volume_read(vol, desc, offset, sizeof(struct iso9660_primary_volume));
 
         switch (desc->volume_descriptor.type) {
         case ISO9660_VDT_PRIMARY:
@@ -136,7 +140,10 @@ static void iso9660_cache_root(struct volume *vol,
     }
 
     *root = ext_mem_alloc(*root_size);
-    uint64_t offset = (uint64_t)pv.root.extent.little * ISO9660_SECTOR_SIZE;
+    uint64_t offset;
+    if (__builtin_mul_overflow((uint64_t)pv.root.extent.little, (uint64_t)ISO9660_SECTOR_SIZE, &offset)) {
+        panic(false, "ISO9660: root extent offset overflow");
+    }
     volume_read(vol, *root, offset, *root_size);
 }
 
@@ -380,7 +387,12 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
 
         first = false;
 
-        uint64_t dir_offset = (uint64_t)next_sector * ISO9660_SECTOR_SIZE;
+        uint64_t dir_offset;
+        if (__builtin_mul_overflow((uint64_t)next_sector, (uint64_t)ISO9660_SECTOR_SIZE, &dir_offset)) {
+            pmm_free(current, current_size);
+            pmm_free(ret, sizeof(struct iso9660_file_handle));
+            return NULL;
+        }
         volume_read(vol, current, dir_offset, current_size);
     }
 
@@ -408,7 +420,14 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
 
 static void iso9660_read(struct file_handle *file, void *buf, uint64_t loc, uint64_t count) {
     struct iso9660_file_handle *f = file->fd;
-    uint64_t offset = (uint64_t)f->LBA * ISO9660_SECTOR_SIZE + loc;
+    uint64_t base_offset;
+    if (__builtin_mul_overflow((uint64_t)f->LBA, (uint64_t)ISO9660_SECTOR_SIZE, &base_offset)) {
+        panic(false, "iso9660: offset calculation overflow");
+    }
+    uint64_t offset;
+    if (__builtin_add_overflow(base_offset, loc, &offset)) {
+        panic(false, "iso9660: offset calculation overflow");
+    }
     volume_read(f->context->vol, buf, offset, count);
 }
 
