@@ -130,11 +130,18 @@ int inet_pton(const char *src, void *dst) {
         if (current == newcur)
             return -1;
         current = newcur;
-        if (*current == 0 && i < 3)
-            return -1;
+        if (i < 3) {
+            // Expect '.' delimiter between octets
+            if (*current != '.')
+                return -1;
+            current++;
+        } else {
+            // After last octet, string must end
+            if (*current != 0)
+                return -1;
+        }
         if (value > 255)
             return -1;
-        current++;
         array[i] = value;
     }
     memcpy(dst, array, 4);

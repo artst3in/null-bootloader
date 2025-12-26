@@ -97,21 +97,25 @@ void *memchr(const void *ptr, int ch, size_t n) {
 }
 
 char *strchr(const char *str, int ch) {
-    for (size_t i = 0; str[i]; i++) {
-        if (str[i] == ch) {
+    for (size_t i = 0; ; i++) {
+        if (str[i] == (char)ch) {
             return (char *)str + i;
         }
+        if (str[i] == '\0') {
+            return NULL;
+        }
     }
-
-    return NULL;
 }
 
 char *strrchr(const char *str, int ch) {
     char *p = NULL;
 
-    for (size_t i = 0; str[i]; i++) {
-        if (str[i] == ch) {
+    for (size_t i = 0; ; i++) {
+        if (str[i] == (char)ch) {
             p = (char *)str + i;
+        }
+        if (str[i] == '\0') {
+            break;
         }
     }
 
