@@ -118,6 +118,9 @@ size_t get_trailing_zeros(uint64_t val) {
 uint32_t oct2bin(uint8_t *str, uint32_t max) {
     uint32_t value = 0;
     while (max-- > 0) {
+        if (*str < '0' || *str > '7') {
+            break;  // Invalid octal character
+        }
         value <<= 3;
         value += *str++ - '0';
     }
@@ -134,6 +137,8 @@ uint32_t hex2bin(uint8_t *str, uint32_t size) {
             value += (uint32_t)((*str) - 'A' + 10);
         else if (*str >= 'a' && *str <= 'f')
             value += (uint32_t)((*str) - 'a' + 10);
+        else
+            break;  // Invalid hex character
         str++;
     }
     return value;
