@@ -218,8 +218,18 @@ void *acpi_get_table(const char *signature, int index) {
     else
         rsdt = (struct rsdt *)(uintptr_t)rsdp->rsdt_addr;
 
-    size_t entry_count =
-        (rsdt->header.length - sizeof(struct sdt)) / (use_xsdt ? 8 : 4);
+    if (rsdt == NULL) {
+        return NULL;
+    }
+
+    // Validate RSDT/XSDT header length
+    if (rsdt->header.length < sizeof(struct sdt)) {
+        printv("acpi: Invalid %s header length\n", use_xsdt ? "XSDT" : "RSDT");
+        return NULL;
+    }
+
+    size_t entry_size = use_xsdt ? 8 : 4;
+    size_t entry_count = (rsdt->header.length - sizeof(struct sdt)) / entry_size;
 
     for (size_t i = 0; i < entry_count; i++) {
         struct sdt *ptr;
@@ -277,6 +287,9 @@ void acpi_map_tables(void) {
     }
 
     struct rsdt *xsdt = (void *)(uintptr_t)rsdp->xsdt_addr;
+    if (xsdt->header.length < sizeof(struct sdt)) {
+        goto no_xsdt;
+    }
     size_t xsdt_entry_count = (xsdt->header.length - sizeof(struct sdt)) / 8;
 
     map_single_table((uintptr_t)xsdt, (uint32_t)-1);
@@ -293,6 +306,9 @@ no_xsdt:;
     }
 
     struct rsdt *rsdt = (void *)(uintptr_t)rsdp->rsdt_addr;
+    if (rsdt->header.length < sizeof(struct sdt)) {
+        goto no_rsdt;
+    }
     size_t rsdt_entry_count = (rsdt->header.length - sizeof(struct sdt)) / 4;
 
     map_single_table((uintptr_t)rsdt, (uint32_t)-1);
