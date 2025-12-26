@@ -1,3 +1,18 @@
+2025-12-26  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.5.1 ***
+
+    Noteworthy changes compared to the previous release, 10.5.0:
+
+    Bug fixes:
+        - Many bug fixes throughout the codebase, mainly tackling hardening
+          (especially of filesystem drivers). Most issues were caught with
+          static analysis.
+        - Fixage of some memory leaks.
+        - Fixage of major issue that could have caused UEFI PXE to not work.
+        - Multiboot1: fix issue that would cause the information buffer to be
+          underallocated.
+
 2025-12-11  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.5.0 ***
