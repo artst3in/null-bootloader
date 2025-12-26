@@ -74,6 +74,11 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
         panic(false, "Attempted volume_read() on pxe");
     }
 
+    uint64_t part_size = volume->sect_count * volume->sector_size;
+    if (loc >= part_size || count > part_size - loc) {
+        return false;
+    }
+
     uint64_t block_size = volume->fastest_xfer_size * volume->sector_size;
 
     uint64_t progress = 0;
