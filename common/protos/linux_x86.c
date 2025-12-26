@@ -597,6 +597,9 @@ no_fb:;
         if (mmap[i].type >= 0x1000) {
             continue;
         }
+        if (j >= E820_MAX_ENTRIES_ZEROPAGE) {
+            panic(false, "linux: Too many E820 memory map entries");
+        }
         e820_table[j].addr = mmap[i].base;
         e820_table[j].size = mmap[i].length;
         e820_table[j].type = mmap[i].type;
