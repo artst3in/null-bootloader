@@ -503,7 +503,12 @@ tab_part:
         case GETCHAR_F10:
             memcpy(saved_orig_entry, buffer, buffer_len);
             saved_orig_entry[buffer_len] = 0;
-            strcpy(saved_title, title);
+            size_t title_len = strlen(title);
+            if (title_len >= sizeof(saved_title)) {
+                title_len = sizeof(saved_title) - 1;
+            }
+            memcpy(saved_title, title, title_len);
+            saved_title[title_len] = 0;
             editor_no_term_reset ? editor_no_term_reset = false : reset_term();
             booting_from_editor = true;
             return buffer;
