@@ -135,6 +135,10 @@ static bool set_vbe_mode(uint16_t mode) {
     return true;
 }
 
+// Maximum number of video modes to enumerate to prevent infinite loops
+// from corrupted VBE mode lists without a proper 0xffff terminator
+#define VBE_MAX_MODES 512
+
 struct fb_info *vbe_get_mode_list(size_t *count) {
     struct vbe_info_struct vbe_info;
     if (!get_vbe_info(&vbe_info)) {
@@ -145,7 +149,7 @@ struct fb_info *vbe_get_mode_list(size_t *count) {
                                                    vbe_info.vid_modes_off);
 
     size_t modes_count = 0;
-    for (size_t i = 0; vid_modes[i] != 0xffff; i++) {
+    for (size_t i = 0; i < VBE_MAX_MODES && vid_modes[i] != 0xffff; i++) {
         struct vbe_mode_info_struct vbe_mode_info;
         if (!get_vbe_mode_info(&vbe_mode_info, vid_modes[i])) {
             continue;
@@ -163,7 +167,7 @@ struct fb_info *vbe_get_mode_list(size_t *count) {
 
     struct fb_info *ret = ext_mem_alloc(modes_count * sizeof(struct fb_info));
 
-    for (size_t i = 0, j = 0; vid_modes[i] != 0xffff; i++) {
+    for (size_t i = 0, j = 0; i < VBE_MAX_MODES && vid_modes[i] != 0xffff; i++) {
         struct vbe_mode_info_struct vbe_mode_info;
         if (!get_vbe_mode_info(&vbe_mode_info, vid_modes[i])) {
             continue;
@@ -247,7 +251,9 @@ bool init_vbe(struct fb_info *ret,
                 edid_width  += ((int)edid_info->det_timing_desc1[4] & 0xf0) << 4;
             int edid_height  = (int)edid_info->det_timing_desc1[5];
                 edid_height += ((int)edid_info->det_timing_desc1[7] & 0xf0) << 4;
-            if (edid_width && edid_height) {
+            // Sanity check EDID values
+            if (edid_width > 0 && edid_width <= 16384 &&
+                edid_height > 0 && edid_height <= 16384) {
                 target_width  = edid_width;
                 target_height = edid_height;
                 target_bpp    = 32;
@@ -263,7 +269,7 @@ bool init_vbe(struct fb_info *ret,
     }
 
 retry:
-    for (size_t i = 0; vid_modes[i] != 0xffff; i++) {
+    for (size_t i = 0; i < VBE_MAX_MODES && vid_modes[i] != 0xffff; i++) {
         struct vbe_mode_info_struct vbe_mode_info;
         if (!get_vbe_mode_info(&vbe_mode_info, vid_modes[i])) {
             continue;
