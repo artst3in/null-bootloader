@@ -1155,18 +1155,29 @@ FEAT_START
             module_path = (char *)get_phys_addr(internal_module->path);
             module_cmdline = (char *)get_phys_addr(internal_module->string);
 
-            char *module_path_abs = ext_mem_alloc(1024);
-            char *module_path_abs_p = module_path_abs;
             if (internal_module->flags & LIMINE_INTERNAL_MODULE_COMPRESSED) {
                 panic(true, "limine: Compressed internal modules no longer supported");
             }
-            strcpy(module_path_abs_p, k_resource);
-            module_path_abs_p += strlen(k_resource);
-            strcpy(module_path_abs_p, "(");
-            module_path_abs_p += 1;
-            strcpy(module_path_abs_p, k_root);
-            module_path_abs_p += strlen(k_root);
-            strcpy(module_path_abs_p, "):");
+
+            // Validate path length to prevent buffer overflow
+            size_t k_resource_len = strlen(k_resource);
+            size_t k_root_len = strlen(k_root);
+            size_t module_path_len = strlen(module_path);
+            size_t k_path_len = strlen(k_path);
+            // Format: k_resource + "(" + k_root + "):" + k_path + "/" + module_path + null
+            size_t total_len = k_resource_len + 1 + k_root_len + 2 + k_path_len + 1 + module_path_len + 1;
+            if (total_len > 1024) {
+                panic(true, "limine: Internal module path too long");
+            }
+
+            char *module_path_abs = ext_mem_alloc(1024);
+            char *module_path_abs_p = module_path_abs;
+            memcpy(module_path_abs_p, k_resource, k_resource_len);
+            module_path_abs_p += k_resource_len;
+            *module_path_abs_p++ = '(';
+            memcpy(module_path_abs_p, k_root, k_root_len);
+            module_path_abs_p += k_root_len;
+            memcpy(module_path_abs_p, "):", 2);
             module_path_abs_p += 2;
             get_absolute_path(module_path_abs_p, module_path, k_path);
 
