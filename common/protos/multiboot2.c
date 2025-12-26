@@ -250,17 +250,30 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                 panic(true, "multiboot2: Illegal load address");
             }
 
-            load_src = header_offset - (addresstag->header_addr - addresstag->load_addr);
+            size_t addr_diff = addresstag->header_addr - addresstag->load_addr;
+            if (addr_diff > header_offset) {
+                panic(true, "multiboot2: Address tag offset underflow");
+            }
+            load_src = header_offset - addr_diff;
             load_addr = addresstag->load_addr;
         } else {
+            if (header_offset > addresstag->header_addr) {
+                panic(true, "multiboot2: Header offset exceeds header address");
+            }
             load_src = 0;
             load_addr = addresstag->header_addr - header_offset;
         }
 
         size_t load_size;
         if (addresstag->load_end_addr != 0) {
+            if (addresstag->load_end_addr < load_addr) {
+                panic(true, "multiboot2: Load end address less than load address");
+            }
             load_size = addresstag->load_end_addr - load_addr;
         } else {
+            if (load_src > kernel_file_size) {
+                panic(true, "multiboot2: Load source exceeds kernel file size");
+            }
             load_size = kernel_file_size - load_src;
         }
 
