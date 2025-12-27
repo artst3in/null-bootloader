@@ -39,10 +39,10 @@ static bool cache_block(struct volume *volume, uint64_t block) {
     if (__builtin_mul_overflow(block, volume->fastest_xfer_size, &block_offset)) {
         return false;
     }
-    if (first_sect > UINT64_MAX - block_offset) {
+    uint64_t read_sector;
+    if (__builtin_add_overflow(first_sect, block_offset, &read_sector)) {
         return false;
     }
-    uint64_t read_sector = first_sect + block_offset;
 
     for (;;) {
         int ret = disk_read_sectors(volume, volume->cache,
@@ -225,10 +225,9 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
     }
     // Use actual entry size from header for offset calculation
     uint64_t partition_offset = (uint64_t)partition * entry_size;
-    if (entry_offset > UINT64_MAX - partition_offset) {
+    if (__builtin_add_overflow(entry_offset, partition_offset, &entry_offset)) {
         return INVALID_TABLE;  // Addition overflow would occur
     }
-    entry_offset += partition_offset;
 
     struct gpt_entry entry = {0};
     volume_read(volume, &entry, entry_offset, sizeof(entry));
@@ -417,7 +416,8 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
     if (__builtin_add_overflow(first_sect_64, (uint64_t)entry.first_sect, &first_sect_64)) {
         return NO_PARTITION;  // Addition overflow
     }
-    if (first_sect_64 > UINT64_MAX - entry.sect_count) {
+    uint64_t partition_end;
+    if (__builtin_add_overflow(first_sect_64, (uint64_t)entry.sect_count, &partition_end)) {
         return NO_PARTITION;  // Partition would overflow
     }
 

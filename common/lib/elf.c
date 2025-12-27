@@ -910,7 +910,8 @@ again:
         }
 
         // Validate p_offset + p_filesz doesn't overflow
-        if (phdr->p_offset > UINT64_MAX - phdr->p_filesz) {
+        uint64_t offset_end;
+        if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)) {
             panic(true, "elf: p_offset + p_filesz overflow");
         }
 

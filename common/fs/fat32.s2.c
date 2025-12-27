@@ -654,10 +654,10 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
 
         for (unsigned int i = 0; i < SIZEOF_ARRAY(current_part) - 1; i++) {
             // Check for overflow before computing path index
-            if (current_index > UINT_MAX - i) {
+            unsigned int path_idx;
+            if (__builtin_add_overflow(i, current_index, &path_idx)) {
                 return NULL;  // Path index would overflow
             }
-            unsigned int path_idx = i + current_index;
 
             if (path[path_idx] == 0) {
                 memcpy(current_part, path + current_index, i);
@@ -671,10 +671,11 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
                 memcpy(current_part, path + current_index, i);
                 current_part[i] = 0;
                 // Check for overflow before updating current_index
-                if (current_index > UINT_MAX - i - 1) {
+                unsigned int new_index;
+                if (__builtin_add_overflow(current_index, i + 1, &new_index)) {
                     return NULL;  // current_index would overflow
                 }
-                current_index += i + 1;
+                current_index = new_index;
                 expect_directory = true;
                 found_terminator = true;
                 break;
