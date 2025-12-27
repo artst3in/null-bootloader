@@ -763,8 +763,8 @@ no_load_font:;
             fb->framebuffer_height = tmp;
         }
 
-        terms[terms_i] = flanterm_fb_init(ext_mem_alloc,
-                            pmm_free,
+        terms[terms_i] = flanterm_fb_init(ext_mem_alloc_size_t,
+                            pmm_free_size_t,
                             (void *)(uintptr_t)fb->framebuffer_addr,
                             fb->framebuffer_width, fb->framebuffer_height, fb->framebuffer_pitch,
                             fb->red_mask_size, fb->red_mask_shift,

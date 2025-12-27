@@ -355,7 +355,7 @@ void vga_textmode_init(bool managed) {
     term->full_refresh(term);
 
     if (!managed) {
-        term->deinit(term, pmm_free);
+        term->deinit(term, pmm_free_size_t);
         pmm_free(terms, sizeof(void *));
         terms_i = 0;
         terms = NULL;

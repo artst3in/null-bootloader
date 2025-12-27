@@ -19,7 +19,7 @@ extern symbol bss_end;
 
 bool allocations_disallowed = true;
 
-void *conv_mem_alloc(size_t count) {
+void *conv_mem_alloc(uint64_t count) {
     static uint64_t base = 4096;
 
     if (allocations_disallowed)
@@ -564,14 +564,18 @@ struct memmap_entry *get_raw_memmap(size_t *entry_count) {
 }
 #endif
 
-void pmm_free(void *ptr, size_t count) {
+void pmm_free_size_t(void *ptr, size_t length) {
+    pmm_free(ptr, length);
+}
+
+void pmm_free(void *ptr, uint64_t count) {
     count = ALIGN_UP(count, 4096);
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
     memmap_alloc_range((uintptr_t)ptr, count, MEMMAP_USABLE, 0, false, false, true);
 }
 
-void *pmm_realloc(void *old_ptr, size_t old_size, size_t new_size) {
+void *pmm_realloc(void *old_ptr, uint64_t old_size, uint64_t new_size) {
     if (new_size == 0) {
         if (old_ptr != NULL) {
             pmm_free(old_ptr, old_size);
@@ -591,20 +595,24 @@ void *pmm_realloc(void *old_ptr, size_t old_size, size_t new_size) {
     return new_ptr;
 }
 
-void *ext_mem_alloc(size_t count) {
+void *ext_mem_alloc_size_t(size_t count) {
+    return ext_mem_alloc(count);
+}
+
+void *ext_mem_alloc(uint64_t count) {
     return ext_mem_alloc_type(count, MEMMAP_BOOTLOADER_RECLAIMABLE);
 }
 
-void *ext_mem_alloc_type(size_t count, uint32_t type) {
+void *ext_mem_alloc_type(uint64_t count, uint32_t type) {
     return ext_mem_alloc_type_aligned(count, type, 4096);
 }
 
-void *ext_mem_alloc_type_aligned(size_t count, uint32_t type, size_t alignment) {
+void *ext_mem_alloc_type_aligned(uint64_t count, uint32_t type, size_t alignment) {
     return ext_mem_alloc_type_aligned_mode(count, type, alignment, false);
 }
 
 // Allocate memory top down.
-void *ext_mem_alloc_type_aligned_mode(size_t count, uint32_t type, size_t alignment, bool allow_high_allocs) {
+void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alignment, bool allow_high_allocs) {
 #if !defined (__x86_64__) && !defined (__i386__)
     (void)allow_high_allocs;
 #endif

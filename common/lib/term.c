@@ -22,7 +22,7 @@ void term_notready(void) {
     for (size_t i = 0; i < terms_i; i++) {
         struct flanterm_context *term = terms[i];
 
-        term->deinit(term, pmm_free);
+        term->deinit(term, pmm_free_size_t);
     }
 
     pmm_free(terms, terms_i * sizeof(void *));

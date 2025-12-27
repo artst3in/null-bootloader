@@ -55,15 +55,17 @@ bool memmap_alloc_range_in(struct memmap_entry *m, size_t *_count,
 bool memmap_alloc_range(uint64_t base, uint64_t length, uint32_t type, uint32_t overlay_type, bool panic, bool simulation, bool new_entry);
 void pmm_randomise_memory(void);
 
-void *ext_mem_alloc(size_t count);
-void *ext_mem_alloc_type(size_t count, uint32_t type);
-void *ext_mem_alloc_type_aligned(size_t count, uint32_t type, size_t alignment);
-void *ext_mem_alloc_type_aligned_mode(size_t count, uint32_t type, size_t alignment, bool allow_high_allocs);
+void *ext_mem_alloc_size_t(size_t count);
+void *ext_mem_alloc(uint64_t count);
+void *ext_mem_alloc_type(uint64_t count, uint32_t type);
+void *ext_mem_alloc_type_aligned(uint64_t count, uint32_t type, size_t alignment);
+void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alignment, bool allow_high_allocs);
 
-void *conv_mem_alloc(size_t count);
+void *conv_mem_alloc(uint64_t count);
 
-void pmm_free(void *ptr, size_t length);
-void *pmm_realloc(void *old_ptr, size_t old_size, size_t new_size);
+void pmm_free_size_t(void *ptr, size_t length);
+void pmm_free(void *ptr, uint64_t length);
+void *pmm_realloc(void *old_ptr, uint64_t old_size, uint64_t new_size);
 
 #if defined (UEFI)
 void pmm_release_uefi_mem(void);
