@@ -13,11 +13,19 @@ struct iso9660_context {
     uint32_t root_size;
 };
 
-struct iso9660_file_handle {
-    struct iso9660_context *context;
+struct iso9660_extent {
     uint32_t LBA;
     uint32_t size;
 };
+
+struct iso9660_file_handle {
+    struct iso9660_context *context;
+    uint64_t total_size;
+    uint32_t extent_count;
+    struct iso9660_extent *extents;
+};
+
+#define ISO9660_FLAG_MULTI_EXTENT 0x80
 
 #define ISO9660_FIRST_VOLUME_DESCRIPTOR 0x10
 #define ISO9660_VOLUME_DESCRIPTOR_SIZE ISO9660_SECTOR_SIZE
@@ -246,6 +254,46 @@ use_iso_name:
     return false;
 }
 
+// Advance to the next directory entry in the buffer
+// Returns NULL if no more entries or invalid entry
+static struct iso9660_directory_entry *iso9660_next_entry(void *current, void *buffer_end) {
+    struct iso9660_directory_entry *entry = current;
+
+    if (entry->length == 0) {
+        // Skip to next sector boundary
+        uintptr_t current_addr = (uintptr_t)current;
+        uintptr_t next_sector = ALIGN_UP(current_addr + 1, ISO9660_SECTOR_SIZE);
+        if (next_sector >= (uintptr_t)buffer_end)
+            return NULL;
+        entry = (struct iso9660_directory_entry *)next_sector;
+        if (entry->length == 0)
+            return NULL;
+        return entry;
+    }
+
+    void *next = (uint8_t *)current + entry->length;
+    if (next >= buffer_end)
+        return NULL;
+
+    entry = next;
+
+    // Handle zero-length entries (padding at sector boundaries)
+    if (entry->length == 0) {
+        uintptr_t next_sector = ALIGN_UP((uintptr_t)next + 1, ISO9660_SECTOR_SIZE);
+        if (next_sector >= (uintptr_t)buffer_end)
+            return NULL;
+        entry = (struct iso9660_directory_entry *)next_sector;
+        if (entry->length == 0)
+            return NULL;
+    }
+
+    // Validate minimum entry size
+    if (entry->length < sizeof(struct iso9660_directory_entry))
+        return NULL;
+
+    return entry;
+}
+
 static struct iso9660_directory_entry *iso9660_find(void *buffer, uint32_t size, const char *filename) {
     while (size) {
         struct iso9660_directory_entry *entry = buffer;
@@ -367,8 +415,45 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
         next_sector = entry->extent.little;
         next_size = entry->extent_size.little;
 
-        if (*path == '\0')
-            break;    // Found :)
+        if (*path == '\0') {
+            // Found the file - collect all extents for multi-extent files
+            void *buffer_end = (uint8_t *)current + current_size;
+
+            // First pass: count extents and calculate total size
+            uint32_t extent_count = 1;
+            uint64_t total_size = entry->extent_size.little;
+            struct iso9660_directory_entry *e = entry;
+
+            while (e->flags & ISO9660_FLAG_MULTI_EXTENT) {
+                e = iso9660_next_entry(e, buffer_end);
+                if (e == NULL)
+                    break;
+                extent_count++;
+                total_size += e->extent_size.little;
+            }
+
+            // Allocate extent array
+            ret->extents = ext_mem_alloc(extent_count * sizeof(struct iso9660_extent));
+            ret->extent_count = extent_count;
+            ret->total_size = total_size;
+
+            // Second pass: populate extent array
+            e = entry;
+            for (uint32_t i = 0; i < extent_count; i++) {
+                ret->extents[i].LBA = e->extent.little;
+                ret->extents[i].size = e->extent_size.little;
+                if (i + 1 < extent_count) {
+                    e = iso9660_next_entry(e, buffer_end);
+                }
+            }
+
+            // Free the directory buffer if we allocated one
+            if (!first) {
+                pmm_free(current, current_size);
+            }
+
+            goto setup_handle;
+        }
 
         path++;  // Skip the '/' separator
 
@@ -401,15 +486,20 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
         pmm_free(current, current_size);
     }
 
-    ret->LBA = next_sector;
-    ret->size = next_size;
+    // Fallback path (trailing slash case) - create single extent
+    ret->extents = ext_mem_alloc(sizeof(struct iso9660_extent));
+    ret->extent_count = 1;
+    ret->total_size = next_size;
+    ret->extents[0].LBA = next_sector;
+    ret->extents[0].size = next_size;
 
+setup_handle:;
     struct file_handle *handle = ext_mem_alloc(sizeof(struct file_handle));
 
     handle->fd = ret;
     handle->read = (void *)iso9660_read;
     handle->close = (void *)iso9660_close;
-    handle->size = ret->size;
+    handle->size = ret->total_size;
     handle->vol = vol;
 #if defined (UEFI)
     handle->efi_part_handle = vol->efi_part_handle;
@@ -420,17 +510,41 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
 
 static void iso9660_read(struct file_handle *file, void *buf, uint64_t loc, uint64_t count) {
     struct iso9660_file_handle *f = file->fd;
-    uint64_t base_offset;
-    if (__builtin_mul_overflow((uint64_t)f->LBA, (uint64_t)ISO9660_SECTOR_SIZE, &base_offset)) {
-        panic(false, "iso9660: offset calculation overflow");
+
+    // Find which extent 'loc' falls into and read across extents as needed
+    uint64_t extent_start = 0;
+    for (uint32_t i = 0; i < f->extent_count && count > 0; i++) {
+        uint64_t extent_size = f->extents[i].size;
+        uint64_t extent_end = extent_start + extent_size;
+
+        if (loc < extent_end) {
+            // Read starts (or continues) in this extent
+            uint64_t offset_in_extent = (loc > extent_start) ? (loc - extent_start) : 0;
+            uint64_t bytes_available = extent_size - offset_in_extent;
+            uint64_t to_read = (count < bytes_available) ? count : bytes_available;
+
+            uint64_t base_offset;
+            if (__builtin_mul_overflow((uint64_t)f->extents[i].LBA, (uint64_t)ISO9660_SECTOR_SIZE, &base_offset)) {
+                panic(false, "iso9660: offset calculation overflow");
+            }
+            uint64_t disk_offset;
+            if (__builtin_add_overflow(base_offset, offset_in_extent, &disk_offset)) {
+                panic(false, "iso9660: offset calculation overflow");
+            }
+
+            volume_read(f->context->vol, buf, disk_offset, to_read);
+
+            buf = (uint8_t *)buf + to_read;
+            loc += to_read;
+            count -= to_read;
+        }
+
+        extent_start = extent_end;
     }
-    uint64_t offset;
-    if (__builtin_add_overflow(base_offset, loc, &offset)) {
-        panic(false, "iso9660: offset calculation overflow");
-    }
-    volume_read(f->context->vol, buf, offset, count);
 }
 
 static void iso9660_close(struct file_handle *file) {
-    pmm_free(file->fd, sizeof(struct iso9660_file_handle));
+    struct iso9660_file_handle *f = file->fd;
+    pmm_free(f->extents, f->extent_count * sizeof(struct iso9660_extent));
+    pmm_free(f, sizeof(struct iso9660_file_handle));
 }
