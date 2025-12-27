@@ -283,7 +283,7 @@ void term_fallback(void) {
             goto fail;
         }
 
-        terms[0] = flanterm_fb_init(ext_mem_alloc, pmm_free,
+        terms[0] = flanterm_fb_init(ext_mem_alloc_size_t, pmm_free_size_t,
             (void *)(uintptr_t)fb_fbs[0].framebuffer_addr, fb_fbs[0].framebuffer_width,
             fb_fbs[0].framebuffer_height, fb_fbs[0].framebuffer_pitch,
             fb_fbs[0].red_mask_size, fb_fbs[0].red_mask_shift,
