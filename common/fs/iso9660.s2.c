@@ -30,6 +30,7 @@ struct iso9660_file_handle {
 #define ISO9660_FIRST_VOLUME_DESCRIPTOR 0x10
 #define ISO9660_VOLUME_DESCRIPTOR_SIZE ISO9660_SECTOR_SIZE
 #define ROCK_RIDGE_MAX_FILENAME 255
+#define ISO9660_MAX_EXTENT_COUNT 65536
 
 // --- Both endian structures ---
 struct BE16_t { uint16_t little, big; } __attribute__((packed));
@@ -425,11 +426,17 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
             struct iso9660_directory_entry *e = entry;
 
             while (e->flags & ISO9660_FLAG_MULTI_EXTENT) {
-                e = iso9660_next_entry(e, buffer_end);
-                if (e == NULL)
+                struct iso9660_directory_entry *next = iso9660_next_entry(e, buffer_end);
+                if (next == NULL)
                     break;
+                e = next;
                 extent_count++;
                 total_size += e->extent_size.little;
+
+                // Sanity check to prevent runaway on corrupted directories
+                if (extent_count >= ISO9660_MAX_EXTENT_COUNT) {
+                    break;
+                }
             }
 
             // Allocate extent array
@@ -443,7 +450,10 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
                 ret->extents[i].LBA = e->extent.little;
                 ret->extents[i].size = e->extent_size.little;
                 if (i + 1 < extent_count) {
-                    e = iso9660_next_entry(e, buffer_end);
+                    struct iso9660_directory_entry *next = iso9660_next_entry(e, buffer_end);
+                    if (next == NULL)
+                        break;
+                    e = next;
                 }
             }
 
