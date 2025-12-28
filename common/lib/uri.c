@@ -14,10 +14,17 @@
 #include <crypt/blake2b.h>
 
 // A URI takes the form of: resource(root):/path#hash
-// The following function splits up a URI into its components
+// The following function splits up a URI into its components.
+// Note: Returns pointers into a static buffer. Callers must copy values
+// if they need to persist across multiple uri_resolve() calls.
 bool uri_resolve(char *uri, char **resource, char **root, char **path, char **hash) {
+    #define URI_BUF_SIZE 4096
+    static char buf[URI_BUF_SIZE];
+
     size_t length = strlen(uri) + 1;
-    char *buf = ext_mem_alloc(length);
+    if (length > URI_BUF_SIZE) {
+        panic(true, "uri_resolve: URI too long (max %u)", URI_BUF_SIZE - 1);
+    }
     memcpy(buf, uri, length);
     uri = buf;
 
