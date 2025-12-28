@@ -19,7 +19,6 @@ const char *config_b2sum = CONFIG_B2SUM_SIGNATURE CONFIG_B2SUM_EMPTY;
 
 static bool config_get_entry_name(char *ret, size_t index, size_t limit);
 static char *config_get_entry(size_t *size, size_t index);
-static char *copy_config_value(const char *src);
 
 #define SEPARATOR '\n'
 
@@ -322,7 +321,7 @@ static struct menu_entry *create_menu_tree(struct menu_entry *parent,
 
         char *comment = config_get_value(entry->body, 0, "COMMENT");
         if (comment != NULL) {
-            entry->comment = copy_config_value(comment);
+            entry->comment = strdup(comment);
         }
 
         if (prev != NULL)
@@ -649,30 +648,42 @@ cont:
 
 static const char *lastkey;
 
-static char *copy_config_value(const char *src) {
-    if (src == NULL) {
-        return NULL;
-    }
-    size_t len = strlen(src) + 1;
-    char *dst = ext_mem_alloc(len);
-    memcpy(dst, src, len);
-    return dst;
-}
-
 struct conf_tuple config_get_tuple(const char *config, size_t index,
                                    const char *key1, const char *key2) {
+    // Static buffers for return values.
+    // Callers must copy the result if they need persistence across calls.
+    #define CONF_TUPLE_BUF_SIZE 4096
+    static char value1_buf[CONF_TUPLE_BUF_SIZE];
+    static char value2_buf[CONF_TUPLE_BUF_SIZE];
+
     struct conf_tuple conf_tuple;
 
     char *tmp = config_get_value(config, index, key1);
     if (tmp == NULL) {
         return (struct conf_tuple){0};
     }
-    conf_tuple.value1 = copy_config_value(tmp);
+    size_t len = strlen(tmp);
+    if (len >= CONF_TUPLE_BUF_SIZE) {
+        len = CONF_TUPLE_BUF_SIZE - 1;
+    }
+    memcpy(value1_buf, tmp, len);
+    value1_buf[len] = '\0';
+    conf_tuple.value1 = value1_buf;
 
     const char *lk1 = lastkey;
 
     tmp = config_get_value(lk1, 0, key2);
-    conf_tuple.value2 = copy_config_value(tmp);
+    if (tmp != NULL) {
+        len = strlen(tmp);
+        if (len >= CONF_TUPLE_BUF_SIZE) {
+            len = CONF_TUPLE_BUF_SIZE - 1;
+        }
+        memcpy(value2_buf, tmp, len);
+        value2_buf[len] = '\0';
+        conf_tuple.value2 = value2_buf;
+    } else {
+        conf_tuple.value2 = NULL;
+    }
 
     const char *lk2 = lastkey;
 
@@ -682,7 +693,6 @@ struct conf_tuple config_get_tuple(const char *config, size_t index,
 
     if (conf_tuple.value2 != NULL && next_value1 != NULL) {
         if ((uintptr_t)lk2 > (uintptr_t)lk3) {
-            pmm_free(conf_tuple.value2, strlen(conf_tuple.value2) + 1);
             conf_tuple.value2 = NULL;
         }
     }
@@ -690,12 +700,12 @@ struct conf_tuple config_get_tuple(const char *config, size_t index,
     return conf_tuple;
 }
 
-// Static buffer for config_get_value return values.
-// Callers must copy the result if they need persistence across calls.
-#define CONFIG_VALUE_BUF_SIZE 4096
-static char config_value_buf[CONFIG_VALUE_BUF_SIZE];
-
 char *config_get_value(const char *config, size_t index, const char *key) {
+    // Static buffer for return values.
+    // Callers must copy the result if they need persistence across calls.
+    #define CONFIG_VALUE_BUF_SIZE 4096
+    static char buf[CONFIG_VALUE_BUF_SIZE];
+
     if (!key || !config_ready)
         return NULL;
 
@@ -721,10 +731,10 @@ char *config_get_value(const char *config, size_t index, const char *key) {
             if (value_len >= CONFIG_VALUE_BUF_SIZE) {
                 value_len = CONFIG_VALUE_BUF_SIZE - 1;
             }
-            memcpy(config_value_buf, config + i, value_len);
-            config_value_buf[value_len] = '\0';
+            memcpy(buf, config + i, value_len);
+            buf[value_len] = '\0';
             lastkey = config + i;
-            return config_value_buf;
+            return buf;
         }
     }
 
