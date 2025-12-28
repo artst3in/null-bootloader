@@ -682,6 +682,11 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         if ((f = uri_open(menu_font)) == NULL) {
             print("menu: Could not open font file.\n");
         } else {
+            if (font_size > f->size) {
+                print("Font size too large for provided font file. Not loading.\n");
+                fclose(f);
+                goto no_load_font;
+            }
             fread(f, font, 0, font_size);
             if (menu_font_size != NULL) {
                 font_width = tmp_font_width;
