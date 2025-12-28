@@ -1186,20 +1186,22 @@ FEAT_START
 
             module_required = internal_module->flags & LIMINE_INTERNAL_MODULE_REQUIRED;
         } else {
-            struct conf_tuple conf_tuple =
-                    config_get_tuple(config, i - (module_request->revision >= 1 ? module_request->internal_module_count : 0),
-                                     "MODULE_PATH", "MODULE_STRING");
+            size_t config_index = i - (module_request->revision >= 1 ? module_request->internal_module_count : 0);
 
-            struct conf_tuple conf_tuple1 =
-                    config_get_tuple(config, i - (module_request->revision >= 1 ? module_request->internal_module_count : 0),
-                                     "MODULE_PATH", "MODULE_CMDLINE");
+            // Try MODULE_STRING first, then fall back to MODULE_CMDLINE
+            struct conf_tuple conf_tuple =
+                    config_get_tuple(config, config_index, "MODULE_PATH", "MODULE_STRING");
 
             module_path = conf_tuple.value1;
-            module_cmdline = conf_tuple.value2 ?: conf_tuple1.value2;
-        }
+            module_cmdline = conf_tuple.value2;
 
-        if (module_cmdline == NULL) {
-            module_cmdline = "";
+            if (module_cmdline == NULL) {
+                conf_tuple = config_get_tuple(config, config_index, "MODULE_PATH", "MODULE_CMDLINE");
+                module_cmdline = conf_tuple.value2;
+            }
+
+            // Copy cmdline since conf_tuple uses static buffers
+            module_cmdline = module_cmdline ? strdup(module_cmdline) : "";
         }
 
         print("limine: Loading module `%#`...\n", module_path);
