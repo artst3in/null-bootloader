@@ -5,6 +5,7 @@
 #include <string.h>
 #include <lib/libc.h>
 #include <lib/misc.h>
+#include <mm/pmm.h>
 
 // Slightly adapted strtoul() implementation from FreeBSD.
 // https://github.com/freebsd/freebsd-src/blob/de1aa3dab23c06fec962a14da3e7b4755c5880cf/lib/libc/stdlib/strtoul.c
@@ -120,4 +121,11 @@ char *strrchr(const char *str, int ch) {
     }
 
     return p;
+}
+
+char *strdup(const char *s) {
+    size_t len = strlen(s) + 1;
+    char *buf = ext_mem_alloc(len);
+    memcpy(buf, s, len);
+    return buf;
 }
