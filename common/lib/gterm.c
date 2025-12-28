@@ -665,6 +665,8 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
     char *menu_font_size = config_get_value(config, 0, "TERM_FONT_SIZE");
     if (menu_font_size != NULL) {
         parse_resolution(&tmp_font_width, &tmp_font_height, NULL, menu_font_size);
+        // XXX: Do not allow widths != 8
+        tmp_font_width = 8;
 
         size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
 
