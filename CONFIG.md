@@ -155,11 +155,13 @@ These are ignored if using text mode.
   whole glyph by default; see `term_font_size`). See e.g. the
   [VGA text mode font](https://github.com/viler-int10h/vga-text-mode-fonts)
   collection for fonts.
-* `term_font_size` - The size of the font in dots, which must correspond to the
-  font file or the display will be garbled. Note that glyphs are always one
-  byte wide, and columns over 8 are empty. Many fonts may be used in both 8-
-  and 9-dot wide variants. Defaults to `8x16`. Ignored if `term_font` not set
-  or if the font fails to load.
+* `term_font_size` - The size of each glyph of the font in dots, which must
+  correspond to the font file, or display will be garbled or loading issues
+  will occur. Since it is assumed that all fonts are of width 8, the first
+  value of the pair (AKA the `8` in `8x16`) is effectively ignored. To set
+  horizontal spacing between glyphs on screen, see `term_font_spacing`.
+  Defaults to `8x16`. Ignored if `term_font` not set or if the font fails to
+  load.
 * `term_font_scale` - Scaling for the font in the x and y directions. `2x2`
   would display the font in double size, which is useful on high-DPI displays
   at native resolution. `2x1` only makes the font twice as wide, similar to the
@@ -167,10 +169,8 @@ These are ignored if using text mode.
   resolution display. Values over 8 are disallowed. Default is no scaling,
   i.e. `1x1`.
 * `term_font_spacing` - Horizontal spacing, in pixels, between glyphs on
-  screen. It is equivalent to setting a font width of
-  `<specified width>+<this value>`, except this value is preserved even in case
-  font loading fails, and it also applies to the built-in Limine font. Defaults
-  to 1. 0 is allowed.
+  screen. Also applies to the built-in Limine font. Defaults to 1. 0 is
+  allowed.
 * `term_palette` - Specifies the colour palette used by the terminal (RRGGBB).
   It is a `;` separated array of 8 colours: black, red, green, brown, blue,
   magenta, cyan, and gray. Ignored if not using a graphical terminal.
