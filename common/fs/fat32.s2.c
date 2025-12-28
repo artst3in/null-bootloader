@@ -292,14 +292,24 @@ static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster
             }
             break;
         }
-        case 16:
+        case 16: {
             *out = 0;
-            volume_read(context->part, out, fat_base + (uint64_t)cluster * sizeof(uint16_t), sizeof(uint16_t));
+            uint64_t offset = (uint64_t)cluster * sizeof(uint16_t);
+            if (offset + sizeof(uint16_t) > fat_size) {
+                return -1;
+            }
+            volume_read(context->part, out, fat_base + offset, sizeof(uint16_t));
             break;
-        case 32:
-            volume_read(context->part, out, fat_base + (uint64_t)cluster * sizeof(uint32_t), sizeof(uint32_t));
+        }
+        case 32: {
+            uint64_t offset = (uint64_t)cluster * sizeof(uint32_t);
+            if (offset + sizeof(uint32_t) > fat_size) {
+                return -1;
+            }
+            volume_read(context->part, out, fat_base + offset, sizeof(uint32_t));
             *out &= 0x0fffffff;
             break;
+        }
         default:
             __builtin_unreachable();
     }
