@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <limits.h>
 #include <fs/fat32.h>
 #include <lib/misc.h>
 #include <drivers/disk.h>
