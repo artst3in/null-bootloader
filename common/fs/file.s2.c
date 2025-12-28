@@ -83,6 +83,9 @@ void fclose(struct file_handle *fd) {
 
 void fread(struct file_handle *fd, void *buf, uint64_t loc, uint64_t count) {
     if (fd->is_memfile) {
+        if (loc >= fd->size || count > fd->size - loc) {
+            panic(false, "fread: attempted out of bounds read");
+        }
         memcpy(buf, fd->fd + loc, count);
     } else {
         fd->read(fd, buf, loc, count);
