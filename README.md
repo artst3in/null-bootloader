@@ -10,14 +10,19 @@ optimized for LunaOS.
 ## What we changed:
 
 ✅ Removed terminal rendering (5000 lines)
+
 ✅ Removed unused protocols (Multiboot, Linux boot)
+
 ✅ Added Luna-specific boot fields
+
 ✅ Optimized boot time (~50% faster)
 
 ## What we DIDN'T change:
 
 ❌ Boot process (memory, SMP, paging)
+
 ❌ We learned this the hard way
+
 ❌ Never touching that again
 
 ## Why fork?
