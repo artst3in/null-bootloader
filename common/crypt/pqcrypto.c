@@ -25,11 +25,21 @@
 static const uint8_t DILITHIUM_PUBLIC_KEY[DILITHIUM_PUBLICKEYBYTES] = {0};
 #endif
 
-// Keys are copied from DILITHIUM_PUBLIC_KEY in pqcrypto_init()
+// Provide default for KYBER_SECRET_KEY if not defined
+#ifndef HAVE_KYBER_KEY
+#define HAVE_KYBER_KEY 0
+#endif
+
+#if !HAVE_KYBER_KEY
+static const uint8_t KYBER_SECRET_KEY[KYBER_SECRETKEYBYTES] = {0};
+#endif
+
+// Keys are copied from embedded arrays in pqcrypto_init()
 pqcrypto_keys pqcrypto_embedded_keys = {
     .dilithium_pk = {0},
     .kyber_sk = {0},
-    .valid = 0
+    .valid = 0,
+    .has_kyber = 0
 };
 
 // Magic bytes to identify encrypted kernel
@@ -65,12 +75,11 @@ int pqcrypto_keys_available(void) {
 }
 
 int pqcrypto_init(void) {
-    // Copy embedded key to runtime structure
+    // Copy Dilithium public key to runtime structure
     memcpy(pqcrypto_embedded_keys.dilithium_pk, DILITHIUM_PUBLIC_KEY,
            DILITHIUM_PUBLICKEYBYTES);
 
-    // Validate that keys are present
-    // Check if dilithium public key has any non-zero bytes
+    // Validate Dilithium key is present (has non-zero bytes)
     uint8_t any_nonzero = 0;
     for (size_t i = 0; i < DILITHIUM_PUBLICKEYBYTES; i++) {
         any_nonzero |= pqcrypto_embedded_keys.dilithium_pk[i];
@@ -79,6 +88,21 @@ int pqcrypto_init(void) {
     if (any_nonzero) {
         pqcrypto_embedded_keys.valid = 1;
     }
+
+    // Copy Kyber secret key if available
+#if HAVE_KYBER_KEY
+    memcpy(pqcrypto_embedded_keys.kyber_sk, KYBER_SECRET_KEY,
+           KYBER_SECRETKEYBYTES);
+
+    // Validate Kyber key is present
+    any_nonzero = 0;
+    for (size_t i = 0; i < KYBER_SECRETKEYBYTES; i++) {
+        any_nonzero |= pqcrypto_embedded_keys.kyber_sk[i];
+    }
+    if (any_nonzero) {
+        pqcrypto_embedded_keys.has_kyber = 1;
+    }
+#endif
 
     return pqcrypto_embedded_keys.valid ? PQCRYPTO_OK : PQCRYPTO_ERR_NO_KEY;
 }
@@ -89,7 +113,7 @@ int pqcrypto_init(void) {
 
 int pqcrypto_verify_kernel(const uint8_t *kernel, size_t kernel_size,
                            const uint8_t *signature, size_t sig_size) {
-    if (!pqcrypto_keys_available()) {
+    if (!pqcrypto_embedded_keys.valid) {
         return PQCRYPTO_ERR_NO_KEY;
     }
 
@@ -137,7 +161,7 @@ int pqcrypto_is_encrypted(const uint8_t *data, size_t size) {
 
 int pqcrypto_decrypt_kernel(const uint8_t *encrypted, size_t encrypted_size,
                             uint8_t *plaintext, size_t *plaintext_size) {
-    if (!pqcrypto_keys_available()) {
+    if (!pqcrypto_embedded_keys.has_kyber) {
         return PQCRYPTO_ERR_NO_KEY;
     }
 

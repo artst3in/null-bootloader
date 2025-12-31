@@ -57,7 +57,8 @@
 typedef struct {
     uint8_t dilithium_pk[DILITHIUM_PUBLICKEYBYTES];  // Signature verification
     uint8_t kyber_sk[KYBER_SECRETKEYBYTES];          // Decryption (secret key!)
-    uint8_t valid;                                    // 1 if keys are loaded
+    uint8_t valid;                                    // 1 if signing keys are loaded
+    uint8_t has_kyber;                                // 1 if decryption key is loaded
 } pqcrypto_keys;
 
 // Global key storage (defined in pqcrypto.c or embedded_keys.c)

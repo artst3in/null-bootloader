@@ -59,6 +59,11 @@ bool kernel_verify_init(void) {
         print("[ WARN ] No signing keys embedded (verification disabled)\n");
     }
 
+    // Check for Kyber decryption key
+    if (pqcrypto_embedded_keys.has_kyber) {
+        print("[  OK  ] Kyber-1024 (ML-KEM) decryption key loaded\n");
+    }
+
     return keys_present;
 }
 
@@ -67,8 +72,7 @@ bool kernel_verify_enabled(void) {
 }
 
 bool kernel_decrypt_enabled(void) {
-    // This would be set from config
-    return false;
+    return pqcrypto_embedded_keys.has_kyber != 0;
 }
 
 // ============================================================================
