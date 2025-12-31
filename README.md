@@ -28,7 +28,7 @@
 **The numbers:**
 
 - 🗑️ **~4,300 lines removed** - Multiboot, Linux boot, Chainload, ISO9660
-- 📉 **~136K of code eliminated** - unused protocol handlers
+- 📦 **19 files deleted** - unused protocol handlers and filesystems
 - ✅ **1 protocol supported** - Limine (the only one LunaOS uses)
 - 🔒 **0 regressions** - boot process untouched
 
