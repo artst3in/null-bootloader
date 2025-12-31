@@ -860,7 +860,7 @@ noreturn void _menu(bool first_run) {
 #else
         menu_branding = "Null " LIMINE_VERSION " ("
 #if defined (__x86_64__)
-            "x86-64"
+            "x64"
 #elif defined (__riscv)
             "riscv64"
 #elif defined (__aarch64__)
