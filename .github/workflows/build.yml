@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld nasm autoconf automake make mtools
+          sudo apt-get install -y clang lld llvm nasm autoconf automake make mtools
 
       - name: Bootstrap
         run: ./bootstrap
