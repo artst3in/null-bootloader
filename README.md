@@ -238,7 +238,7 @@ Null embodies the **First Law of Computational Physics** (LCP):
 
 ---
 
-**Made with 🌙 by the LunaOS team**
+**Made with 💜 by the LunaOS team**
 
 **dε/dt ≤ 0**
 
