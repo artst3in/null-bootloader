@@ -11,7 +11,7 @@
 #include <pxe/tftp.h>
 #include <menu.h>
 #include <lib/getchar.h>
-#include <crypt/blake2b.h>
+#include <crypt/blake3.h>
 
 // A URI takes the form of: resource(root):/path#hash
 // The following function splits up a URI into its components.
@@ -73,16 +73,16 @@ bool uri_resolve(char *uri, char **resource, char **root, char **path, char **ha
             *hash = uri + i;
         }
 
-        if (strlen(uri + i) != 128) {
-            panic(true, "Blake2b hash must be 128 characters long");
+        if (strlen(uri + i) != 64) {
+            panic(true, "BLAKE3 hash must be 64 characters long");
             return false;
         }
 
-        // Validate all 128 characters are valid hexadecimal
-        for (size_t j = 0; j < 128; j++) {
+        // Validate all 64 characters are valid hexadecimal
+        for (size_t j = 0; j < 64; j++) {
             char c = uri[i + j];
             if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
-                panic(true, "Blake2b hash contains invalid character at position %d", (int)j);
+                panic(true, "BLAKE3 hash contains invalid character at position %d", (int)j);
                 return false;
             }
         }
@@ -253,14 +253,14 @@ struct file_handle *uri_open(char *uri) {
     }
 
     if (hash != NULL && ret != NULL) {
-        uint8_t out_buf[BLAKE2B_OUT_BYTES];
+        uint8_t out_buf[BLAKE3_OUT_LEN];
 #if defined (UEFI) && defined (__x86_64__)
         void *file_buf = freadall_mode(ret, MEMMAP_BOOTLOADER_RECLAIMABLE, true);
 #else
         void *file_buf = freadall(ret, MEMMAP_BOOTLOADER_RECLAIMABLE);
 #endif
-        blake2b(out_buf, file_buf, ret->size);
-        uint8_t hash_buf[BLAKE2B_OUT_BYTES];
+        blake3(out_buf, file_buf, ret->size);
+        uint8_t hash_buf[BLAKE3_OUT_LEN];
 
         for (size_t i = 0; i < sizeof(hash_buf); i++) {
             hash_buf[i] = digit_to_int(hash[i * 2]) << 4 | digit_to_int(hash[i * 2 + 1]);
@@ -268,9 +268,9 @@ struct file_handle *uri_open(char *uri) {
 
         if (memcmp(hash_buf, out_buf, sizeof(out_buf)) != 0) {
             if (hash_mismatch_panic) {
-                panic(true, "Blake2b hash for URI `%#` does not match!", uri);
+                panic(true, "BLAKE3 hash for URI `%#` does not match!", uri);
             } else {
-                print("WARNING: Blake2b hash for URI `%#` does not match!\n"
+                print("WARNING: BLAKE3 hash for URI `%#` does not match!\n"
                       "         Press Y to continue, press any other key to return to menu...", uri);
 
                 char ch = getchar();

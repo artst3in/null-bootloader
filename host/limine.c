@@ -1143,12 +1143,12 @@ uninstall_mode_cleanup:
 }
 #endif
 
-#define CONFIG_B2SUM_SIGNATURE "++CONFIG_B2SUM_SIGNATURE++"
+#define CONFIG_B3SUM_SIGNATURE "++CONFIG_B3SUM_SIGNATURE++"
 
 static void enroll_config_usage(void) {
-    printf("usage: %s enroll-config <Limine executable> <BLAKE2B of config file>\n", program_name);
+    printf("usage: %s enroll-config <Null executable> <BLAKE3 hash of config file>\n", program_name);
     printf("\n");
-    printf("    --reset      Remove enrolled BLAKE2B, will not check config integrity\n");
+    printf("    --reset      Remove enrolled BLAKE3 hash, will not check config integrity\n");
     printf("\n");
     printf("    --quiet      Do not print verbose diagnostic messages\n");
     printf("\n");
@@ -1185,8 +1185,8 @@ static int enroll_config(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (!reset && strlen(argv[2]) != 128) {
-        fprintf(stderr, "error: BLAKE2B specified is not 128 characters long.\n");
+    if (!reset && strlen(argv[2]) != 64) {
+        fprintf(stderr, "error: BLAKE3 hash specified is not 64 characters long.\n");
         goto cleanup;
     }
 
@@ -1216,16 +1216,16 @@ static int enroll_config(int argc, char *argv[]) {
 
     char *checksum_loc = NULL;
     size_t checked_count = 0;
-    const char *config_b2sum_sign = CONFIG_B2SUM_SIGNATURE;
-    for (size_t i = 0; i < bootloader_size - ((sizeof(CONFIG_B2SUM_SIGNATURE) - 1) + 128) + 1; i++) {
-        if (bootloader[i] != config_b2sum_sign[checked_count]) {
+    const char *config_b3sum_sign = CONFIG_B3SUM_SIGNATURE;
+    for (size_t i = 0; i < bootloader_size - ((sizeof(CONFIG_B3SUM_SIGNATURE) - 1) + 64) + 1; i++) {
+        if (bootloader[i] != config_b3sum_sign[checked_count]) {
             checked_count = 0;
             continue;
         }
 
         checked_count++;
 
-        if (checked_count == sizeof(CONFIG_B2SUM_SIGNATURE) - 1) {
+        if (checked_count == sizeof(CONFIG_B3SUM_SIGNATURE) - 1) {
             checksum_loc = &bootloader[i + 1];
             break;
         }
@@ -1237,9 +1237,9 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (!reset) {
-        memcpy(checksum_loc, argv[2], 128);
+        memcpy(checksum_loc, argv[2], 64);
     } else {
-        memset(checksum_loc, '0', 128);
+        memset(checksum_loc, '0', 64);
     }
 
     if (fseek(bootloader_file, 0, SEEK_SET) != 0) {
@@ -1252,7 +1252,7 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (!quiet) {
-        fprintf(stderr, "Config file BLAKE2B successfully %s.\n", reset ? "reset" : "enrolled");
+        fprintf(stderr, "Config file BLAKE3 hash successfully %s.\n", reset ? "reset" : "enrolled");
     }
     ret = EXIT_SUCCESS;
 

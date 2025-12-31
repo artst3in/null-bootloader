@@ -15,14 +15,14 @@ The kernel should be responsible for parsing everything else as it sees fit.
 ### What about LUKS? What about security? Encrypt the kernel!
 
 Simply put, this is unnecessary. Putting the kernel/modules in a readable FAT32
-partition and letting Null know about their BLAKE2B checksums in the config
+partition and letting Null know about their BLAKE3 checksums in the config
 file provides as much security as encrypting the kernel does.
 
 ### What if a malicious actor modifies the config file?
 
 While this is a pointless effort on legacy x86 BIOS, it is a reasonable
 expectation to secure the boot sequence on UEFI systems with Secure Boot.
-Null provides a way to modify its own EFI executable to bake in the BLAKE2B
+Null provides a way to modify its own EFI executable to bake in the BLAKE3
 checksum of the config file itself. The EFI executable can then get signed with
 a key added to the firmware's keychain. This prevents modifications to the
 config file (and in turn the checksums contained there) from going unnoticed.

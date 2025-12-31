@@ -18,11 +18,13 @@
         - Boot menu (for recovery mode and kernel selection)
         - FAT32 filesystem
         - PXE/TFTP network boot
-        - BLAKE2B hash verification
+        - BLAKE3 hash verification (upgraded from BLAKE2B)
         - All core boot functionality (memory map, SMP, paging)
 
+    Cryptography:
+        - Replaced BLAKE2B with BLAKE3 (4x faster, modern design)
+
     Future work (TODO):
-        - Replace BLAKE2B with BLAKE3
         - Add Kyber post-quantum crypto support
 
     Based on Limine 10.6.0 by Mintsuki and contributors.

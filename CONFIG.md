@@ -274,9 +274,9 @@ A resource can be one of the following:
   from the server Null booted from. This resource is only available when
   booting off PXE.
 
-A path can optionally be suffixed with a blake2b hash for the referenced file,
-by appending a pound character (`#`) followed by the blake2b hash.
-E.g.: `boot():/somemodule.tar#ca6914d2...446b470a`.
+A path can optionally be suffixed with a BLAKE3 hash for the referenced file,
+by appending a pound character (`#`) followed by the 64-character BLAKE3 hash.
+E.g.: `boot():/somemodule.tar#a1b2c3d4...e5f6g7h8`.
 
 ## Macros
 

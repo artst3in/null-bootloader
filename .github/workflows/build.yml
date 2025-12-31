@@ -1,0 +1,105 @@
+name: Build Null Bootloader
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld nasm autoconf automake make mtools
+
+      - name: Bootstrap
+        run: ./bootstrap
+
+      - name: Configure (UEFI x64)
+        run: ./configure --enable-uefi-x86-64
+
+      - name: Build
+        run: make
+
+      - name: Upload UEFI bootloader
+        uses: actions/upload-artifact@v4
+        with:
+          name: null-uefi-x64
+          path: bin/BOOTX64.EFI
+
+      - name: Configure (BIOS)
+        run: |
+          make clean
+          ./configure --enable-bios
+
+      - name: Build BIOS
+        run: make
+
+      - name: Upload BIOS bootloader
+        uses: actions/upload-artifact@v4
+        with:
+          name: null-bios
+          path: |
+            bin/limine-bios.sys
+            bin/limine-bios-cd.bin
+            bin/limine-uefi-cd.bin
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download UEFI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: null-uefi-x64
+          path: release/
+
+      - name: Download BIOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: null-bios
+          path: release/
+
+      - name: Get version
+        id: version
+        run: echo "version=$(cat version)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Null ${{ steps.version.outputs.version }}
+          body: |
+            ## Null Bootloader ${{ steps.version.outputs.version }}
+
+            Minimal bootloader for LunaOS - a stripped-down Limine fork.
+
+            ### Downloads
+            - `BOOTX64.EFI` - UEFI bootloader (copy to `/EFI/BOOT/`)
+            - `limine-bios.sys` - BIOS stage 2
+            - `limine-bios-cd.bin` - BIOS CD boot sector
+
+            ### Changes
+            See [ChangeLog](https://github.com/${{ github.repository }}/blob/main/ChangeLog)
+          files: |
+            release/BOOTX64.EFI
+            release/limine-bios.sys
+            release/limine-bios-cd.bin
+            release/limine-uefi-cd.bin
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,7 +7,7 @@
 #  include <lib/real.h>
 #elif defined (UEFI)
 #  include <efi.h>
-#  include <crypt/blake2b.h>
+#  include <crypt/blake3.h>
 #endif
 #include <lib/misc.h>
 #include <lib/print.h>
@@ -418,13 +418,13 @@ static struct volume *pxe_from_efi_handle(EFI_HANDLE efi_handle) {
 #define UNIQUE_SECTOR_POOL_SIZE 65536
 static uint8_t *unique_sector_pool;
 
-static struct volume *volume_by_unique_sector(void *b2b) {
+static struct volume *volume_by_unique_sector(void *b3) {
     for (size_t i = 0; i < volume_index_i; i++) {
         if (volume_index[i]->unique_sector_valid == false) {
             continue;
         }
 
-        if (memcmp(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES) == 0) {
+        if (memcmp(volume_index[i]->unique_sector_b3, b3, BLAKE3_OUT_BYTES) == 0) {
             return volume_index[i];
         }
     }
@@ -543,10 +543,10 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
         goto fallback;
     }
 
-    uint8_t b2b[BLAKE2B_OUT_BYTES];
-    blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+    uint8_t b3[BLAKE3_OUT_BYTES];
+    blake3(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
-    ret = volume_by_unique_sector(b2b);
+    ret = volume_by_unique_sector(b3);
     if (ret != NULL) {
         return ret;
     }
@@ -669,13 +669,13 @@ static void find_unique_sectors(void) {
             continue;
         }
 
-        uint8_t b2b[BLAKE2B_OUT_BYTES];
-        blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+        uint8_t b3[BLAKE3_OUT_BYTES];
+        blake3(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
-        struct volume *collision = volume_by_unique_sector(b2b);
+        struct volume *collision = volume_by_unique_sector(b3);
         if (collision == NULL) {
             volume_index[i]->unique_sector_valid = true;
-            memcpy(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES);
+            memcpy(volume_index[i]->unique_sector_b3, b3, BLAKE3_OUT_BYTES);
             continue;
         }
 

@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-2025.12-blue.svg)]()
 [![License](https://img.shields.io/badge/license-BSD%202--Clause-green.svg)](COPYING)
-[![Platform](https://img.shields.io/badge/platform-x86__64%20%7C%20UEFI%20%7C%20BIOS-orange.svg)]()
+[![Platform](https://img.shields.io/badge/platform-x64%20%7C%20UEFI%20%7C%20BIOS-orange.svg)]()
 [![Lines Removed](https://img.shields.io/badge/lines_removed-4%2C300-red.svg)]()
 
 **🚀 Minimal** • **🛡️ Proven** • **⚡ Fast** • **🌙 LunaOS-Native**
@@ -57,7 +57,7 @@
 - 📁 FAT32 filesystem
 - 🌍 PXE/TFTP network boot
 - 💿 EFI partition support
-- 🔐 Config verification (BLAKE2B)
+- 🔐 Config verification (BLAKE3)
 
 </td>
 </tr>
@@ -119,7 +119,7 @@
 | 📋 **Boot menu** | Recovery mode, kernel selection | ✅ Essential |
 | 📁 **FAT32** | Read kernel from EFI partition | ✅ Essential |
 | 🌐 **PXE/TFTP** | Network boot (sister resurrection) | 💡 Useful |
-| 🔐 **BLAKE2B** | Config file verification | 💡 Useful |
+| 🔐 **BLAKE3** | Config file verification | 💡 Useful |
 | 🗺️ **Memory map** | DO NOT TOUCH | 🔒 Sacred |
 | 🔀 **SMP boot** | DO NOT TOUCH | 🔒 Sacred |
 | 📄 **Paging** | DO NOT TOUCH | 🔒 Sacred |
@@ -156,8 +156,8 @@ Tracked in source code as TODO comments:
 
 | Feature | Location | Status |
 |---------|----------|--------|
-| ⚡ Replace BLAKE2B with BLAKE3 | `crypt/blake2b.c` | 📅 Planned |
-| 🔐 Add Kyber post-quantum crypto | `crypt/blake2b.c` | 📅 Planned |
+| ⚡ BLAKE3 cryptographic hashing | `crypt/blake3.c` | ✅ Done |
+| 🔐 Add Kyber post-quantum crypto | `crypt/kyber.c` | 📅 Planned |
 
 ---
 

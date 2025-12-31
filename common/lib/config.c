@@ -9,13 +9,13 @@
 #include <fs/file.h>
 #include <lib/print.h>
 #include <pxe/tftp.h>
-#include <crypt/blake2b.h>
+#include <crypt/blake3.h>
 #include <sys/cpu.h>
 
-#define CONFIG_B2SUM_SIGNATURE "++CONFIG_B2SUM_SIGNATURE++"
-#define CONFIG_B2SUM_EMPTY "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+#define CONFIG_B3SUM_SIGNATURE "++CONFIG_B3SUM_SIGNATURE++"
+#define CONFIG_B3SUM_EMPTY "0000000000000000000000000000000000000000000000000000000000000000"
 
-const char *config_b2sum = CONFIG_B2SUM_SIGNATURE CONFIG_B2SUM_EMPTY;
+const char *config_b3sum = CONFIG_B3SUM_SIGNATURE CONFIG_B3SUM_EMPTY;
 
 static bool config_get_entry_name(char *ret, size_t index, size_t limit);
 static char *config_get_entry(size_t *size, size_t index);
@@ -341,20 +341,20 @@ struct macro {
 static struct macro *macros = NULL;
 
 int init_config(size_t config_size) {
-    config_b2sum += sizeof(CONFIG_B2SUM_SIGNATURE) - 1;
+    config_b3sum += sizeof(CONFIG_B3SUM_SIGNATURE) - 1;
 
-    if (memcmp((void *)config_b2sum, CONFIG_B2SUM_EMPTY, 128) != 0) {
+    if (memcmp((void *)config_b3sum, CONFIG_B3SUM_EMPTY, 64) != 0) {
         editor_enabled = false;
 
-        uint8_t out_buf[BLAKE2B_OUT_BYTES];
-        blake2b(out_buf, config_addr, config_size - 2);
-        uint8_t hash_buf[BLAKE2B_OUT_BYTES];
+        uint8_t out_buf[BLAKE3_OUT_LEN];
+        blake3(out_buf, config_addr, config_size - 2);
+        uint8_t hash_buf[BLAKE3_OUT_LEN];
 
-        for (size_t i = 0; i < BLAKE2B_OUT_BYTES; i++) {
-            hash_buf[i] = digit_to_int(config_b2sum[i * 2]) << 4 | digit_to_int(config_b2sum[i * 2 + 1]);
+        for (size_t i = 0; i < BLAKE3_OUT_LEN; i++) {
+            hash_buf[i] = digit_to_int(config_b3sum[i * 2]) << 4 | digit_to_int(config_b3sum[i * 2 + 1]);
         }
 
-        if (memcmp(hash_buf, out_buf, BLAKE2B_OUT_BYTES) != 0) {
+        if (memcmp(hash_buf, out_buf, BLAKE3_OUT_LEN) != 0) {
             panic(false, "!!! CHECKSUM MISMATCH FOR CONFIG FILE !!!");
         }
     }

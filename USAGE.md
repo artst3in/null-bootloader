@@ -16,7 +16,7 @@ A valid config file should also be provided as described in
 ## Secure Boot
 Null can be booted with secure boot if the executable is signed and the key
 used to sign it is added to the firmware's keychain. This should be done in
-combination with enrolling the BLAKE2B hash of the Null config file into the
+combination with enrolling the BLAKE3 hash of the Null config file into the
 Null EFI executable image itself for verification purposes.
 For more information see the `limine enroll-config` program and
 [the FAQ](FAQ.md).
