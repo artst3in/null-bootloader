@@ -15,10 +15,6 @@
 #include <mm/pmm.h>
 #include <drivers/vbe.h>
 #include <drivers/vga_textmode.h>
-#include <protos/linux.h>
-#include <protos/chainload.h>
-#include <protos/multiboot1.h>
-#include <protos/multiboot2.h>
 #include <protos/limine.h>
 #include <sys/cpu.h>
 #include <lib/misc.h>
@@ -846,9 +842,9 @@ noreturn void _menu(bool first_run) {
         {
             uint32_t eax, ebx, ecx, edx;
             if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-                menu_branding = "Limine " LIMINE_VERSION " (ia-32, BIOS)";
+                menu_branding = "Null " LIMINE_VERSION " (ia-32, BIOS)";
             } else {
-                menu_branding = "Limine " LIMINE_VERSION " (x86-64, BIOS)";
+                menu_branding = "Null " LIMINE_VERSION " (x86-64, BIOS)";
             }
         }
 #elif defined (UEFI)
@@ -856,13 +852,13 @@ noreturn void _menu(bool first_run) {
         {
             uint32_t eax, ebx, ecx, edx;
             if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-                menu_branding = "Limine " LIMINE_VERSION " (ia-32, UEFI32)";
+                menu_branding = "Null " LIMINE_VERSION " (ia-32, UEFI32)";
             } else {
-                menu_branding = "Limine " LIMINE_VERSION " (x86-64, UEFI32)";
+                menu_branding = "Null " LIMINE_VERSION " (x86-64, UEFI32)";
             }
         }
 #else
-        menu_branding = "Limine " LIMINE_VERSION " ("
+        menu_branding = "Null " LIMINE_VERSION " ("
 #if defined (__x86_64__)
             "x86-64"
 #elif defined (__riscv)
@@ -1246,34 +1242,11 @@ noreturn void boot(char *config) {
         panic(true, "Boot protocol not specified for this entry");
     }
 
+    // Null bootloader: Limine protocol only
+    // Removed protocols: multiboot1, multiboot2, linux, chainload
     if (!strcmp(proto, "limine")) {
         limine_load(config, cmdline);
-    } else if (!strcmp(proto, "linux")) {
-        linux_load(config, cmdline);
-    } else if (!strcmp(proto, "multiboot1") || !strcmp(proto, "multiboot")) {
-#if defined (__x86_64__) || defined (__i386__)
-        multiboot1_load(config, cmdline);
-#else
-        quiet = false;
-        print("Multiboot 1 is not available on non-x86 architectures.\n\n");
-#endif
-    } else if (!strcmp(proto, "multiboot2")) {
-#if defined (__x86_64__) || defined (__i386__)
-        multiboot2_load(config, cmdline);
-#else
-        quiet = false;
-        print("Multiboot 2 is not available on non-x86 architectures.\n\n");
-#endif
-#if defined (BIOS)
-    } else if (!strcmp(proto, "bios_chainload")
-            || !strcmp(proto, "bios")) {
-#elif defined (UEFI)
-    } else if (!strcmp(proto, "efi_chainload")
-            || !strcmp(proto, "efi")
-            || !strcmp(proto, "uefi")) {
-#endif
-        chainload(config, cmdline);
     }
 
-    panic(true, "Unsupported protocol specified.");
+    panic(true, "Unsupported protocol specified. Null bootloader only supports 'limine' protocol.");
 }

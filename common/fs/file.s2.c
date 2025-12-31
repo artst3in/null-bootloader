@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <fs/file.h>
 #include <fs/fat32.h>
-#include <fs/iso9660.h>
 #include <lib/print.h>
 #include <lib/misc.h>
 #include <mm/pmm.h>
@@ -51,9 +50,6 @@ struct file_handle *fopen(struct volume *part, const char *filename) {
         return ret;
     }
 
-    if ((ret = iso9660_open(part, filename)) != NULL) {
-        goto success;
-    }
     if ((ret = fat32_open(part, filename)) != NULL) {
         goto success;
     }

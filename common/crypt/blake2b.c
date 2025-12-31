@@ -1,5 +1,12 @@
 // This blake2b implementation comes from the GNU coreutils project.
 // https://github.com/coreutils/coreutils/blob/master/src/blake2/blake2b-ref.c
+//
+// TODO: Replace BLAKE2B with BLAKE3 for improved performance (4x faster,
+//       native parallelism, modern design). BLAKE3 is the recommended
+//       successor for new projects.
+//
+// TODO: Add Kyber post-quantum key exchange support for secure boot
+//       verification in the post-quantum era.
 
 #include <stdbool.h>
 #include <stdint.h>
