@@ -1,4 +1,4 @@
-AC_INIT([Limine], [m4_esyscmd([./version.sh])], [https://codeberg.org/Limine/Limine/issues], [limine], [https://limine-bootloader.org/])
+AC_INIT([Null], [m4_esyscmd([./version.sh])], [https://github.com/artst3in/null-bootloader/issues], [null], [https://github.com/artst3in/null-bootloader])
 
 AC_PREREQ([2.69])
 
@@ -132,9 +132,9 @@ GET_PROG([STRIP], [strip], [tool])
 AC_CHECK_HEADERS([stdio.h stdlib.h stdint.h stddef.h stdbool.h stdarg.h string.h errno.h inttypes.h limits.h time.h],
     [], [AC_MSG_ERROR([required header not found])])
 
-AC_ARG_VAR([TOOLCHAIN_FOR_TARGET], [alternative toolchain prefix for Limine])
+AC_ARG_VAR([TOOLCHAIN_FOR_TARGET], [alternative toolchain prefix for Null])
 
-AC_ARG_VAR([CC_FOR_TARGET], [C compiler command for Limine])
+AC_ARG_VAR([CC_FOR_TARGET], [C compiler command for Null])
 if test "x${CC_FOR_TARGET+set}" = "x"; then
     if test "x${TOOLCHAIN_FOR_TARGET+set}" = "x"; then
         CC_FOR_TARGET="clang"
@@ -142,7 +142,7 @@ if test "x${CC_FOR_TARGET+set}" = "x"; then
         CC_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}gcc"
     fi
 fi
-AC_ARG_VAR([LD_FOR_TARGET], [linker command for Limine])
+AC_ARG_VAR([LD_FOR_TARGET], [linker command for Null])
 if test "x${LD_FOR_TARGET+set}" = "x"; then
     if test "x${TOOLCHAIN_FOR_TARGET+set}" = "x"; then
         LD_FOR_TARGET="ld.lld"
@@ -153,11 +153,11 @@ fi
 
 test "x${TOOLCHAIN_FOR_TARGET+set}" = "x" && TOOLCHAIN_FOR_TARGET=llvm-
 
-AC_ARG_VAR([OBJCOPY_FOR_TARGET], [objcopy command for Limine])
+AC_ARG_VAR([OBJCOPY_FOR_TARGET], [objcopy command for Null])
 test "x${OBJCOPY_FOR_TARGET+set}" = "x" && OBJCOPY_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}objcopy"
-AC_ARG_VAR([OBJDUMP_FOR_TARGET], [objdump command for Limine])
+AC_ARG_VAR([OBJDUMP_FOR_TARGET], [objdump command for Null])
 test "x${OBJDUMP_FOR_TARGET+set}" = "x" && OBJDUMP_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}objdump"
-AC_ARG_VAR([READELF_FOR_TARGET], [readelf command for Limine])
+AC_ARG_VAR([READELF_FOR_TARGET], [readelf command for Null])
 test "x${READELF_FOR_TARGET+set}" = "x" && READELF_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}readelf"
 
 GET_PROG([CC_FOR_TARGET])
@@ -327,20 +327,20 @@ for cflag in $CFLAGS; do
     esac
 done
 
-AC_ARG_VAR([CFLAGS_FOR_TARGET], [C flags for Limine])
+AC_ARG_VAR([CFLAGS_FOR_TARGET], [C flags for Null])
 test "x${CFLAGS_FOR_TARGET+set}" = "x" && CFLAGS_FOR_TARGET="$BORROWED_CFLAGS"
 
-AC_ARG_VAR([CPPFLAGS_FOR_TARGET], [C preprocessor flags for Limine])
+AC_ARG_VAR([CPPFLAGS_FOR_TARGET], [C preprocessor flags for Null])
 test "x${CPPFLAGS_FOR_TARGET+set}" = "x" && CPPFLAGS_FOR_TARGET=""
 
-AC_ARG_VAR([LDFLAGS_FOR_TARGET], [linker flags for Limine])
+AC_ARG_VAR([LDFLAGS_FOR_TARGET], [linker flags for Null])
 test "x${LDFLAGS_FOR_TARGET+set}" = "x" && LDFLAGS_FOR_TARGET=""
 
-AC_ARG_VAR([NASMFLAGS_FOR_TARGET], [nasm flags for Limine])
+AC_ARG_VAR([NASMFLAGS_FOR_TARGET], [nasm flags for Null])
 test "x${NASMFLAGS_FOR_TARGET+set}" = "x" && NASMFLAGS_FOR_TARGET="-g"
 
-LIMINE_COPYRIGHT=$($GREP Copyright "$SRCDIR/COPYING")
-AC_SUBST([LIMINE_COPYRIGHT])
+NULL_COPYRIGHT=$($GREP Copyright "$SRCDIR/COPYING")
+AC_SUBST([NULL_COPYRIGHT])
 
 AC_PREFIX_DEFAULT([/usr/local])
 
