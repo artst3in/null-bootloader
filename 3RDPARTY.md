@@ -1,10 +1,10 @@
 # 3rd Party Software Acknowledgments
 
-The Limine project depends on several other projects.
+The Null bootloader is a fork of Limine and depends on several other projects.
 
 (For readers with access to source code, know that these are pulled in by the
 `./bootstrap` script, or, in the case of release tarballs, are shipped
-alongside the core Limine code in the tarballs themselves, similar to
+alongside the core Null code in the tarballs themselves, similar to
 `./bootstrap` having already been run.)
 
 These additional projects are NOT covered by the License as contained inside
@@ -14,10 +14,13 @@ otherwise removed by the packager). These are instead licensed as described by
 each individual project's documentation present in each project's dedicated
 subdirectory or license header(s) in the source tree. For readers without access
 to the source code, one can read the following for a quick overview of licenses
-that Limine is distributed under:
+that Null is distributed under:
 
-A non-binding, informal summary of all projects Limine depends on, and the
+A non-binding, informal summary of all projects Null depends on, and the
 licenses used by said projects, in SPDX format, is as follows:
+
+- [Limine](https://github.com/limine-bootloader/limine) (BSD-2-Clause) is the
+upstream bootloader that Null is forked from.
 
 - [cc-runtime](https://codeberg.org/OSDev/cc-runtime)
 (Apache-2.0 WITH LLVM-exception) is used to provide runtime libgcc-like
@@ -63,5 +66,5 @@ manipulating Flat Device Trees.
 
 Note that some of these projects, or parts of them, are provided under
 dual-licensing, in which case, in the above list, the only license mentioned is
-the one chosen by the Limine developers. Refer to each individual project's
+the one chosen by the Null developers. Refer to each individual project's
 documentation for details.
