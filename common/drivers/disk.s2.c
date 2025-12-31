@@ -544,7 +544,7 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
     }
 
     uint8_t b3[BLAKE3_OUT_BYTES];
-    blake3(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+    blake3_extended(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
     ret = volume_by_unique_sector(b3);
     if (ret != NULL) {
@@ -670,7 +670,7 @@ static void find_unique_sectors(void) {
         }
 
         uint8_t b3[BLAKE3_OUT_BYTES];
-        blake3(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+        blake3_extended(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
         struct volume *collision = volume_by_unique_sector(b3);
         if (collision == NULL) {
