@@ -57,7 +57,7 @@
 - 📁 FAT32 filesystem
 - 🌍 PXE/TFTP network boot
 - 💿 EFI partition support
-- 🔐 Config verification (BLAKE3)
+- 🔐 Post-quantum crypto (Dilithium/Kyber)
 
 </td>
 </tr>
@@ -119,7 +119,7 @@
 | 📋 **Boot menu** | Recovery mode, kernel selection | ✅ Essential |
 | 📁 **FAT32** | Read kernel from EFI partition | ✅ Essential |
 | 🌐 **PXE/TFTP** | Network boot (sister resurrection) | 💡 Useful |
-| 🔐 **BLAKE3** | Config file verification | 💡 Useful |
+| 🔐 **PQCrypto** | Post-quantum signatures & encryption | ✅ Essential |
 | 🗺️ **Memory map** | DO NOT TOUCH | 🔒 Sacred |
 | 🔀 **SMP boot** | DO NOT TOUCH | 🔒 Sacred |
 | 📄 **Paging** | DO NOT TOUCH | 🔒 Sacred |
@@ -150,14 +150,78 @@ We tried everything else:
 
 ---
 
-## 🔮 Future Work
+## 🔐 Post-Quantum Cryptography
 
-Tracked in source code as TODO comments:
+Null includes a complete post-quantum cryptographic stack for secure boot:
 
-| Feature | Location | Status |
-|---------|----------|--------|
-| ⚡ BLAKE3 cryptographic hashing | `crypt/blake3.c` | ✅ Done |
-| 🔐 Add Kyber post-quantum crypto | `crypt/kyber.c` | 📅 Planned |
+### Crypto Primitives
+
+| Component | Algorithm | Purpose | Size |
+|-----------|-----------|---------|------|
+| 🔏 **Signatures** | Dilithium-3 (ML-DSA) | Kernel verification | ~40 KB |
+| 🔑 **Key Exchange** | Kyber-1024 (ML-KEM) | Encrypted kernel support | ~25 KB |
+| 🔒 **Encryption** | ChaCha20-Poly1305 | Authenticated encryption | ~8 KB |
+| #️⃣ **Hashing** | SHAKE256 (SHA-3 XOF) | Dilithium internals | ~10 KB |
+
+**Total crypto code: ~83 KB**
+
+### Security Levels
+
+- **Dilithium-3**: NIST Security Level 3 (~128-bit post-quantum)
+- **Kyber-1024**: NIST Security Level 5 (~256-bit post-quantum)
+- **ChaCha20-Poly1305**: 256-bit symmetric + 128-bit authentication
+
+### Configuration Options
+
+```ini
+# limine.conf
+
+/LunaOS (Signed)
+    protocol: limine
+    kernel_path: boot():/luna_soul
+    KERNEL_VERIFY=yes        # Require signature (default if keys present)
+
+/LunaOS (Encrypted)
+    protocol: limine
+    kernel_path: boot():/luna_soul.enc
+    KERNEL_VERIFY=yes
+    KERNEL_ENCRYPTED=yes     # Decrypt before verify
+```
+
+### Key Management
+
+Keys are embedded at build time:
+- **Public key** (Dilithium): Compiled into bootloader for verification
+- **Secret key** (Kyber): Compiled into bootloader for decryption
+
+Use the `limine` utility to embed keys:
+```bash
+limine keygen --output keys/       # Generate keypair
+limine sign kernel keys/luna.key   # Sign kernel
+limine embed-keys BOOTX64.EFI keys/luna.pub keys/kyber.key
+```
+
+### Boot Flow
+
+```
+1. Load kernel from disk
+2. Check KERNEL_ENCRYPTED → Decrypt with Kyber+ChaCha20
+3. Check KERNEL_VERIFY → Verify Dilithium signature
+4. Execute verified kernel
+```
+
+### File Formats
+
+**Signed kernel**: `[kernel data][Dilithium signature (3293 bytes)]`
+
+**Encrypted kernel**:
+```
+[Magic "LUNAENC1" (8 bytes)]
+[Kyber ciphertext (1568 bytes)]
+[Nonce (12 bytes)]
+[Auth tag (16 bytes)]
+[Encrypted kernel+signature]
+```
 
 ---
 
