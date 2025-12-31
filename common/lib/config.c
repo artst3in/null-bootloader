@@ -9,7 +9,10 @@
 #include <fs/file.h>
 #include <lib/print.h>
 #include <pxe/tftp.h>
-#include <crypt/blake3.h>
+#include <crypt/shake.h>
+
+// Config hash length (was BLAKE3_OUT_LEN)
+#define CONFIG_HASH_LEN 32
 #include <sys/cpu.h>
 
 #define CONFIG_B3SUM_SIGNATURE "++CONFIG_B3SUM_SIGNATURE++"
@@ -346,15 +349,15 @@ int init_config(size_t config_size) {
     if (memcmp((void *)config_b3sum, CONFIG_B3SUM_EMPTY, 64) != 0) {
         editor_enabled = false;
 
-        uint8_t out_buf[BLAKE3_OUT_LEN];
-        blake3(out_buf, config_addr, config_size - 2);
-        uint8_t hash_buf[BLAKE3_OUT_LEN];
+        uint8_t out_buf[CONFIG_HASH_LEN];
+        shake256(out_buf, CONFIG_HASH_LEN, config_addr, config_size - 2);
+        uint8_t hash_buf[CONFIG_HASH_LEN];
 
-        for (size_t i = 0; i < BLAKE3_OUT_LEN; i++) {
+        for (size_t i = 0; i < CONFIG_HASH_LEN; i++) {
             hash_buf[i] = digit_to_int(config_b3sum[i * 2]) << 4 | digit_to_int(config_b3sum[i * 2 + 1]);
         }
 
-        if (memcmp(hash_buf, out_buf, BLAKE3_OUT_LEN) != 0) {
+        if (memcmp(hash_buf, out_buf, CONFIG_HASH_LEN) != 0) {
             panic(false, "!!! CHECKSUM MISMATCH FOR CONFIG FILE !!!");
         }
     }

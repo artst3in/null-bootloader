@@ -7,12 +7,14 @@
 #include <lib/guid.h>
 #if defined (UEFI)
 #  include <efi.h>
-#  include <crypt/blake3.h>
 #endif
 
 #define NO_PARTITION  (-1)
 #define INVALID_TABLE (-2)
 #define END_OF_TABLE  (-3)
+
+// Hash output size for volume identification
+#define VOLUME_HASH_BYTES 64
 
 struct volume {
 #if defined (UEFI)
@@ -26,7 +28,7 @@ struct volume {
     EFI_PXE_BASE_CODE_PROTOCOL *pxe_base_code;
 
     bool unique_sector_valid;
-    uint8_t unique_sector_b3[BLAKE3_OUT_BYTES];
+    uint8_t unique_sector_b3[VOLUME_HASH_BYTES];
 #elif defined (BIOS)
     int drive;
 #endif

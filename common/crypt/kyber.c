@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <crypt/kyber.h>
-#include <crypt/blake3.h>
+#include <crypt/shake.h>
 #include <lib/libc.h>
 
 // ============================================================================
@@ -227,28 +227,21 @@ static void polyvec_basemul_acc(kyber_poly *r, const kyber_polyvec *a, const kyb
 // Sampling
 // ============================================================================
 
-// SHAKE-128 XOF using BLAKE3 (bootloader doesn't have SHA3)
-// This is a simplification - production should use proper SHAKE
-static void xof_absorb(blake3_hasher *state, const uint8_t seed[KYBER_SYMBYTES],
+// SHAKE-128 XOF for NIST ML-KEM compliance
+static void xof_absorb(shake128_ctx *state, const uint8_t seed[KYBER_SYMBYTES],
                        uint8_t x, uint8_t y) {
-    uint8_t buf[KYBER_SYMBYTES + 2];
-    memcpy(buf, seed, KYBER_SYMBYTES);
-    buf[KYBER_SYMBYTES] = x;
-    buf[KYBER_SYMBYTES + 1] = y;
-    blake3_hasher_init(state);
-    blake3_hasher_update(state, buf, sizeof(buf));
+    shake128_absorb_once(state, seed, KYBER_SYMBYTES, (uint16_t)x | ((uint16_t)y << 8));
 }
 
-static void xof_squeezeblocks(uint8_t *out, size_t nblocks, blake3_hasher *state) {
-    // BLAKE3 is an XOF, so we can squeeze arbitrary length
-    blake3_hasher_finalize(state, out, nblocks * 168);
+static void xof_squeezeblocks(uint8_t *out, size_t nblocks, shake128_ctx *state) {
+    shake128_squeeze(state, out, nblocks * SHAKE128_RATE);
 }
 
 // Sample polynomial from XOF output (rejection sampling)
 static void poly_sample_ntt(kyber_poly *r, const uint8_t seed[KYBER_SYMBYTES],
                             uint8_t i, uint8_t j) {
     uint8_t buf[504];  // 3 blocks of 168 bytes
-    blake3_hasher state;
+    shake128_ctx state;
     unsigned int ctr, pos;
     uint16_t val0, val1;
 
@@ -440,11 +433,8 @@ void kyber_pke_keypair(uint8_t *pk, uint8_t *sk, const uint8_t seed[KYBER_SYMBYT
     uint8_t *noiseseed = buf + KYBER_SYMBYTES;
     uint8_t nonce = 0;
 
-    // Expand seed
-    blake3_hasher h;
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, seed, KYBER_SYMBYTES);
-    blake3_hasher_finalize(&h, buf, sizeof(buf));
+    // Expand seed using SHAKE256 (G function in ML-KEM)
+    shake256(buf, sizeof(buf), seed, KYBER_SYMBYTES);
 
     // Generate matrix A
     for (int i = 0; i < KYBER_K; i++) {
@@ -453,22 +443,20 @@ void kyber_pke_keypair(uint8_t *pk, uint8_t *sk, const uint8_t seed[KYBER_SYMBYT
         }
     }
 
-    // Generate secret and error vectors
+    // Generate secret and error vectors using PRF (SHAKE256)
     uint8_t noise[KYBER_K * KYBER_N / 4];
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, noiseseed, KYBER_SYMBYTES);
-    blake3_hasher_update(&h, &nonce, 1);
-    blake3_hasher_finalize(&h, noise, sizeof(noise));
+    uint8_t prf_input[KYBER_SYMBYTES + 1];
+    memcpy(prf_input, noiseseed, KYBER_SYMBYTES);
+    prf_input[KYBER_SYMBYTES] = nonce;
+    shake256(noise, sizeof(noise), prf_input, sizeof(prf_input));
 
     for (int i = 0; i < KYBER_K; i++) {
         poly_sample_cbd(&s.vec[i], &noise[i * KYBER_N / 4], KYBER_ETA1);
         nonce++;
     }
 
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, noiseseed, KYBER_SYMBYTES);
-    blake3_hasher_update(&h, &nonce, 1);
-    blake3_hasher_finalize(&h, noise, sizeof(noise));
+    prf_input[KYBER_SYMBYTES] = nonce;
+    shake256(noise, sizeof(noise), prf_input, sizeof(prf_input));
 
     for (int i = 0; i < KYBER_K; i++) {
         poly_sample_cbd(&e.vec[i], &noise[i * KYBER_N / 4], KYBER_ETA1);
@@ -498,7 +486,7 @@ void kyber_pke_encrypt(uint8_t *ct, const uint8_t *m, const uint8_t *pk,
     kyber_poly v, k, epp;
     const uint8_t *seed = pk + KYBER_POLYVECBYTES;
     uint8_t nonce = 0;
-    blake3_hasher h;
+    uint8_t prf_input[KYBER_SYMBYTES + 1];
 
     polyvec_frombytes(&pkpv, pk);
 
@@ -511,22 +499,19 @@ void kyber_pke_encrypt(uint8_t *ct, const uint8_t *m, const uint8_t *pk,
         }
     }
 
-    // Generate r, e1, e2
+    // Generate r, e1, e2 using PRF (SHAKE256)
     uint8_t noise[KYBER_K * KYBER_N / 4];
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, coins, KYBER_SYMBYTES);
-    blake3_hasher_update(&h, &nonce, 1);
-    blake3_hasher_finalize(&h, noise, sizeof(noise));
+    memcpy(prf_input, coins, KYBER_SYMBYTES);
+    prf_input[KYBER_SYMBYTES] = nonce;
+    shake256(noise, sizeof(noise), prf_input, sizeof(prf_input));
 
     for (int i = 0; i < KYBER_K; i++) {
         poly_sample_cbd(&sp.vec[i], &noise[i * KYBER_N / 4], KYBER_ETA1);
         nonce++;
     }
 
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, coins, KYBER_SYMBYTES);
-    blake3_hasher_update(&h, &nonce, 1);
-    blake3_hasher_finalize(&h, noise, sizeof(noise));
+    prf_input[KYBER_SYMBYTES] = nonce;
+    shake256(noise, sizeof(noise), prf_input, sizeof(prf_input));
 
     for (int i = 0; i < KYBER_K; i++) {
         poly_sample_cbd(&ep.vec[i], &noise[i * KYBER_N / 4], KYBER_ETA2);
@@ -534,10 +519,8 @@ void kyber_pke_encrypt(uint8_t *ct, const uint8_t *m, const uint8_t *pk,
     }
 
     uint8_t noise2[KYBER_N / 4];
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, coins, KYBER_SYMBYTES);
-    blake3_hasher_update(&h, &nonce, 1);
-    blake3_hasher_finalize(&h, noise2, sizeof(noise2));
+    prf_input[KYBER_SYMBYTES] = nonce;
+    shake256(noise2, sizeof(noise2), prf_input, sizeof(prf_input));
     poly_sample_cbd(&epp, noise2, KYBER_ETA2);
 
     polyvec_ntt(&sp);
@@ -588,7 +571,6 @@ void kyber_pke_decrypt(uint8_t *m, const uint8_t *ct, const uint8_t *sk) {
 
 int kyber_keypair(uint8_t *pk, uint8_t *sk, const uint8_t *coins) {
     uint8_t buf[2 * KYBER_SYMBYTES];
-    blake3_hasher h;
 
     // Get random seed
     if (coins) {
@@ -604,10 +586,9 @@ int kyber_keypair(uint8_t *pk, uint8_t *sk, const uint8_t *coins) {
     // Append public key to secret key
     memcpy(sk + KYBER_POLYVECBYTES, pk, KYBER_PUBLICKEYBYTES);
 
-    // Append H(pk) to secret key
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, pk, KYBER_PUBLICKEYBYTES);
-    blake3_hasher_finalize(&h, sk + KYBER_POLYVECBYTES + KYBER_PUBLICKEYBYTES, KYBER_SYMBYTES);
+    // Append H(pk) to secret key using SHAKE256
+    shake256(sk + KYBER_POLYVECBYTES + KYBER_PUBLICKEYBYTES, KYBER_SYMBYTES,
+             pk, KYBER_PUBLICKEYBYTES);
 
     // Append random z to secret key (for implicit rejection)
     if (coins) {
@@ -622,7 +603,6 @@ int kyber_keypair(uint8_t *pk, uint8_t *sk, const uint8_t *coins) {
 int kyber_encapsulate(uint8_t *ct, uint8_t *ss, const uint8_t *pk, const uint8_t *coins) {
     uint8_t buf[2 * KYBER_SYMBYTES];
     uint8_t kr[2 * KYBER_SYMBYTES];
-    blake3_hasher h;
 
     // Get random message
     if (coins) {
@@ -631,33 +611,23 @@ int kyber_encapsulate(uint8_t *ct, uint8_t *ss, const uint8_t *pk, const uint8_t
         memset(buf, 0x55, KYBER_SYMBYTES);  // Placeholder - NOT SECURE
     }
 
-    // H(m)
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, buf, KYBER_SYMBYTES);
-    blake3_hasher_finalize(&h, buf, KYBER_SYMBYTES);
+    // H(m) using SHAKE256
+    shake256(buf, KYBER_SYMBYTES, buf, KYBER_SYMBYTES);
 
-    // H(pk)
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, pk, KYBER_PUBLICKEYBYTES);
-    blake3_hasher_finalize(&h, buf + KYBER_SYMBYTES, KYBER_SYMBYTES);
+    // H(pk) using SHAKE256
+    shake256(buf + KYBER_SYMBYTES, KYBER_SYMBYTES, pk, KYBER_PUBLICKEYBYTES);
 
-    // G(m || H(pk)) -> (K, r)
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, buf, 2 * KYBER_SYMBYTES);
-    blake3_hasher_finalize(&h, kr, 2 * KYBER_SYMBYTES);
+    // G(m || H(pk)) -> (K, r) using SHAKE256
+    shake256(kr, 2 * KYBER_SYMBYTES, buf, 2 * KYBER_SYMBYTES);
 
     // Encrypt m with r
     kyber_pke_encrypt(ct, buf, pk, kr + KYBER_SYMBYTES);
 
-    // H(ct)
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, ct, KYBER_CIPHERTEXTBYTES);
-    blake3_hasher_finalize(&h, kr + KYBER_SYMBYTES, KYBER_SYMBYTES);
+    // H(ct) using SHAKE256
+    shake256(kr + KYBER_SYMBYTES, KYBER_SYMBYTES, ct, KYBER_CIPHERTEXTBYTES);
 
-    // KDF(K || H(ct)) -> ss
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, kr, 2 * KYBER_SYMBYTES);
-    blake3_hasher_finalize(&h, ss, KYBER_SSBYTES);
+    // KDF(K || H(ct)) -> ss using SHAKE256
+    shake256(ss, KYBER_SSBYTES, kr, 2 * KYBER_SYMBYTES);
 
     return 0;
 }
@@ -667,7 +637,6 @@ int kyber_decapsulate(uint8_t *ss, const uint8_t *ct, const uint8_t *sk) {
     uint8_t kr[2 * KYBER_SYMBYTES];
     uint8_t cmp[KYBER_CIPHERTEXTBYTES];
     const uint8_t *pk = sk + KYBER_POLYVECBYTES;
-    blake3_hasher h;
     uint8_t fail;
 
     // Decrypt
@@ -676,10 +645,8 @@ int kyber_decapsulate(uint8_t *ss, const uint8_t *ct, const uint8_t *sk) {
     // H(pk) from secret key
     memcpy(buf + KYBER_SYMBYTES, sk + KYBER_POLYVECBYTES + KYBER_PUBLICKEYBYTES, KYBER_SYMBYTES);
 
-    // G(m' || H(pk)) -> (K', r')
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, buf, 2 * KYBER_SYMBYTES);
-    blake3_hasher_finalize(&h, kr, 2 * KYBER_SYMBYTES);
+    // G(m' || H(pk)) -> (K', r') using SHAKE256
+    shake256(kr, 2 * KYBER_SYMBYTES, buf, 2 * KYBER_SYMBYTES);
 
     // Re-encrypt with r'
     kyber_pke_encrypt(cmp, buf, pk, kr + KYBER_SYMBYTES);
@@ -687,18 +654,14 @@ int kyber_decapsulate(uint8_t *ss, const uint8_t *ct, const uint8_t *sk) {
     // Verify ciphertext
     fail = kyber_verify(ct, cmp, KYBER_CIPHERTEXTBYTES);
 
-    // H(ct)
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, ct, KYBER_CIPHERTEXTBYTES);
-    blake3_hasher_finalize(&h, kr + KYBER_SYMBYTES, KYBER_SYMBYTES);
+    // H(ct) using SHAKE256
+    shake256(kr + KYBER_SYMBYTES, KYBER_SYMBYTES, ct, KYBER_CIPHERTEXTBYTES);
 
     // Conditional: use z if verification failed (implicit rejection)
     kyber_cmov(kr, sk + KYBER_SECRETKEYBYTES - KYBER_SYMBYTES, KYBER_SYMBYTES, fail);
 
-    // KDF(K || H(ct)) -> ss
-    blake3_hasher_init(&h);
-    blake3_hasher_update(&h, kr, 2 * KYBER_SYMBYTES);
-    blake3_hasher_finalize(&h, ss, KYBER_SSBYTES);
+    // KDF(K || H(ct)) -> ss using SHAKE256
+    shake256(ss, KYBER_SSBYTES, kr, 2 * KYBER_SYMBYTES);
 
     return 0;
 }

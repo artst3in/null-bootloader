@@ -11,7 +11,10 @@
 #include <pxe/tftp.h>
 #include <menu.h>
 #include <lib/getchar.h>
-#include <crypt/blake3.h>
+#include <crypt/shake.h>
+
+// URI hash length (was BLAKE3_OUT_LEN)
+#define URI_HASH_LEN 32
 
 // A URI takes the form of: resource(root):/path#hash
 // The following function splits up a URI into its components.
@@ -253,14 +256,14 @@ struct file_handle *uri_open(char *uri) {
     }
 
     if (hash != NULL && ret != NULL) {
-        uint8_t out_buf[BLAKE3_OUT_LEN];
+        uint8_t out_buf[URI_HASH_LEN];
 #if defined (UEFI) && defined (__x86_64__)
         void *file_buf = freadall_mode(ret, MEMMAP_BOOTLOADER_RECLAIMABLE, true);
 #else
         void *file_buf = freadall(ret, MEMMAP_BOOTLOADER_RECLAIMABLE);
 #endif
-        blake3(out_buf, file_buf, ret->size);
-        uint8_t hash_buf[BLAKE3_OUT_LEN];
+        shake256(out_buf, URI_HASH_LEN, file_buf, ret->size);
+        uint8_t hash_buf[URI_HASH_LEN];
 
         for (size_t i = 0; i < sizeof(hash_buf); i++) {
             hash_buf[i] = digit_to_int(hash[i * 2]) << 4 | digit_to_int(hash[i * 2 + 1]);
@@ -268,9 +271,9 @@ struct file_handle *uri_open(char *uri) {
 
         if (memcmp(hash_buf, out_buf, sizeof(out_buf)) != 0) {
             if (hash_mismatch_panic) {
-                panic(true, "BLAKE3 hash for URI `%#` does not match!", uri);
+                panic(true, "SHAKE256 hash for URI `%#` does not match!", uri);
             } else {
-                print("WARNING: BLAKE3 hash for URI `%#` does not match!\n"
+                print("WARNING: SHAKE256 hash for URI `%#` does not match!\n"
                       "         Press Y to continue, press any other key to return to menu...", uri);
 
                 char ch = getchar();
