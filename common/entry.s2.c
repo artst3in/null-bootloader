@@ -15,8 +15,6 @@
 #include <fs/file.h>
 #include <lib/elf.h>
 #include <mm/pmm.h>
-#include <protos/linux.h>
-#include <protos/chainload.h>
 #include <menu.h>
 #include <pxe/pxe.h>
 #include <pxe/tftp.h>
