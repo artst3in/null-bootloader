@@ -16,8 +16,16 @@
 // Embedded Keys
 // ============================================================================
 
-// Default: no keys (must be patched at build time)
-// The limine utility will embed actual keys here
+// Try to include generated keys (created by luna_sign export)
+#if __has_include("embedded_keys.h")
+#include "embedded_keys.h"
+#define HAVE_EMBEDDED_KEYS 1
+#else
+#define HAVE_EMBEDDED_KEYS 0
+static const uint8_t DILITHIUM_PUBLIC_KEY[DILITHIUM_PUBLICKEYBYTES] = {0};
+#endif
+
+// Keys are copied from DILITHIUM_PUBLIC_KEY in pqcrypto_init()
 pqcrypto_keys pqcrypto_embedded_keys = {
     .dilithium_pk = {0},
     .kyber_sk = {0},
@@ -57,6 +65,10 @@ int pqcrypto_keys_available(void) {
 }
 
 int pqcrypto_init(void) {
+    // Copy embedded key to runtime structure
+    memcpy(pqcrypto_embedded_keys.dilithium_pk, DILITHIUM_PUBLIC_KEY,
+           DILITHIUM_PUBLICKEYBYTES);
+
     // Validate that keys are present
     // Check if dilithium public key has any non-zero bytes
     uint8_t any_nonzero = 0;
@@ -76,12 +88,16 @@ int pqcrypto_init(void) {
 // ============================================================================
 
 int pqcrypto_verify_kernel(const uint8_t *kernel, size_t kernel_size,
-                           const uint8_t *signature) {
+                           const uint8_t *signature, size_t sig_size) {
     if (!pqcrypto_keys_available()) {
         return PQCRYPTO_ERR_NO_KEY;
     }
 
-    int result = dilithium_verify(signature, PQCRYPTO_SIG_SIZE,
+    if (sig_size != PQCRYPTO_SIG_SIZE) {
+        return PQCRYPTO_ERR_INVALID_SIZE;
+    }
+
+    int result = dilithium_verify(signature, sig_size,
                                   kernel, kernel_size,
                                   pqcrypto_embedded_keys.dilithium_pk);
 
@@ -95,14 +111,14 @@ int pqcrypto_verify_kernel_appended(const uint8_t *kernel_image,
         return PQCRYPTO_ERR_INVALID_SIZE;
     }
 
-    // Signature is at the end
     size_t ksize = total_size - PQCRYPTO_SIG_SIZE;
     const uint8_t *signature = kernel_image + ksize;
 
-    int result = pqcrypto_verify_kernel(kernel_image, ksize, signature);
-
-    if (result == PQCRYPTO_OK && kernel_size) {
-        *kernel_size = ksize;
+    int result = pqcrypto_verify_kernel(kernel_image, ksize, signature, PQCRYPTO_SIG_SIZE);
+    if (result == PQCRYPTO_OK) {
+        if (kernel_size) {
+            *kernel_size = ksize;
+        }
     }
 
     return result;

@@ -73,3 +73,12 @@ compile_commands.json
 # clangd caches
 /.clangd
 /.cache/clangd
+
+# PQCrypto tools (downloaded and built locally)
+/tools/pqcrypto/dilithium-ref
+/tools/pqcrypto/kyber-ref
+/tools/pqcrypto/keys/*.sec
+/tools/pqcrypto/keys/*.pub
+
+# Never commit secret keys
+*.sec

@@ -152,80 +152,123 @@ We tried everything else:
 
 ## 🔐 Post-Quantum Cryptography
 
-Null includes a complete post-quantum cryptographic stack for secure boot:
+Null includes a complete post-quantum cryptographic stack for secure boot.
+
+### 🚀 Quick Start (One Command)
+
+```bash
+./setup-pqcrypto.sh
+```
+
+This single command will:
+1. Download pq-crystals reference implementations
+2. Build `luna_sign` and `luna_crypt` tools
+3. Generate signing and encryption keys
+4. Embed keys into the bootloader
+5. Build the bootloader
 
 ### Crypto Primitives
 
-| Component | Algorithm | Purpose | Size |
-|-----------|-----------|---------|------|
-| 🔏 **Signatures** | Dilithium-3 (ML-DSA) | Kernel verification | ~40 KB |
-| 🔑 **Key Exchange** | Kyber-1024 (ML-KEM) | Encrypted kernel support | ~25 KB |
-| 🔒 **Encryption** | ChaCha20-Poly1305 | Authenticated encryption | ~8 KB |
-| #️⃣ **Hashing** | SHAKE256 (SHA-3 XOF) | Dilithium internals | ~10 KB |
+| Component | Algorithm | Security Level | Key Sizes |
+|-----------|-----------|----------------|-----------|
+| 🔏 **Signatures** | Dilithium-3 (ML-DSA) | NIST Level 3 (128-bit) | PK: 1952B, SK: 4032B, Sig: 3309B |
+| 🔑 **Key Encapsulation** | Kyber-1024 (ML-KEM) | NIST Level 5 (256-bit) | PK: 1568B, SK: 3168B, CT: 1568B |
+| 🔒 **Symmetric AEAD** | ChaCha20-Poly1305 | 256-bit | Key: 32B, Nonce: 12B, Tag: 16B |
 
-**Total crypto code: ~83 KB**
+### How It Works
 
-### Security Levels
-
-- **Dilithium-3**: NIST Security Level 3 (~128-bit post-quantum)
-- **Kyber-1024**: NIST Security Level 5 (~256-bit post-quantum)
-- **ChaCha20-Poly1305**: 256-bit symmetric + 128-bit authentication
-
-### Configuration Options
-
-```ini
-# limine.conf
-
-/LunaOS (Signed)
-    protocol: limine
-    kernel_path: boot():/luna_soul
-    KERNEL_VERIFY=yes        # Require signature (default if keys present)
-
-/LunaOS (Encrypted)
-    protocol: limine
-    kernel_path: boot():/luna_soul.enc
-    KERNEL_VERIFY=yes
-    KERNEL_ENCRYPTED=yes     # Decrypt before verify
+**Signing** protects against kernel replacement (integrity):
+```
+Developer                           User's Machine
+    │                                    │
+    │  kernel.elf + secret key           │
+    │      │                             │
+    │  [luna_sign] ──────────────►  kernel.signed
+    │                                    │
+    │  BOOTX64.EFI ─────────────►   Bootloader verifies
+    │  (has public key)                  signature before
+    │                                    executing kernel
 ```
 
-### Key Management
+**Encryption** protects against kernel reading (confidentiality):
+```
+Developer                           User's Machine
+    │                                    │
+    │  kernel.signed + public key        │
+    │      │                             │
+    │  [luna_crypt] ─────────────►  kernel.enc
+    │                                    │
+    │  BOOTX64.EFI ─────────────►   Bootloader decrypts
+    │  (has secret key)                  then verifies
+```
 
-Keys are embedded at build time:
-- **Public key** (Dilithium): Compiled into bootloader for verification
-- **Secret key** (Kyber): Compiled into bootloader for decryption
+### Tool Usage
 
-Use the `limine` utility to embed keys:
 ```bash
-limine keygen --output keys/       # Generate keypair
-limine sign kernel keys/luna.key   # Sign kernel
-limine embed-keys BOOTX64.EFI keys/luna.pub keys/kyber.key
-```
+# Sign a kernel (appends 3309-byte Dilithium-3 signature)
+./tools/pqcrypto/dilithium-ref/ref/luna_sign sign kernel.elf keys/signing.sec kernel.signed
 
-### Boot Flow
+# Verify a signed kernel
+./tools/pqcrypto/dilithium-ref/ref/luna_sign verify kernel.signed keys/signing.pub
 
-```
-1. Load kernel from disk
-2. Check KERNEL_ENCRYPTED → Decrypt with Kyber+ChaCha20
-3. Check KERNEL_VERIFY → Verify Dilithium signature
-4. Execute verified kernel
+# Encrypt a file (Kyber-1024 + ChaCha20-Poly1305)
+./tools/pqcrypto/kyber-ref/ref/luna_crypt encrypt kernel.signed keys/encryption.pub kernel.enc
+
+# Decrypt a file
+./tools/pqcrypto/kyber-ref/ref/luna_crypt decrypt kernel.enc keys/encryption.sec kernel.dec
 ```
 
 ### File Formats
 
-**Signed kernel**: `[kernel data][Dilithium signature (3293 bytes)]`
+**Signed kernel**: `[kernel data][Dilithium-3 signature (3309 bytes)]`
 
-**Encrypted kernel**:
+**Encrypted kernel** (LUNAENC1 format):
 ```
-[Magic "LUNAENC1" (8 bytes)]
-[Kyber ciphertext (1568 bytes)]
-[Nonce (12 bytes)]
-[Auth tag (16 bytes)]
-[Encrypted kernel+signature]
+┌─────────────────────────────────────────────────────────────────┐
+│ Magic: "LUNAENC1" (8 bytes)                                     │
+├─────────────────────────────────────────────────────────────────┤
+│ Kyber-1024 Ciphertext (1568 bytes)                              │
+├─────────────────────────────────────────────────────────────────┤
+│ ChaCha20 Nonce (12 bytes)                                       │
+├─────────────────────────────────────────────────────────────────┤
+│ Poly1305 Authentication Tag (16 bytes)                          │
+├─────────────────────────────────────────────────────────────────┤
+│ Encrypted Data (variable length)                                │
+└─────────────────────────────────────────────────────────────────┘
+Header overhead: 1604 bytes
+```
+
+### ⚠️ Important Security Notes
+
+1. **Keys are per-developer** - Each developer generates their own keypair
+2. **Bootloader + kernel are paired** - A bootloader only verifies kernels signed with its embedded public key
+3. **Back up your secret keys** - Store `keys/*.sec` files securely; if lost, you cannot sign new kernels
+4. **Never commit secret keys** - `.sec` files are gitignored by default
+5. **Pre-built binaries are useless** - A downloaded bootloader has someone else's keys embedded
+
+### Setup Script Options
+
+```bash
+./setup-pqcrypto.sh                 # Full setup (recommended)
+./setup-pqcrypto.sh --tools-only    # Only build tools
+./setup-pqcrypto.sh --keys-only     # Only generate keys
+./setup-pqcrypto.sh --build-only    # Only rebuild bootloader
+./setup-pqcrypto.sh --clean         # Clean and start fresh
+./setup-pqcrypto.sh --no-kyber      # Signing only (no encryption)
+./setup-pqcrypto.sh --help          # Show all options
 ```
 
 ---
 
 ## 🏗️ Building
+
+### With PQCrypto (Recommended)
+
+```bash
+./setup-pqcrypto.sh
+```
+
+### Manual Build (No Crypto)
 
 ```bash
 ./bootstrap

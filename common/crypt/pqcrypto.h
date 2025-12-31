@@ -23,8 +23,8 @@
 // Constants
 // ============================================================================
 
-// Signature verification
-#define PQCRYPTO_SIG_SIZE           DILITHIUM_SIGNATUREBYTES    // 3293 bytes
+// Signature verification (NIST Dilithium-3 / ML-DSA)
+#define PQCRYPTO_SIG_SIZE           DILITHIUM_SIGNATUREBYTES    // 3293 bytes (NIST)
 #define PQCRYPTO_PUBKEY_SIZE        DILITHIUM_PUBLICKEYBYTES    // 1952 bytes
 #define PQCRYPTO_SECKEY_SIZE        DILITHIUM_SECRETKEYBYTES    // 4032 bytes
 
@@ -79,7 +79,7 @@ extern pqcrypto_keys pqcrypto_embedded_keys;
  * @return PQCRYPTO_OK if valid, PQCRYPTO_ERR_SIGNATURE if invalid
  */
 int pqcrypto_verify_kernel(const uint8_t *kernel, size_t kernel_size,
-                           const uint8_t *signature);
+                           const uint8_t *signature, size_t sig_size);
 
 /**
  * Verify kernel using signature stored at end of kernel image.

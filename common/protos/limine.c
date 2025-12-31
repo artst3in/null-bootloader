@@ -28,6 +28,7 @@
 #include <fs/file.h>
 #include <mm/pmm.h>
 #include <pxe/tftp.h>
+#include <crypt/kernel_verify.h>
 #include <drivers/edid.h>
 #include <drivers/vga_textmode.h>
 #include <lib/rand.h>
@@ -456,6 +457,13 @@ noreturn void limine_load(char *config, char *cmdline) {
     }
 
     uint8_t *kernel = freadall(kernel_file, MEMMAP_BOOTLOADER_RECLAIMABLE);
+    size_t kernel_size = kernel_file->size;
+
+    // Post-quantum signature verification
+    kernel_verify_init();
+    if (!kernel_verify_and_decrypt(&kernel, &kernel_size, config)) {
+        panic(true, "limine: Kernel signature verification failed!");
+    }
 
     char *kaslr_s = config_get_value(config, 0, "KASLR");
     bool kaslr = false;

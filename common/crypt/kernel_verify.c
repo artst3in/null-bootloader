@@ -34,14 +34,29 @@ bool kernel_verify_init(void) {
         return keys_present;
     }
 
+    print("\n");
+    print("+-- Post-Quantum Cryptography -----------------------------------------\n");
+
     int result = pqcrypto_init();
     keys_present = (result == PQCRYPTO_OK);
     verify_initialized = true;
 
     if (keys_present) {
-        print("pqcrypto: Signature verification keys loaded\n");
+        uint8_t key_id[8];
+        uint8_t full_hash[32];
+        shake256(full_hash, 32,
+                 pqcrypto_embedded_keys.dilithium_pk,
+                 DILITHIUM_PUBLICKEYBYTES);
+        memcpy(key_id, full_hash, 8);
+
+        print("[  OK  ] Dilithium-3 (ML-DSA) verification key loaded\n");
+        print("         Key ID: ");
+        for (int i = 0; i < 8; i++) {
+            print("%02x", key_id[i]);
+        }
+        print("\n");
     } else {
-        print("pqcrypto: No signing keys embedded (verification disabled)\n");
+        print("[ WARN ] No signing keys embedded (verification disabled)\n");
     }
 
     return keys_present;
@@ -147,11 +162,11 @@ bool kernel_verify_and_decrypt(uint8_t **kernel, size_t *size, char *config) {
     }
 
     // Verify signature
-    print("pqcrypto: Verifying kernel signature...\n");
+    print("[  ..  ] Verifying kernel signature (%u bytes)...\n", (unsigned int)ksize);
 
     if (ksize < PQCRYPTO_SIG_SIZE) {
         last_error = "Kernel too small to contain signature";
-        print("pqcrypto: ERROR - %s\n", last_error);
+        print("[ FAIL ] %s\n", last_error);
         return false;
     }
 
@@ -160,14 +175,16 @@ bool kernel_verify_and_decrypt(uint8_t **kernel, size_t *size, char *config) {
 
     if (result != PQCRYPTO_OK) {
         last_error = "Invalid kernel signature";
-        print("pqcrypto: ERROR - %s\n", last_error);
-        print("pqcrypto: Boot halted for security\n");
+        print("[ FAIL ] %s\n", last_error);
+        print("[ HALT ] Boot halted - kernel may be compromised!\n");
         return false;
     }
 
     // Update size to exclude signature
     *size = kernel_size;
 
-    print("pqcrypto: Signature verified successfully\n");
+    print("[  OK  ] Signature VALID (Dilithium-3, NIST Level 3)\n");
+    print("         Kernel: %u bytes, Signature: %u bytes\n",
+          (unsigned int)kernel_size, (unsigned int)PQCRYPTO_SIG_SIZE);
     return true;
 }
