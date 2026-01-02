@@ -73,7 +73,7 @@ if ! test -f version; then
     clone_repo_commit \
         https://codeberg.org/OSDev/freestnd-c-hdrs-0bsd.git \
         freestnd-c-hdrs \
-        5df91dd7062ad0c54f5ffd86193bb9f008677631
+        097259a899d30f0a4b7a694de2de5fdda942e923
 
     clone_repo_commit \
         https://codeberg.org/OSDev/cc-runtime.git \
@@ -85,12 +85,12 @@ if ! test -f version; then
     clone_repo_commit \
         https://codeberg.org/Limine/limine-protocol.git \
         limine-protocol \
-        8a888d7ab3b274fad1a357a922e799fc2ff20729
+        42e836e30242c2c14f889fd76c6f9a57b0c18ec2
 
     clone_repo_commit \
         https://codeberg.org/PicoEFI/PicoEFI.git \
         picoefi \
-        4bd08c13f103de9efd7b215a3e337447f1e2ce37
+        8b79fdaa72ee548a8ea24e3dc4d87bf281312865
 
     clone_repo_commit \
         https://github.com/jibsen/tinf.git \
@@ -104,7 +104,7 @@ if ! test -f version; then
     clone_repo_commit \
         https://codeberg.org/Mintsuki/Flanterm.git \
         flanterm \
-        f9d424145bdde18872714094434797e2f44ff5b4
+        cc71c677566453be4d1e821ede227a101868638c
 
     download_by_hash \
         https://github.com/nothings/stb/raw/5c205738c191bcb0abc65c4febfa9bd25ff35234/stb_image.h \
