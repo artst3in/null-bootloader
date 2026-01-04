@@ -161,7 +161,9 @@ noreturn void chainload(char *config, char *cmdline) {
             }
 
             uint32_t mbr_id_1;
-            volume_read(p, &mbr_id_1, 0x1b8, sizeof(uint32_t));
+            if (!volume_read(p, &mbr_id_1, 0x1b8, sizeof(uint32_t))) {
+                continue;
+            }
 
             if (mbr_id_1 == mbr_id) {
                 p = volume_get_by_coord(false, p->index, part);
@@ -182,7 +184,9 @@ load:
 
     void *buf = ext_mem_alloc(512);
 
-    volume_read(p, buf, 0, 512);
+    if (!volume_read(p, buf, 0, 512)) {
+        panic(true, "bios: Failed to read boot sector");
+    }
 
     uint16_t *boot_sig = (uint16_t *)(buf + 0x1fe);
 

@@ -119,7 +119,9 @@ static void iso9660_find_PVD(struct iso9660_primary_volume *desc, struct volume 
         if (__builtin_mul_overflow((uint64_t)lba, (uint64_t)ISO9660_SECTOR_SIZE, &offset)) {
             panic(false, "ISO9660: volume descriptor offset overflow");
         }
-        volume_read(vol, desc, offset, sizeof(struct iso9660_primary_volume));
+        if (!volume_read(vol, desc, offset, sizeof(struct iso9660_primary_volume))) {
+            panic(false, "ISO9660: failed to read volume descriptor");
+        }
 
         switch (desc->volume_descriptor.type) {
         case ISO9660_VDT_PRIMARY:
@@ -153,7 +155,9 @@ static void iso9660_cache_root(struct volume *vol,
     if (__builtin_mul_overflow((uint64_t)pv.root.extent.little, (uint64_t)ISO9660_SECTOR_SIZE, &offset)) {
         panic(false, "ISO9660: root extent offset overflow");
     }
-    volume_read(vol, *root, offset, *root_size);
+    if (!volume_read(vol, *root, offset, *root_size)) {
+        panic(false, "ISO9660: failed to read root directory");
+    }
 }
 
 static struct iso9660_context *iso9660_get_context(struct volume *vol) {
@@ -352,7 +356,9 @@ static void iso9660_close(struct file_handle *file);
 struct file_handle *iso9660_open(struct volume *vol, const char *path) {
     char buf[6];
     const uint64_t signature = ISO9660_FIRST_VOLUME_DESCRIPTOR * ISO9660_SECTOR_SIZE + 1;
-    volume_read(vol, buf, signature, 5);
+    if (!volume_read(vol, buf, signature, 5)) {
+        return NULL;
+    }
     buf[5] = '\0';
     if (strcmp(buf, "CD001") != 0) {
         return NULL;
@@ -488,7 +494,11 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
             pmm_free(ret, sizeof(struct iso9660_file_handle));
             return NULL;
         }
-        volume_read(vol, current, dir_offset, current_size);
+        if (!volume_read(vol, current, dir_offset, current_size)) {
+            pmm_free(current, current_size);
+            pmm_free(ret, sizeof(struct iso9660_file_handle));
+            return NULL;
+        }
     }
 
     // Free the last directory buffer if we allocated one (not the cached root)
@@ -542,7 +552,9 @@ static void iso9660_read(struct file_handle *file, void *buf, uint64_t loc, uint
                 panic(false, "iso9660: offset calculation overflow");
             }
 
-            volume_read(f->context->vol, buf, disk_offset, to_read);
+            if (!volume_read(f->context->vol, buf, disk_offset, to_read)) {
+                panic(false, "iso9660: failed to read file data");
+            }
 
             buf = (uint8_t *)buf + to_read;
             loc += to_read;

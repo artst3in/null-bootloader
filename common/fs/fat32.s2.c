@@ -103,7 +103,9 @@ static int fat32_init_context(struct fat32_context* context, struct volume *part
     context->part = part;
 
     struct fat32_bpb bpb;
-    volume_read(context->part, &bpb, 0, sizeof(struct fat32_bpb));
+    if (!volume_read(context->part, &bpb, 0, sizeof(struct fat32_bpb))) {
+        return 1;
+    }
 
     // Sanity check of bpb
 
@@ -287,7 +289,9 @@ static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster
                 return -1;
             }
 
-            volume_read(context->part, &tmp, fat_base + offset, sizeof(uint16_t));
+            if (!volume_read(context->part, &tmp, fat_base + offset, sizeof(uint16_t))) {
+                return -1;
+            }
             if (cluster % 2 == 0) {
                 *out = tmp & 0xfff;
             } else {
@@ -301,7 +305,9 @@ static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster
             if (offset + sizeof(uint16_t) > fat_size) {
                 return -1;
             }
-            volume_read(context->part, out, fat_base + offset, sizeof(uint16_t));
+            if (!volume_read(context->part, out, fat_base + offset, sizeof(uint16_t))) {
+                return -1;
+            }
             break;
         }
         case 32: {
@@ -309,7 +315,9 @@ static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster
             if (offset + sizeof(uint32_t) > fat_size) {
                 return -1;
             }
-            volume_read(context->part, out, fat_base + offset, sizeof(uint32_t));
+            if (!volume_read(context->part, out, fat_base + offset, sizeof(uint32_t))) {
+                return -1;
+            }
             *out &= 0x0fffffff;
             break;
         }
@@ -341,7 +349,9 @@ static uint32_t *cache_cluster_chain(struct fat32_context *context,
     uint32_t cluster = initial_cluster;
     size_t chain_length;
     for (chain_length = 1; chain_length <= max_clusters; chain_length++) {
-        read_cluster_from_map(context, cluster, &cluster);
+        if (read_cluster_from_map(context, cluster, &cluster) != 0) {
+            return NULL;
+        }
         if (cluster < 0x2 || cluster > cluster_limit)
             break;
     }
@@ -359,7 +369,10 @@ static uint32_t *cache_cluster_chain(struct fat32_context *context,
     cluster = initial_cluster;
     for (size_t i = 0; i < chain_length; i++) {
         cluster_chain[i] = cluster;
-        read_cluster_from_map(context, cluster, &cluster);
+        if (read_cluster_from_map(context, cluster, &cluster) != 0) {
+            pmm_free(cluster_chain, alloc_size);
+            return NULL;
+        }
     }
     *_chain_length = chain_length;
     return cluster_chain;
@@ -405,7 +418,9 @@ static bool read_cluster_chain(struct fat32_context *context,
         if (__builtin_mul_overflow(sector_offset, (uint64_t)context->bytes_per_sector, &base)) {
             return false;
         }
-        volume_read(context->part, buf + progress, base + offset, chunk);
+        if (!volume_read(context->part, buf + progress, base + offset, chunk)) {
+            return false;
+        }
 
         progress += chunk;
     }
@@ -510,7 +525,10 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
             pmm_free(directory_entries, alloc_size);
             return -1;
         }
-        volume_read(context->part, directory_entries, root_offset, context->root_entries * sizeof(struct fat32_directory_entry));
+        if (!volume_read(context->part, directory_entries, root_offset, context->root_entries * sizeof(struct fat32_directory_entry))) {
+            pmm_free(directory_entries, alloc_size);
+            return -1;
+        }
     }
 
     int ret;
