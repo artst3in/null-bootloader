@@ -493,7 +493,7 @@ tab_part:
             if (cursor_offset) {
                 cursor_offset--;
         case GETCHAR_DELETE:
-                for (size_t i = cursor_offset; ; i++) {
+                for (size_t i = cursor_offset; i < buffer_len; i++) {
                     buffer[i] = buffer[i+1];
                     if (!buffer[i])
                         break;
