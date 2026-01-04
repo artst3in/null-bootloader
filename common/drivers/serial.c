@@ -21,6 +21,9 @@ static void serial_initialise(void) {
         serial_baudrate = 115200;
     } else {
         serial_baudrate = strtoui(baudrate_s, NULL, 10);
+        if (serial_baudrate == 0 || serial_baudrate > 115200) {
+            serial_baudrate = 115200;
+        }
     }
 
     // Init com1
