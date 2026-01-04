@@ -800,14 +800,21 @@ bool memmap_alloc_range_in(struct memmap_entry *m, size_t *_count,
         return true;
     }
 
-    uint64_t top = base + length;
+    uint64_t top;
+    if (__builtin_add_overflow(base, length, &top)) {
+        if (do_panic)
+            panic(false, "Memory allocation overflow.");
+        return false;
+    }
 
     for (size_t i = 0; i < count; i++) {
         if (overlay_type != 0 && m[i].type != overlay_type)
             continue;
 
         uint64_t entry_base = m[i].base;
-        uint64_t entry_top  = m[i].base + m[i].length;
+        uint64_t entry_top;
+        if (__builtin_add_overflow(m[i].base, m[i].length, &entry_top))
+            continue;
 
         if (base >= entry_base && base < entry_top && top <= entry_top) {
             if (simulation)
