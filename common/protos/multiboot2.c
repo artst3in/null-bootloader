@@ -90,9 +90,19 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
 
     fclose(kernel_file);
 
-    struct multiboot_header *header;
+    struct multiboot_header *header = NULL;
 
-    for (size_t header_offset = 0; header_offset < MULTIBOOT_SEARCH; header_offset += MULTIBOOT_HEADER_ALIGN) {
+    // Per Multiboot2 spec, header must be within first 32768 bytes and 8-byte aligned.
+    // Ensure we don't read past end of file when checking magic.
+    size_t search_limit = MULTIBOOT_SEARCH;
+    if (kernel_file_size < sizeof(struct multiboot_header)) {
+        panic(true, "multiboot2: Kernel file too small to contain header");
+    }
+    if (search_limit > kernel_file_size - sizeof(struct multiboot_header)) {
+        search_limit = kernel_file_size - sizeof(struct multiboot_header);
+    }
+
+    for (size_t header_offset = 0; header_offset <= search_limit; header_offset += MULTIBOOT_HEADER_ALIGN) {
         header = (void *)(kernel + header_offset);
 
         if (header->magic == MULTIBOOT2_HEADER_MAGIC) {
@@ -100,7 +110,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
         }
     }
 
-    if (header->magic != MULTIBOOT2_HEADER_MAGIC) {
+    if (header == NULL || header->magic != MULTIBOOT2_HEADER_MAGIC) {
         panic(true, "multiboot2: Invalid magic");
     }
 

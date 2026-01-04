@@ -73,8 +73,18 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
     struct multiboot1_header header = {0};
     size_t header_offset = 0;
 
-    for (header_offset = 0; header_offset < 8192; header_offset += 4) {
-        uint32_t v = *(uint32_t *)(kernel+header_offset);
+    // Per Multiboot spec, header must be within first 8192 bytes and 4-byte aligned.
+    // Ensure we don't read past end of file when checking magic or copying header.
+    size_t search_limit = 8192;
+    if (kernel_file_size < sizeof(struct multiboot1_header)) {
+        panic(true, "multiboot1: Kernel file too small to contain header");
+    }
+    if (search_limit > kernel_file_size - sizeof(struct multiboot1_header)) {
+        search_limit = kernel_file_size - sizeof(struct multiboot1_header);
+    }
+
+    for (header_offset = 0; header_offset <= search_limit; header_offset += 4) {
+        uint32_t v = *(uint32_t *)(kernel + header_offset);
 
         if (v == MULTIBOOT1_HEADER_MAGIC) {
             memcpy(&header, kernel + header_offset, sizeof(header));
