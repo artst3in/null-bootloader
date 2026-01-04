@@ -218,7 +218,11 @@ bytes_per_sector_valid:;
         return 1;  // Overflow in root_start calculation
     }
     context->root_start = (uint32_t)root_start_64;
-    context->root_size = DIV_ROUNDUP(context->root_entries * sizeof(struct fat32_directory_entry), context->bytes_per_sector);
+    uint64_t root_dir_bytes_temp;
+    if (__builtin_mul_overflow((uint64_t)context->root_entries, (uint64_t)sizeof(struct fat32_directory_entry), &root_dir_bytes_temp)) {
+        return 1;
+    }
+    context->root_size = DIV_ROUNDUP(root_dir_bytes_temp, context->bytes_per_sector);
     switch (context->type) {
         case 12:
         case 16:
@@ -487,7 +491,11 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
 
         pmm_free(directory_cluster_chain, dir_chain_len * sizeof(uint32_t));
     } else {
-        dir_chain_len = DIV_ROUNDUP(context->root_entries * sizeof(struct fat32_directory_entry), block_size);
+        uint64_t root_dir_bytes_temp;
+        if (__builtin_mul_overflow((uint64_t)context->root_entries, (uint64_t)sizeof(struct fat32_directory_entry), &root_dir_bytes_temp)) {
+            return -1;
+        }
+        dir_chain_len = DIV_ROUNDUP(root_dir_bytes_temp, block_size);
 
         // Check for overflow
         size_t alloc_size;
