@@ -152,6 +152,10 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        // Prevent infinite loop on zero-length MADT entry
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 0: {
                 // Processor local xAPIC
@@ -192,6 +196,10 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        // Prevent infinite loop on zero-length MADT entry
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 0: {
                 // Processor local xAPIC
