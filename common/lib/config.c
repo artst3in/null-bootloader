@@ -187,9 +187,7 @@ bool init_config_smbios(void) {
 
     if (smbios_entry_64) {
         hdr = (void *)(uintptr_t) smbios_entry_64->table_address;
-        // SMBIOS 3.0 entry point does not provide table_length.
-        // Use a safe maximum bound; iteration terminates on type 127 end marker.
-        table_length = 0x10000;
+        table_length = smbios_entry_64->table_maximum_size;
     } else {
         hdr = (void *)(uintptr_t) smbios_entry_32->table_address;
         struct_count = smbios_entry_32->number_of_structures;
