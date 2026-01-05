@@ -62,6 +62,17 @@ struct blake2b_param {
     uint8_t personal[BLAKE2B_PERSONAL_BYTES];
 } __attribute__((packed));
 
+// Safe unaligned load/store helpers for architectures with strict alignment (ARM64, RISC-V)
+static inline uint64_t load64_le(const void *src) {
+    uint64_t val;
+    memcpy(&val, src, sizeof(val));
+    return val;
+}
+
+static inline void store64_le(void *dst, uint64_t val) {
+    memcpy(dst, &val, sizeof(val));
+}
+
 static void blake2b_increment_counter(struct blake2b_state *state, uint64_t inc) {
     state->t[0] += inc;
     state->t[1] += state->t[0] < inc;
@@ -98,7 +109,7 @@ static void blake2b_compress(struct blake2b_state *state, const uint8_t block[st
     uint64_t v[16];
 
     for (int i = 0; i < 16; i++) {
-        m[i] = *(uint64_t *)(block + i * sizeof(m[i]));
+        m[i] = load64_le(block + i * sizeof(m[i]));
     }
 
     for (int i = 0; i < 8; i++) {
@@ -149,7 +160,7 @@ static void blake2b_init(struct blake2b_state *state) {
     }
 
     for (int i = 0; i < 8; i++) {
-        state->h[i] ^= *(uint64_t *)((void *)&param + sizeof(state->h[i]) * i);
+        state->h[i] ^= load64_le((uint8_t *)&param + sizeof(state->h[i]) * i);
     }
 }
 
@@ -193,7 +204,7 @@ static void blake2b_final(struct blake2b_state *state, void *out) {
     blake2b_compress(state, state->buf);
 
     for (int i = 0; i < 8; i++) {
-        *(uint64_t *)(buffer + sizeof(state->h[i]) * i) = state->h[i];
+        store64_le(buffer + sizeof(state->h[i]) * i, state->h[i]);
     }
 
     memcpy(out, buffer, BLAKE2B_OUT_BYTES);
