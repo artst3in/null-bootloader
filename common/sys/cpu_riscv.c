@@ -137,7 +137,8 @@ static void init_riscv_acpi(void) {
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s", hartid, isa_string);
+            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            continue;
         }
 
         struct riscv_hart *hart = ext_mem_alloc(sizeof(struct riscv_hart));
@@ -205,7 +206,8 @@ static void init_riscv_fdt(const void *fdt) {
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s", hartid, isa_string);
+            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            continue;
         }
 
         struct riscv_hart *hart = ext_mem_alloc(sizeof(struct riscv_hart));
