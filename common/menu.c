@@ -15,6 +15,7 @@
 #include <mm/pmm.h>
 #include <drivers/vbe.h>
 #include <drivers/vga_textmode.h>
+#include <drivers/serial.h>
 #include <protos/linux.h>
 #include <protos/chainload.h>
 #include <protos/multiboot1.h>
@@ -802,6 +803,20 @@ noreturn void _menu(bool first_run) {
         is_efi_serial_present() &&
 #endif
         serial_str != NULL && strcmp(serial_str, "yes") == 0;
+
+#if defined (BIOS)
+    if (serial) {
+        char *baudrate_s = config_get_value(NULL, 0, "SERIAL_BAUDRATE");
+        if (baudrate_s == NULL) {
+            serial_baudrate = 115200;
+        } else {
+            serial_baudrate = strtoui(baudrate_s, NULL, 10);
+            if (serial_baudrate == 0 || serial_baudrate > 115200) {
+                serial_baudrate = 115200;
+            }
+        }
+    }
+#endif
 
     char *hash_mismatch_panic_str = config_get_value(NULL, 0, "HASH_MISMATCH_PANIC");
     hash_mismatch_panic = hash_mismatch_panic_str == NULL || strcmp(hash_mismatch_panic_str, "yes") == 0;
