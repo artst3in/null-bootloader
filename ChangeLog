@@ -1,3 +1,15 @@
+2026-01-07  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.6.2 ***
+
+    Noteworthy changes compared to the previous release, 10.6.1:
+
+    Bug fixes:
+        - Fix a bug where a buffer holding a configuration file option's value
+          was erroneously overwritten. This affected x86 BIOS builds only, and
+          it would be triggered if the `serial_baudrate` configuration file
+          option was used.
+
 2026-01-05  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.6.1 ***
