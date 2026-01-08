@@ -537,6 +537,97 @@ tab_part:
     goto refresh;
 }
 
+static inline bool should_skip_entry(struct menu_entry *entry) {
+    if (entry->sub != NULL) {
+        return false;
+    }
+    char *cur_entry_protocol = config_get_value(entry->body, 0, "PROTOCOL");
+    if (cur_entry_protocol) {
+#if defined (UEFI)
+        if (strcmp(cur_entry_protocol, "bios") == 0
+         || strcmp(cur_entry_protocol, "bios_chainload") == 0) {
+#elif defined (BIOS)
+        if (strcmp(cur_entry_protocol, "efi") == 0
+         || strcmp(cur_entry_protocol, "uefi") == 0
+         || strcmp(cur_entry_protocol, "efi_chainload") == 0) {
+#endif
+            return true;
+        }
+    }
+    return false;
+}
+
+#if defined(UEFI)
+static void get_entry_path(struct menu_entry *entry, char *buf, size_t buf_size, size_t *pos) {
+    if (entry == NULL || buf_size == 0) {
+        return;
+    }
+
+    if (entry->parent != NULL) {
+        get_entry_path(entry->parent, buf, buf_size, pos);
+        if (*pos < buf_size - 1) {
+            buf[(*pos)++] = '/';
+        }
+    }
+
+    size_t name_len = strlen(entry->name);
+    size_t copy_len = name_len;
+    if (*pos + copy_len >= buf_size) {
+        copy_len = buf_size - *pos - 1;
+    }
+    memcpy(buf + *pos, entry->name, copy_len);
+    *pos += copy_len;
+
+    if (*pos < buf_size) {
+        buf[*pos] = '\0';
+    }
+}
+
+// Find entry by path string. If expand_dirs is true, searches all directories regardless
+// of expansion state and expands parent directories when the entry is found.
+static size_t find_entry_by_path(const char *path, struct menu_entry *current_entry,
+                                 size_t base_index, struct menu_entry **found_entry,
+                                 size_t *found_index, bool expand_dirs) {
+    size_t max_entries = 0;
+    bool found_in_subtree = false;
+
+    while (current_entry != NULL) {
+        if (should_skip_entry(current_entry)) {
+            current_entry = current_entry->next;
+            continue;
+        }
+        if (current_entry->sub == NULL) {
+            // Check if this entry matches the path
+            char entry_path[256];
+            size_t pos = 0;
+            get_entry_path(current_entry, entry_path, sizeof(entry_path), &pos);
+            if (strcmp(entry_path, path) == 0) {
+                *found_entry = current_entry;
+                if (found_index != NULL) {
+                    *found_index = base_index + max_entries;
+                }
+                found_in_subtree = true;
+            }
+        }
+        if (current_entry->sub && (expand_dirs || current_entry->expanded)) {
+            size_t sub_entries = find_entry_by_path(path, current_entry->sub,
+                                                    base_index + max_entries + 1,
+                                                    found_entry, found_index, expand_dirs);
+            if (expand_dirs && *found_entry != NULL && !found_in_subtree) {
+                current_entry->expanded = true;
+            }
+            // Only count sub-entries if directory is expanded.
+            if (current_entry->expanded) {
+                max_entries += sub_entries;
+            }
+        }
+        max_entries++;
+        current_entry = current_entry->next;
+    }
+    return max_entries;
+}
+#endif
+
 static size_t print_tree(size_t offset, size_t window, const char *shift, size_t level, size_t base_index, size_t selected_entry,
                       struct menu_entry *current_entry,
                       struct menu_entry **selected_menu_entry,
@@ -564,25 +655,9 @@ static size_t print_tree(size_t offset, size_t window, const char *shift, size_t
         size_t cur_len = 0;
         if (current_entry == NULL)
             break;
-        if (current_entry->sub == NULL) {
-            bool skip_entry = false;
-            char *cur_entry_protocol = config_get_value(current_entry->body, 0, "PROTOCOL");
-            if (cur_entry_protocol) {
-#if defined (UEFI)
-                if (strcmp(cur_entry_protocol, "bios") == 0
-                 || strcmp(cur_entry_protocol, "bios_chainload") == 0) {
-#elif defined (BIOS)
-                if (strcmp(cur_entry_protocol, "efi") == 0
-                 || strcmp(cur_entry_protocol, "uefi") == 0
-                 || strcmp(cur_entry_protocol, "efi_chainload") == 0) {
-#endif
-                    skip_entry = true;
-                }
-                if (skip_entry) {
-                    current_entry = current_entry->next;
-                    continue;
-                }
-            }
+        if (should_skip_entry(current_entry)) {
+            current_entry = current_entry->next;
+            continue;
         }
         if (!no_print && base_index + max_entries < offset) {
             goto skip_line;
@@ -920,14 +995,20 @@ noreturn void _menu(bool first_run) {
 #if defined (UEFI)
     char *remember_last = config_get_value(NULL, 0, "REMEMBER_LAST_ENTRY");
     if (remember_last != NULL && strcasecmp(remember_last, "yes") == 0) {
-        UINTN getvar_size = sizeof(size_t);
-        size_t last;
+        char last_entry_path[256];
+        UINTN getvar_size = sizeof(last_entry_path);
         if (gRT->GetVariable(L"LimineLastBootedEntry",
                              &limine_efi_vendor_guid,
                              NULL,
                              &getvar_size,
-                             &last) == 0 && getvar_size == sizeof(size_t)) {
-            selected_entry = last;
+                             last_entry_path) == 0 && getvar_size > 0) {
+            // Find the entry with this path, expand directories, and get its index.
+            struct menu_entry *found_entry = NULL;
+            size_t found_index = 0;
+            find_entry_by_path(last_entry_path, menu_tree, 0, &found_entry, &found_index, true);
+            if (found_entry != NULL) {
+                selected_entry = found_index;
+            }
         }
     }
 #endif
@@ -1184,11 +1265,15 @@ timeout_aborted:
                 }
 
 #if defined (UEFI)
+                // Save the entry's path so it can persist between boots.
+                char entry_path[256];
+                size_t pos = 0;
+                get_entry_path(selected_menu_entry, entry_path, sizeof(entry_path), &pos);
                 gRT->SetVariable(L"LimineLastBootedEntry",
                                  &limine_efi_vendor_guid,
                                  EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
-                                 sizeof(size_t),
-                                 &selected_entry);
+                                 strlen(entry_path) + 1,
+                                 entry_path);
 #endif
 
                 boot(selected_menu_entry->body);
