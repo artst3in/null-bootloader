@@ -390,6 +390,7 @@ static bool load_uninstall_data(const char *filename) {
         goto error;
     }
 
+    size_t loaded_count = 0;
     for (size_t i = 0; i < uninstall_data_i; i++) {
         if (fread(&uninstall_data[i].loc, sizeof(uint64_t), 1, udfile) != 1) {
             goto fread_error;
@@ -403,8 +404,10 @@ static bool load_uninstall_data(const char *filename) {
             goto error;
         }
         if (fread(uninstall_data[i].data, uninstall_data[i].count, 1, udfile) != 1) {
+            free(uninstall_data[i].data);
             goto fread_error;
         }
+        loaded_count++;
     }
 
     fclose(udfile);
@@ -414,6 +417,10 @@ fread_error:
     perror_wrap("error: load_uninstall_data(): fread()");
 
 error:
+    // Free any previously allocated uninstall data
+    for (size_t j = 0; j < loaded_count; j++) {
+        free(uninstall_data[j].data);
+    }
     if (udfile != NULL) {
         fclose(udfile);
     }
@@ -461,6 +468,7 @@ static bool _device_write(const void *_buffer, uint64_t loc, size_t count) {
     }
 
     if (!_device_read(ud->data, loc, count)) {
+        free(ud->data);
         return false;
     }
 
@@ -474,6 +482,9 @@ skip_save:;
         uint64_t block = (loc + progress) / block_size;
 
         if (!device_cache_block(block)) {
+            if (!uninstalling) {
+                free(ud->data);
+            }
             return false;
         }
 
