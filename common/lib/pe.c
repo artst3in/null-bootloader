@@ -154,11 +154,19 @@ typedef struct {
     uint32_t SizeOfBlock;
 } IMAGE_BASE_RELOCATION_BLOCK;
 
-static void pe64_validate(uint8_t *image) {
+static void pe64_validate(uint8_t *image, size_t file_size) {
     IMAGE_DOS_HEADER *dos_hdr = (IMAGE_DOS_HEADER *)image;
+
+    if (file_size < sizeof(IMAGE_DOS_HEADER)) {
+        panic(true, "pe: File too small for DOS header");
+    }
 
     if (dos_hdr->e_magic != IMAGE_DOS_SIGNATURE) {
         panic(true, "pe: Not a valid PE file");
+    }
+
+    if (dos_hdr->e_lfanew > file_size - sizeof(IMAGE_NT_HEADERS64)) {
+        panic(true, "pe: e_lfanew offset out of bounds");
     }
 
     IMAGE_NT_HEADERS64 *nt_hdrs = (IMAGE_NT_HEADERS64 *)(image + dos_hdr->e_lfanew);
@@ -214,11 +222,19 @@ int pe_bits(uint8_t *image) {
     return -1;
 }
 
-bool pe64_load(uint8_t *image, uint64_t *entry_point, uint64_t *_slide, uint32_t alloc_type, bool kaslr, struct mem_range **_ranges, uint64_t *_ranges_count, uint64_t *physical_base, uint64_t *virtual_base, uint64_t *_image_size, uint64_t *image_size_before_bss, bool *_is_reloc) {
-    pe64_validate(image);
+bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t *_slide, uint32_t alloc_type, bool kaslr, struct mem_range **_ranges, uint64_t *_ranges_count, uint64_t *physical_base, uint64_t *virtual_base, uint64_t *_image_size, uint64_t *image_size_before_bss, bool *_is_reloc) {
+    pe64_validate(image, file_size);
 
     IMAGE_DOS_HEADER *dos_hdr = (IMAGE_DOS_HEADER *)image;
     IMAGE_NT_HEADERS64 *nt_hdrs = (IMAGE_NT_HEADERS64 *)(image + dos_hdr->e_lfanew);
+
+    // Validate SizeOfOptionalHeader doesn't cause sections pointer to go out of bounds
+    size_t sections_offset = dos_hdr->e_lfanew + sizeof(uint32_t) + sizeof(IMAGE_FILE_HEADER) + nt_hdrs->FileHeader.SizeOfOptionalHeader;
+    size_t sections_end = sections_offset + (size_t)nt_hdrs->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
+    if (sections_end > file_size) {
+        panic(true, "pe: Section headers extend beyond file bounds");
+    }
+
     IMAGE_SECTION_HEADER *sections = (IMAGE_SECTION_HEADER *)((uintptr_t)&nt_hdrs->OptionalHeader + nt_hdrs->FileHeader.SizeOfOptionalHeader);
 
     bool is_reloc = true;
@@ -256,6 +272,11 @@ bool pe64_load(uint8_t *image, uint64_t *entry_point, uint64_t *_slide, uint32_t
     *physical_base = (uintptr_t)ext_mem_alloc_type_aligned(image_size, alloc_type, alignment);
     *virtual_base = image_base;
 
+    // Validate SizeOfHeaders doesn't exceed file size
+    if (nt_hdrs->OptionalHeader.SizeOfHeaders > file_size) {
+        panic(true, "pe: SizeOfHeaders exceeds file size");
+    }
+
     memcpy((void *)(uintptr_t)*physical_base, image, nt_hdrs->OptionalHeader.SizeOfHeaders);
 
     if (_image_size) {
@@ -279,6 +300,11 @@ again:
 
         uintptr_t section_base = *physical_base + section->VirtualAddress;
         uint32_t section_raw_size = section->VirtualSize < section->SizeOfRawData ? section->VirtualSize : section->SizeOfRawData;
+
+        // Validate section data doesn't exceed file bounds
+        if ((uint64_t)section->PointerToRawData + section_raw_size > file_size) {
+            panic(true, "pe: Section %zu data extends beyond file bounds", i);
+        }
 
         memcpy((void *)section_base, image + section->PointerToRawData, section_raw_size);
     }

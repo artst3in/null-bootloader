@@ -484,7 +484,7 @@ noreturn void limine_load(char *config, char *cmdline) {
             }
             break;
         case EXECUTABLE_FORMAT_PE:
-            if (!pe64_load(kernel, &entry_point, &slide,
+            if (!pe64_load(kernel, kernel_file->size, &entry_point, &slide,
                             MEMMAP_KERNEL_AND_MODULES, kaslr,
                             &ranges, &ranges_count,
                             &physical_base, &virtual_base, NULL,
