@@ -366,16 +366,17 @@ int init_config(size_t config_size) {
     for (size_t i = 0; i < config_size; i++) {
         size_t skip = 0;
         if (config_addr[i] == ' ' || config_addr[i] == '\t') {
-            while (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t') {
+            while (i + skip < config_size && (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t')) {
                 skip++;
             }
-            if (config_addr[i + skip] == '\n') {
+            if (i + skip < config_size && config_addr[i + skip] == '\n') {
                 goto skip_loop;
             }
             skip = 0;
         }
-        while ((config_addr[i + skip] == '\r')
-            || ((!i || config_addr[i - 1] == '\n') && (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t'))
+        while (i + skip < config_size
+            && ((config_addr[i + skip] == '\r')
+                || ((!i || config_addr[i - 1] == '\n') && (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t')))
         ) {
             skip++;
         }
@@ -486,7 +487,7 @@ skip_loop:
                         panic(true, "config: Malformed macro usage");
                     }
                 }
-                if (config_addr[i++] != '=') {
+                if (i >= config_size || config_addr[i++] != '=') {
                     i = orig_i;
                     goto next;
                 }
