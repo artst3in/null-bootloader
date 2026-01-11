@@ -157,26 +157,12 @@ bytes_per_sector_valid:;
 
     // The following mess to identify the FAT type is from the FAT spec
     // at paragraph 3.5
-    uint64_t root_dir_bytes;
-    if (__builtin_mul_overflow((uint64_t)bpb.root_entries_count, 32ULL, &root_dir_bytes)) {
-        return 1;
-    }
-    size_t root_dir_sects = (root_dir_bytes + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector;
+    size_t root_dir_sects = ((bpb.root_entries_count * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector;
 
     // Calculate total sectors and metadata sectors separately to check for underflow
     uint64_t total_sects = bpb.sectors_count_16 ? bpb.sectors_count_16 : bpb.sectors_count_32;
     uint64_t sectors_per_fat = bpb.sectors_per_fat_16 ? bpb.sectors_per_fat_16 : bpb.sectors_per_fat_32;
-    uint64_t fat_total_sects;
-    if (__builtin_mul_overflow((uint64_t)bpb.fats_count, sectors_per_fat, &fat_total_sects)) {
-        return 1;
-    }
-    uint64_t metadata_sects;
-    if (__builtin_add_overflow((uint64_t)bpb.reserved_sectors, fat_total_sects, &metadata_sects)) {
-        return 1;
-    }
-    if (__builtin_add_overflow(metadata_sects, root_dir_sects, &metadata_sects)) {
-        return 1;
-    }
+    uint64_t metadata_sects = (uint64_t)bpb.reserved_sectors + ((uint64_t)bpb.fats_count * sectors_per_fat) + root_dir_sects;
 
     // Check for underflow before subtraction
     if (metadata_sects >= total_sects) {
@@ -208,14 +194,7 @@ bytes_per_sector_valid:;
     context->root_entries = bpb.root_entries_count;
 
     // Calculate root_start with overflow check
-    uint64_t fat_sectors_64;
-    if (__builtin_mul_overflow((uint64_t)context->number_of_fats, (uint64_t)context->sectors_per_fat, &fat_sectors_64)) {
-        return 1;
-    }
-    uint64_t root_start_64;
-    if (__builtin_add_overflow((uint64_t)context->reserved_sectors, fat_sectors_64, &root_start_64)) {
-        return 1;
-    }
+    uint64_t root_start_64 = (uint64_t)context->reserved_sectors + (uint64_t)context->number_of_fats * context->sectors_per_fat;
     if (root_start_64 > UINT32_MAX) {
         return 1;  // Overflow in root_start calculation
     }
@@ -265,14 +244,8 @@ bytes_per_sector_valid:;
 }
 
 static int read_cluster_from_map(struct fat32_context *context, uint32_t cluster, uint32_t *out) {
-    uint64_t fat_base;
-    if (__builtin_mul_overflow((uint64_t)context->fat_start_lba, (uint64_t)context->bytes_per_sector, &fat_base)) {
-        return -1;
-    }
-    uint64_t fat_size;
-    if (__builtin_mul_overflow((uint64_t)context->sectors_per_fat, (uint64_t)context->bytes_per_sector, &fat_size)) {
-        return -1;
-    }
+    uint64_t fat_base = (uint64_t)context->fat_start_lba * context->bytes_per_sector;
+    uint64_t fat_size = (uint64_t)context->sectors_per_fat * context->bytes_per_sector;
 
     switch (context->type) {
         case 12: {
@@ -378,10 +351,7 @@ static bool read_cluster_chain(struct fat32_context *context,
                                uint32_t *cluster_chain,
                                size_t chain_len,
                                void *buf, uint64_t loc, uint64_t count) {
-    uint64_t block_size;
-    if (__builtin_mul_overflow((uint64_t)context->sectors_per_cluster, (uint64_t)context->bytes_per_sector, &block_size)) {
-        return false;
-    }
+    uint64_t block_size = (uint64_t)context->sectors_per_cluster * (uint64_t)context->bytes_per_sector;
     for (uint64_t progress = 0; progress < count;) {
         uint64_t block = (loc + progress) / block_size;
 
@@ -401,19 +371,7 @@ static bool read_cluster_chain(struct fat32_context *context,
         if (chunk > block_size - offset)
             chunk = block_size - offset;
 
-        // Calculate base offset with overflow checks
-        uint64_t cluster_offset;
-        if (__builtin_mul_overflow((uint64_t)(cluster - 2), (uint64_t)context->sectors_per_cluster, &cluster_offset)) {
-            return false;
-        }
-        uint64_t sector_offset;
-        if (__builtin_add_overflow((uint64_t)context->data_start_lba, cluster_offset, &sector_offset)) {
-            return false;
-        }
-        uint64_t base;
-        if (__builtin_mul_overflow(sector_offset, (uint64_t)context->bytes_per_sector, &base)) {
-            return false;
-        }
+        uint64_t base = ((uint64_t)context->data_start_lba + (uint64_t)(cluster - 2) * context->sectors_per_cluster) * context->bytes_per_sector;
         if (!volume_read(context->part, buf + progress, base + offset, chunk)) {
             return false;
         }
@@ -465,10 +423,7 @@ static bool fat32_filename_to_8_3(char *dest, const char *src) {
 }
 
 static int fat32_open_in(struct fat32_context* context, struct fat32_directory_entry* directory, struct fat32_directory_entry* file, const char* name) {
-    size_t block_size;
-    if (__builtin_mul_overflow((size_t)context->sectors_per_cluster, (size_t)context->bytes_per_sector, &block_size)) {
-        return -1;
-    }
+    size_t block_size = context->sectors_per_cluster * context->bytes_per_sector;
     char current_lfn[FAT32_LFN_MAX_FILENAME_LENGTH] = {0};
 
     size_t dir_chain_len;
@@ -512,12 +467,7 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
 
         directory_entries = ext_mem_alloc(alloc_size);
 
-        uint64_t root_offset;
-        if (__builtin_mul_overflow((uint64_t)context->root_start, (uint64_t)context->bytes_per_sector, &root_offset)) {
-            pmm_free(directory_entries, alloc_size);
-            return -1;
-        }
-        if (!volume_read(context->part, directory_entries, root_offset, context->root_entries * sizeof(struct fat32_directory_entry))) {
+        if (!volume_read(context->part, directory_entries, (uint64_t)context->root_start * context->bytes_per_sector, context->root_entries * sizeof(struct fat32_directory_entry))) {
             pmm_free(directory_entries, alloc_size);
             return -1;
         }
