@@ -1223,8 +1223,19 @@ static int enroll_config(int argc, char *argv[]) {
         perror_wrap("error: enroll_config(): fseek()");
         goto cleanup;
     }
-    size_t bootloader_size = ftell(bootloader_file);
+    long ftell_result = ftell(bootloader_file);
+    if (ftell_result < 0) {
+        perror_wrap("error: enroll_config(): ftell()");
+        goto cleanup;
+    }
+    size_t bootloader_size = (size_t)ftell_result;
     rewind(bootloader_file);
+
+    size_t min_size = (sizeof(CONFIG_B2SUM_SIGNATURE) - 1) + 128;
+    if (bootloader_size < min_size) {
+        fprintf(stderr, "error: Bootloader file too small (need at least %zu bytes)\n", min_size);
+        goto cleanup;
+    }
 
     bootloader = malloc(bootloader_size);
     if (bootloader == NULL) {
@@ -1240,7 +1251,7 @@ static int enroll_config(int argc, char *argv[]) {
     char *checksum_loc = NULL;
     size_t checked_count = 0;
     const char *config_b2sum_sign = CONFIG_B2SUM_SIGNATURE;
-    for (size_t i = 0; i < bootloader_size - ((sizeof(CONFIG_B2SUM_SIGNATURE) - 1) + 128) + 1; i++) {
+    for (size_t i = 0; i < bootloader_size - min_size + 1; i++) {
         if (bootloader[i] != config_b2sum_sign[checked_count]) {
             checked_count = 0;
             continue;
