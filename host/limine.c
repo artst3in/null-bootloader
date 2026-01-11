@@ -370,6 +370,8 @@ error:
 }
 
 static bool load_uninstall_data(const char *filename) {
+    size_t loaded_count = 0;
+
     if (!quiet) {
         fprintf(stderr, "Loading uninstall data from file: `%s`...\n", filename);
     }
@@ -390,7 +392,6 @@ static bool load_uninstall_data(const char *filename) {
         goto error;
     }
 
-    size_t loaded_count = 0;
     for (size_t i = 0; i < uninstall_data_i; i++) {
         if (fread(&uninstall_data[i].loc, sizeof(uint64_t), 1, udfile) != 1) {
             goto fread_error;
@@ -450,6 +451,8 @@ static bool _device_read(void *_buffer, uint64_t loc, size_t count) {
 }
 
 static bool _device_write(const void *_buffer, uint64_t loc, size_t count) {
+    struct uninstall_data *ud = NULL;
+
     if (uninstalling) {
         goto skip_save;
     }
@@ -459,7 +462,7 @@ static bool _device_write(const void *_buffer, uint64_t loc, size_t count) {
         return false;
     }
 
-    struct uninstall_data *ud = &uninstall_data[uninstall_data_i];
+    ud = &uninstall_data[uninstall_data_i];
 
     ud->data = malloc(count);
     if (ud->data == NULL) {
