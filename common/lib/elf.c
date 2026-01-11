@@ -623,6 +623,10 @@ bool elf64_load_section(uint8_t *elf, void *buffer, const char *name, size_t lim
         panic(true, "elf: shdr_size < sizeof(struct elf64_shdr)");
     }
 
+    if (hdr->shstrndx >= hdr->sh_num) {
+        return false;
+    }
+
     struct elf64_shdr *shstrtab = (void *)elf + (hdr->shoff + hdr->shstrndx * hdr->shdr_size);
 
     char *names = (void *)elf + shstrtab->sh_offset;
