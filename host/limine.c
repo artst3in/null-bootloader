@@ -384,6 +384,12 @@ static bool load_uninstall_data(const char *filename) {
         goto fread_error;
     }
 
+    if (uninstall_data_i > UNINSTALL_DATA_MAX) {
+        fprintf(stderr, "error: load_uninstall_data(): too many entries (%zu > %d)\n",
+                (size_t)uninstall_data_i, UNINSTALL_DATA_MAX);
+        goto error;
+    }
+
     for (size_t i = 0; i < uninstall_data_i; i++) {
         if (fread(&uninstall_data[i].loc, sizeof(uint64_t), 1, udfile) != 1) {
             goto fread_error;
