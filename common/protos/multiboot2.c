@@ -144,6 +144,9 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
             case MULTIBOOT_HEADER_TAG_INFORMATION_REQUEST: {
                 // Iterate the requests and check if they are supported by or not.
                 struct multiboot_header_tag_information_request *request = (void *)tag;
+                if (request->size < sizeof(struct multiboot_header_tag_information_request)) {
+                    panic(true, "multiboot2: Invalid information request tag size");
+                }
                 uint32_t size = (request->size - sizeof(struct multiboot_header_tag_information_request)) / sizeof(uint32_t);
 
                 for (uint32_t i = 0; i < size; i++) {
