@@ -53,17 +53,24 @@ uint64_t strtoui(const char *s, const char **end, int base) {
     return n;
 }
 
-void get_absolute_path(char *path_ptr, const char *path, const char *pwd) {
+bool get_absolute_path(char *path_ptr, const char *path, const char *pwd, size_t size) {
     char *orig_ptr = path_ptr;
+    char *end_ptr = path_ptr + size - 1;
+
+    if (size == 0) return false;
 
     if (!*path) {
-        strcpy(path_ptr, pwd);
-        return;
+        size_t pwd_len = strlen(pwd);
+        if (pwd_len >= size) return false;
+        memcpy(path_ptr, pwd, pwd_len + 1);
+        return true;
     }
 
     if (*path != '/') {
-        strcpy(path_ptr, pwd);
-        path_ptr += strlen(path_ptr);
+        size_t pwd_len = strlen(pwd);
+        if (pwd_len >= size) return false;
+        memcpy(path_ptr, pwd, pwd_len + 1);
+        path_ptr += pwd_len;
     } else {
         *path_ptr = '/';
         path_ptr++;
@@ -100,6 +107,7 @@ first_run:
                     continue;
                 }
                 if (((path_ptr - 1) != orig_ptr) && (*(path_ptr - 1) != '/')) {
+                    if (path_ptr >= end_ptr) return false;
                     *path_ptr = '/';
                     path_ptr++;
                 }
@@ -109,8 +117,9 @@ term:
                 if ((*(path_ptr - 1) == '/') && ((path_ptr - 1) != orig_ptr))
                     path_ptr--;
                 *path_ptr = 0;
-                return;
+                return true;
             default:
+                if (path_ptr >= end_ptr) return false;
                 *path_ptr = *path;
                 path++;
                 path_ptr++;

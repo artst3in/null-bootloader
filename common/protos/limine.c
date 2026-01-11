@@ -1179,7 +1179,10 @@ FEAT_START
             module_path_abs_p += k_root_len;
             memcpy(module_path_abs_p, "):", 2);
             module_path_abs_p += 2;
-            get_absolute_path(module_path_abs_p, module_path, k_path);
+            size_t remaining_size = 1024 - (module_path_abs_p - module_path_abs);
+            if (!get_absolute_path(module_path_abs_p, module_path, k_path, remaining_size)) {
+                panic(true, "limine: Internal module path too long");
+            }
 
             module_path = module_path_abs;
             module_path_allocated = true;
