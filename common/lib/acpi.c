@@ -238,6 +238,10 @@ void *acpi_get_table(const char *signature, int index) {
         else
             ptr = (struct sdt *)(uintptr_t)((uint32_t *)rsdt->ptrs_start)[i];
 
+        if (ptr == NULL) {
+            continue;
+        }
+
         if (!memcmp(ptr->signature, signature, 4)
          && !acpi_checksum(ptr, ptr->length)
          && cnt++ == index) {
