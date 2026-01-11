@@ -375,7 +375,10 @@ void init_memmap(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length = entry->NumberOfPages * 4096;
+        uint64_t length;
+        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
+            panic(false, "pmm: EFI memory descriptor size overflow");
+        }
 
         memmap[memmap_entries].base = base;
         memmap[memmap_entries].length = length;
@@ -465,7 +468,10 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
             uint64_t base = r->base;
             uint64_t top = base + r->length;
             uint64_t efi_base = entry->PhysicalStart;
-            uint64_t efi_size = entry->NumberOfPages * 4096;
+            uint64_t efi_size;
+            if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &efi_size)) {
+                continue;  // Skip malformed entry
+            }
 
             if (efi_base < base) {
                 if (efi_size <= base - efi_base)
