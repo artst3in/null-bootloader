@@ -1014,7 +1014,10 @@ part_too_low:
         uint32_t partition_num;
 
         if (part_ndx != NULL) {
-            sscanf(part_ndx, "%" SCNu32, &partition_num);
+            if (sscanf(part_ndx, "%" SCNu32, &partition_num) != 1) {
+                fprintf(stderr, "error: Invalid partition number format.\n");
+                goto cleanup;
+            }
             partition_num--;
             if (partition_num > ENDSWAP(gpt_header.number_of_partition_entries)) {
                 fprintf(stderr, "error: Partition number is too large.\n");
