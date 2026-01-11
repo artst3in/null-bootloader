@@ -150,7 +150,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     size_t max_cpus = 0;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
         // Prevent infinite loop on zero-length MADT entry
         if (*(madt_ptr + 1) == 0) {
@@ -194,7 +194,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     mtrr_save();
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
         // Prevent infinite loop on zero-length MADT entry
         if (*(madt_ptr + 1) == 0) {
@@ -317,7 +317,8 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
     // Prepare the trampoline
     static void *trampoline = NULL;
     if (trampoline == NULL) {
-        trampoline = ext_mem_alloc(smp_trampoline_size);
+        // AArch64 trampoline expects 0x1000 byte buffer with passed_info at the end
+        trampoline = ext_mem_alloc(0x1000);
 
         memcpy(trampoline, smp_trampoline_start, smp_trampoline_size);
     }
@@ -458,7 +459,7 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     size_t max_cpus = 0;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
         switch (*madt_ptr) {
             case 11: {
@@ -479,7 +480,7 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
 
     // Try to start all APs
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
         switch (*madt_ptr) {
             case 11: {
@@ -652,7 +653,10 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
 
             const void *psci_method = fdt_getprop(dtb, psci, "method", NULL);
 
-            if (!strcmp(psci_method, "smc")) {
+            if (psci_method == NULL) {
+                printv("smp: PSCI method property not found\n");
+                continue;
+            } else if (!strcmp(psci_method, "smc")) {
                 boot_method = BOOT_WITH_PSCI_SMC;
             } else if (!strcmp(psci_method, "hvc")) {
                 boot_method = BOOT_WITH_PSCI_HVC;
