@@ -38,7 +38,17 @@ uint64_t strtoui(const char *s, const char **end, int base) {
                 *end = &s[i];
             break;
         }
-        n = n * base + d;
+        uint64_t mul_result;
+        if (__builtin_mul_overflow(n, (uint64_t)base, &mul_result)) {
+            if (end != NULL)
+                *end = &s[i];
+            return UINT64_MAX;
+        }
+        if (__builtin_add_overflow(mul_result, (uint64_t)d, &n)) {
+            if (end != NULL)
+                *end = &s[i];
+            return UINT64_MAX;
+        }
     }
     return n;
 }
