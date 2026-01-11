@@ -326,6 +326,11 @@ again:
         while (reloc_dir->Size - reloc_block_offset >= sizeof(IMAGE_BASE_RELOCATION_BLOCK)) {
             IMAGE_BASE_RELOCATION_BLOCK *block = (IMAGE_BASE_RELOCATION_BLOCK *)((uintptr_t)*physical_base + reloc_dir->VirtualAddress + reloc_block_offset);
 
+            // Validate SizeOfBlock to prevent infinite loop (if 0) and underflow (if too small)
+            if (block->SizeOfBlock < sizeof(IMAGE_BASE_RELOCATION_BLOCK)) {
+                panic(true, "pe: Invalid relocation block size");
+            }
+
             uintptr_t block_base = *physical_base + block->VirtualAddress;
             size_t entries = (block->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION_BLOCK)) / sizeof(uint16_t);
             uint16_t *relocs = (uint16_t *)(block + 1);
