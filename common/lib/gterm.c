@@ -426,6 +426,10 @@ static void loop_internal(struct fb_info *fb, size_t xstart, size_t xend, size_t
 
 static void generate_canvas(struct fb_info *fb) {
     if (background) {
+        // Free previous canvas if it exists
+        if (bg_canvas != NULL) {
+            pmm_free(bg_canvas, bg_canvas_size);
+        }
         bg_canvas_size = fb->framebuffer_width * fb->framebuffer_height * sizeof(uint32_t);
         bg_canvas = ext_mem_alloc(bg_canvas_size);
 
