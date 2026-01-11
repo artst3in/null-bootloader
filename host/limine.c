@@ -693,11 +693,11 @@ static int bios_install(int argc, char *argv[]) {
                 fprintf(stderr, "warning: --uninstall already set.\n");
             }
             uninstall_mode = true;
-        } else if (memcmp(argv[i], "--uninstall-data-file=", 21) == 0) {
+        } else if (memcmp(argv[i], "--uninstall-data-file=", 22) == 0) {
             if (uninstall_file != NULL && !quiet) {
                 fprintf(stderr, "warning: --uninstall-data-file already set. Overriding...\n");
             }
-            uninstall_file = argv[i] + 21;
+            uninstall_file = argv[i] + 22;
             if (strlen(uninstall_file) == 0) {
                 fprintf(stderr, "error: Uninstall data file has a zero-length name!\n");
                 return EXIT_FAILURE;
