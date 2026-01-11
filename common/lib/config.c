@@ -439,6 +439,7 @@ skip_loop:
             }
 
             if (config_addr[i] == '\n' || config_addr[i] == 0 || config_addr[i+1] != '=') {
+                pmm_free(macro, sizeof(struct macro));
                 continue;
             }
             i += 2;
