@@ -1189,10 +1189,10 @@ static int enroll_config(int argc, char *argv[]) {
             enroll_config_usage();
             return EXIT_SUCCESS;
         } else if (strcmp(argv[i], "--quiet") == 0) {
-            remove_arg(&argc, argv, i);
+            remove_arg(&argc, argv, i--);
             quiet = true;
         } else if (strcmp(argv[i], "--reset") == 0) {
-            remove_arg(&argc, argv, i);
+            remove_arg(&argc, argv, i--);
             reset = true;
         }
     }
