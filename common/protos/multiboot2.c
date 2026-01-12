@@ -139,6 +139,9 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
     for (struct multiboot_header_tag *tag = (struct multiboot_header_tag*)(header + 1); // header + 1 to skip the header struct.
        tag < (struct multiboot_header_tag *)((uintptr_t)header + header->header_length) && tag->type != MULTIBOOT_HEADER_TAG_END;
        tag = (struct multiboot_header_tag *)((uintptr_t)tag + ALIGN_UP(tag->size, MULTIBOOT_TAG_ALIGN))) {
+        if (tag->size == 0) {
+            break;
+        }
         bool is_required = !(tag->flags & MULTIBOOT_HEADER_TAG_OPTIONAL);
         switch (tag->type) {
             case MULTIBOOT_HEADER_TAG_INFORMATION_REQUEST: {
