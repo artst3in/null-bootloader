@@ -783,7 +783,7 @@ skip_modeset:;
             struct multiboot_tag_smbios *tag = (struct multiboot_tag_smbios *)(mb2_info + info_idx);
 
             tag->type = MULTIBOOT_TAG_TYPE_SMBIOS;
-            tag->size = sizeof(struct multiboot_tag_smbios);
+            tag->size = sizeof(struct multiboot_tag_smbios) + smbios_entry_32->length;
 
             tag->major = smbios_entry_32->major_version;
             tag->minor = smbios_entry_32->minor_version;
@@ -798,7 +798,7 @@ skip_modeset:;
             struct multiboot_tag_smbios *tag = (struct multiboot_tag_smbios *)(mb2_info + info_idx);
 
             tag->type = MULTIBOOT_TAG_TYPE_SMBIOS;
-            tag->size = sizeof(struct multiboot_tag_smbios);
+            tag->size = sizeof(struct multiboot_tag_smbios) + smbios_entry_64->length;
 
             tag->major = smbios_entry_64->major_version;
             tag->minor = smbios_entry_64->minor_version;
