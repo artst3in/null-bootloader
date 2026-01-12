@@ -73,6 +73,7 @@ struct edid_info_struct *get_edid_info(EFI_HANDLE gop_handle) {
             goto success;
 
 fail:
+    pmm_free(buf, sizeof(struct edid_info_struct));
     printv("edid: Could not fetch EDID data.\n");
     return NULL;
 
