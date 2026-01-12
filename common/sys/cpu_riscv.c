@@ -130,11 +130,28 @@ static void init_riscv_acpi(void) {
                 continue;
             }
             const struct rhct_header *node = (void *)((uintptr_t)rhct + node_offset);
+            if (node->size < sizeof(struct rhct_header) ||
+                node_offset + node->size > rhct->header.length) {
+                continue;
+            }
             switch (node->type) {
-                case RHCT_ISA_STRING:
-                    isa_string = ((struct rhct_isa_string *)node)->isa_string;
+                case RHCT_ISA_STRING: {
+                    if (node->size < sizeof(struct rhct_isa_string))
+                        break;
+                    struct rhct_isa_string *isa_node = (struct rhct_isa_string *)node;
+                    // Validate string is within node bounds and null-terminated
+                    uint16_t max_str_len = node->size - sizeof(struct rhct_isa_string);
+                    if (isa_node->isa_string_len > max_str_len)
+                        break;
+                    if (isa_node->isa_string_len == 0 ||
+                        isa_node->isa_string[isa_node->isa_string_len - 1] != '\0')
+                        break;
+                    isa_string = isa_node->isa_string;
                     break;
+                }
                 case RHCT_MMU:
+                    if (node->size < sizeof(struct rhct_mmu))
+                        break;
                     mmu_type = ((struct rhct_mmu *)node)->mmu_type;
                     flags |= RISCV_HART_HAS_MMU;
                     break;
