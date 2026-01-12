@@ -1040,7 +1040,7 @@ part_too_low:
                 goto cleanup;
             }
             partition_num--;
-            if (partition_num > ENDSWAP(gpt_header.number_of_partition_entries)) {
+            if (partition_num >= ENDSWAP(gpt_header.number_of_partition_entries)) {
                 fprintf(stderr, "error: Partition number is too large.\n");
                 goto cleanup;
             }
