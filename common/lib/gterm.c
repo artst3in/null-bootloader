@@ -385,10 +385,14 @@ __attribute__((always_inline)) static inline void genloop(struct fb_info *fb, si
             }
             else { /* internal part */
                 for (size_t x = xstart; x < xend; x++) {
-                    size_t image_x = (x - background->x_displacement);
-                    bool x_external = image_x >= background->x_size;
-                    uint32_t img_pixel = *(uint32_t*)(img + image_x * colsize + off);
-                    uint32_t i = blend(fb, x, y, x_external ? background->back_colour : img_pixel);
+                    uint32_t pixel;
+                    if (x < background->x_displacement || x - background->x_displacement >= background->x_size) {
+                        pixel = background->back_colour;
+                    } else {
+                        size_t image_x = x - background->x_displacement;
+                        pixel = *(uint32_t*)(img + image_x * colsize + off);
+                    }
+                    uint32_t i = blend(fb, x, y, pixel);
                     bg_canvas[canvas_off + x] = i;
                 }
             }
