@@ -191,7 +191,7 @@ static bool load_name(char *buf, size_t limit, struct iso9660_directory_entry *e
 
     int rrnamelen = 0;
     unsigned char *nm_entry = NULL;
-    while ((sysarea_len >= 4) && ((sysarea[3] == 1) || (sysarea[2] == 2))) {
+    while ((sysarea_len >= 4) && (sysarea[3] == 1)) {
         // Validate entry length doesn't exceed remaining sysarea
         if (sysarea[2] > sysarea_len) {
             break;
