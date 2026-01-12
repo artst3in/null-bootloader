@@ -84,10 +84,7 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
         }
     }
 
-    uint64_t block_size;
-    if (__builtin_mul_overflow(volume->fastest_xfer_size, volume->sector_size, &block_size)) {
-        return false;
-    }
+    uint64_t block_size = volume->fastest_xfer_size * volume->sector_size;
 
     uint64_t progress = 0;
     while (progress < count) {
