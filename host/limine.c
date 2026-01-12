@@ -836,6 +836,13 @@ static int bios_install(int argc, char *argv[]) {
             part_to_conv[part_to_conv_i].lba_end = ENDSWAP(gpt_entry.ending_lba);
             lba2chs(part_to_conv[part_to_conv_i].chs_end, part_to_conv[part_to_conv_i].lba_end);
 
+            if (part_to_conv[part_to_conv_i].lba_end - part_to_conv[part_to_conv_i].lba_start + 1 > UINT32_MAX) {
+                if (!quiet) {
+                    fprintf(stderr, "Sector count of partition %" PRIi64 " is greater than UINT32_MAX, will not convert GPT.\n", i + 1);
+                }
+                goto no_mbr_conv;
+            }
+
             int type = gpt2mbr_type(ENDSWAP(gpt_entry.partition_type_guid[0]),
                                     ENDSWAP(gpt_entry.partition_type_guid[1]));
             if (type == -1) {
