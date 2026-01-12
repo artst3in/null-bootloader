@@ -167,7 +167,7 @@ static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL
     pmm_free(ret, modes_count * sizeof(struct fb_info));
     ret = tmp;
 
-    *count = modes_count;
+    *count = actual_count;
     return ret;
 }
 
