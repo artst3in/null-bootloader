@@ -481,6 +481,9 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
         switch (*madt_ptr) {
             case 11: {
                 // GIC CPU Interface
+                if (*(madt_ptr + 1) < sizeof(struct madt_gicc))
+                    continue;
+
                 struct madt_gicc *gicc = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -502,6 +505,9 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
         switch (*madt_ptr) {
             case 11: {
                 // GIC CPU Interface
+                if (*(madt_ptr + 1) < sizeof(struct madt_gicc))
+                    continue;
+
                 struct madt_gicc *gicc = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
