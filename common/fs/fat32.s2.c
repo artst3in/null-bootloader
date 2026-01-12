@@ -679,7 +679,7 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
             ret->first_cluster = current_file.cluster_num_low;
             if (context.type == 32)
                 ret->first_cluster |= (uint64_t)current_file.cluster_num_high << 16;
-            ret->size_clusters = DIV_ROUNDUP(current_file.file_size_bytes, context.bytes_per_sector);
+            ret->size_clusters = DIV_ROUNDUP((uint64_t)current_file.file_size_bytes, context.bytes_per_sector);
             ret->size_bytes = current_file.file_size_bytes;
             // Initialize chain_len before calling cache_cluster_chain
             // (cache_cluster_chain may return NULL without setting it for empty files)
