@@ -430,12 +430,17 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     if (fadt == NULL)
         return NULL;
 
-    // Read the single field from the FADT without defining a struct for the whole table
-    uint16_t arm_boot_args;
-    memcpy(&arm_boot_args, fadt + 129, 2);
+    // Check FADT length before accessing ARM boot flags at offset 129
+    uint32_t fadt_length;
+    memcpy(&fadt_length, fadt + 4, 4);
+    if (fadt_length >= 131) {
+        // Read the single field from the FADT without defining a struct for the whole table
+        uint16_t arm_boot_args;
+        memcpy(&arm_boot_args, fadt + 129, 2);
 
-    if (arm_boot_args & 1) // PSCI compliant?
-        boot_method = arm_boot_args & 2 ? BOOT_WITH_PSCI_HVC : BOOT_WITH_PSCI_SMC;
+        if (arm_boot_args & 1) // PSCI compliant?
+            boot_method = arm_boot_args & 2 ? BOOT_WITH_PSCI_HVC : BOOT_WITH_PSCI_SMC;
+    }
 
     // Search for MADT table
     struct madt *madt = acpi_get_table("APIC", 0);
@@ -553,8 +558,9 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
     int psci = fdt_path_offset(dtb, "/psci");
 
     if (psci > 0 && !fdt_node_check_compatible(dtb, psci, "arm,psci")) {
+        int prop_len;
         const void *prop;
-        if (!(prop = fdt_getprop(dtb, psci, "cpu_on", NULL))) {
+        if (!(prop = fdt_getprop(dtb, psci, "cpu_on", &prop_len)) || prop_len < 4) {
             printv("smp: failed to find PSCI cpu_on prop\n");
             return NULL;
         }
@@ -597,12 +603,13 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
 
     fdt_for_each_subnode(node, dtb, cpus) {
         const void *prop;
+        int prop_len;
 
         if (!(prop = fdt_getprop(dtb, node, "device_type", NULL)) || strcmp(prop, "cpu")) {
             continue;
         }
 
-        if (!(prop = fdt_getprop(dtb, node, "reg", NULL))) {
+        if (!(prop = fdt_getprop(dtb, node, "reg", &prop_len)) || prop_len < address_cells * 4) {
             continue;
         }
 
@@ -667,7 +674,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
         } else if (!strcmp(prop, "spin-table")) {
             boot_method = BOOT_WITH_SPIN_TBL;
 
-            if (!(prop = fdt_getprop(dtb, node, "cpu-release-addr", NULL))) {
+            if (!(prop = fdt_getprop(dtb, node, "cpu-release-addr", &prop_len)) || prop_len < 8) {
                 printv("smp: missing cpu-release-addr\n");
                 continue;
             }
