@@ -109,6 +109,9 @@ void init_io_apics(void) {
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 1: {
                 max_io_apics++;
@@ -123,6 +126,9 @@ void init_io_apics(void) {
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 1: {
                 io_apics[max_io_apics++] = (void *)madt_ptr;

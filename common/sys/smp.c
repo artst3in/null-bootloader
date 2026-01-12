@@ -478,6 +478,9 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 11: {
                 // GIC CPU Interface
@@ -502,6 +505,9 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 11: {
                 // GIC CPU Interface
