@@ -196,10 +196,18 @@ static void pe64_validate(uint8_t *image, size_t file_size) {
 #endif
 }
 
-int pe_bits(uint8_t *image) {
+int pe_bits(uint8_t *image, size_t image_size) {
+    if (image_size < sizeof(IMAGE_DOS_HEADER)) {
+        return -1;
+    }
+
     IMAGE_DOS_HEADER *dos_hdr = (IMAGE_DOS_HEADER *)image;
 
     if (dos_hdr->e_magic != IMAGE_DOS_SIGNATURE) {
+        return -1;
+    }
+
+    if ((size_t)dos_hdr->e_lfanew > image_size - sizeof(IMAGE_NT_HEADERS64)) {
         return -1;
     }
 
