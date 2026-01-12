@@ -159,6 +159,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
         switch (*madt_ptr) {
             case 0: {
                 // Processor local xAPIC
+                if (*(madt_ptr + 1) < sizeof(struct madt_lapic))
+                    continue;
+
                 struct madt_lapic *lapic = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -170,6 +173,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
             case 9: {
                 // Processor local x2APIC
                 if (!x2apic)
+                    continue;
+
+                if (*(madt_ptr + 1) < sizeof(struct madt_x2apic))
                     continue;
 
                 struct madt_x2apic *x2lapic = (void *)madt_ptr;
@@ -203,6 +209,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
         switch (*madt_ptr) {
             case 0: {
                 // Processor local xAPIC
+                if (*(madt_ptr + 1) < sizeof(struct madt_lapic))
+                    continue;
+
                 struct madt_lapic *lapic = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -238,6 +247,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
             case 9: {
                 // Processor local x2APIC
                 if (!x2apic)
+                    continue;
+
+                if (*(madt_ptr + 1) < sizeof(struct madt_x2apic))
                     continue;
 
                 struct madt_x2apic *x2lapic = (void *)madt_ptr;
