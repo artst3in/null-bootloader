@@ -165,6 +165,10 @@ static void pe64_validate(uint8_t *image, size_t file_size) {
         panic(true, "pe: Not a valid PE file");
     }
 
+    if (file_size < sizeof(IMAGE_NT_HEADERS64)) {
+        panic(true, "pe: File too small for NT headers");
+    }
+
     if (dos_hdr->e_lfanew > file_size - sizeof(IMAGE_NT_HEADERS64)) {
         panic(true, "pe: e_lfanew offset out of bounds");
     }
@@ -204,6 +208,10 @@ int pe_bits(uint8_t *image, size_t image_size) {
     IMAGE_DOS_HEADER *dos_hdr = (IMAGE_DOS_HEADER *)image;
 
     if (dos_hdr->e_magic != IMAGE_DOS_SIGNATURE) {
+        return -1;
+    }
+
+    if (image_size < sizeof(IMAGE_NT_HEADERS64)) {
         return -1;
     }
 
