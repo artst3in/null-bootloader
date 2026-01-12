@@ -549,6 +549,9 @@ noreturn void limine_load(char *config, char *cmdline) {
     requests_count = 0;
     if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
+            if (i >= MAX_REQUESTS) {
+                panic(true, "limine: Maximum requests exceeded");
+            }
             if (limine_reqs[i] == 0) {
                 break;
             }
