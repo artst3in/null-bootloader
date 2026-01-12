@@ -77,9 +77,15 @@ static struct riscv_hart *riscv_get_hart(size_t hartid) {
 static inline struct rhct_hart_info *rhct_get_hart_info(struct rhct *rhct, uint32_t acpi_uid) {
     uint32_t offset = rhct->nodes_offset;
     for (uint32_t i = 0; i < rhct->nodes_len; i++) {
+        if (offset + sizeof(struct rhct_header) > rhct->header.length) {
+            return NULL;
+        }
         struct rhct_hart_info *node = (void *)((uintptr_t)rhct + offset);
         if (node->header.type == RHCT_HART_INFO && node->acpi_processor_uid == acpi_uid) {
             return node;
+        }
+        if (node->header.size == 0) {
+            return NULL;
         }
         offset += node->header.size;
     }
@@ -119,7 +125,11 @@ static void init_riscv_acpi(void) {
         uint8_t flags = 0;
 
         for (uint32_t i = 0; i < hart_info->offsets_len; i++) {
-            const struct rhct_header *node = (void *)((uintptr_t)rhct + hart_info->offsets[i]);
+            uint32_t node_offset = hart_info->offsets[i];
+            if (node_offset + sizeof(struct rhct_header) > rhct->header.length) {
+                continue;
+            }
+            const struct rhct_header *node = (void *)((uintptr_t)rhct + node_offset);
             switch (node->type) {
                 case RHCT_ISA_STRING:
                     isa_string = ((struct rhct_isa_string *)node)->isa_string;
