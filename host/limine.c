@@ -818,6 +818,13 @@ static int bios_install(int argc, char *argv[]) {
                 continue;
             }
 
+            if (part_to_conv_i == 4) {
+                if (!quiet) {
+                    fprintf(stderr, "GPT contains more than 4 partitions, will not convert.\n");
+                }
+                goto no_mbr_conv;
+            }
+
             if (ENDSWAP(gpt_entry.starting_lba) > UINT32_MAX) {
                 if (!quiet) {
                     fprintf(stderr, "Starting LBA of partition %" PRIi64 " is greater than UINT32_MAX, will not convert GPT.\n", i + 1);
@@ -848,13 +855,6 @@ static int bios_install(int argc, char *argv[]) {
             if (type == -1) {
                 if (!quiet) {
                     fprintf(stderr, "Cannot convert partition type for partition %" PRIi64 ", will not convert GPT.\n", i + 1);
-                }
-                goto no_mbr_conv;
-            }
-
-            if (part_to_conv_i == 4) {
-                if (!quiet) {
-                    fprintf(stderr, "GPT contains more than 4 partitions, will not convert.\n");
                 }
                 goto no_mbr_conv;
             }
