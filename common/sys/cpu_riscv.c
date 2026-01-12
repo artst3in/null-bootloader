@@ -101,6 +101,9 @@ static void init_riscv_acpi(void) {
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
          (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length; madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         if (*madt_ptr != 0x18) {
             continue;
         }
