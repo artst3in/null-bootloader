@@ -40,10 +40,10 @@ enum executable_format {
     EXECUTABLE_FORMAT_PE,
 };
 
-static enum executable_format detect_kernel_format(uint8_t *kernel) {
+static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kernel_size) {
     if (elf_bits(kernel) != -1) {
         return EXECUTABLE_FORMAT_ELF;
-    } else if (pe_bits(kernel) != -1) {
+    } else if (pe_bits(kernel, kernel_size) != -1) {
         return EXECUTABLE_FORMAT_PE;
     } else {
         panic(true, "limine: Unknown kernel executable format");
@@ -471,7 +471,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint64_t image_size_before_bss;
     bool is_reloc;
 
-    enum executable_format kernel_format = detect_kernel_format(kernel);
+    enum executable_format kernel_format = detect_kernel_format(kernel, kernel_file->size);
     switch (kernel_format) {
         case EXECUTABLE_FORMAT_ELF:
             if (!elf64_load(kernel, &entry_point, &slide,
