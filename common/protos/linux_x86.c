@@ -304,6 +304,11 @@ noreturn void linux_load(char *config, char *cmdline) {
     if ((kernel_file = uri_open(kernel_path)) == NULL)
         panic(true, "linux: Failed to open kernel with path `%#`. Is the path correct?", kernel_path);
 
+    // Minimum size check: need at least 0x206 bytes for signature at 0x202
+    if (kernel_file->size < 0x206) {
+        panic(true, "linux: Kernel file too small");
+    }
+
 #if defined (UEFI) && defined (__x86_64__)
     bool use_64_bit_proto = false;
 #endif
@@ -326,6 +331,10 @@ noreturn void linux_load(char *config, char *cmdline) {
 
     size_t real_mode_code_size = 512 + setup_code_size;
 
+    if (real_mode_code_size > kernel_file->size) {
+        panic(true, "linux: Kernel file too small for real mode code");
+    }
+
     struct boot_params *boot_params = ext_mem_alloc(sizeof(struct boot_params));
 
     struct setup_header *setup_header = &boot_params->hdr;
@@ -335,6 +344,10 @@ noreturn void linux_load(char *config, char *cmdline) {
         fread(kernel_file, &x, 0x201, 1);
         0x202 + x;
     });
+
+    if (setup_header_end > kernel_file->size) {
+        panic(true, "linux: Kernel file too small for setup header");
+    }
 
     fread(kernel_file, setup_header, 0x1f1, setup_header_end - 0x1f1);
 
@@ -353,8 +366,12 @@ noreturn void linux_load(char *config, char *cmdline) {
     if (verbose) {
         char *kernel_version = ext_mem_alloc(128);
         if (setup_header->kernel_version != 0) {
-            fread(kernel_file, kernel_version, setup_header->kernel_version + 0x200, 128);
-            print("linux: Kernel version: %s\n", kernel_version);
+            size_t version_offset = (size_t)setup_header->kernel_version + 0x200;
+            if (version_offset + 128 <= kernel_file->size) {
+                fread(kernel_file, kernel_version, version_offset, 128);
+                kernel_version[127] = '\0';
+                print("linux: Kernel version: %s\n", kernel_version);
+            }
         }
         pmm_free(kernel_version, 128);
     }
