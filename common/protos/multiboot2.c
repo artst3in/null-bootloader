@@ -479,7 +479,13 @@ reloc_fail:
             panic(true, "multiboot2: Cannot return ELF file information");
         }
     } else {
-        uint32_t size = sizeof(struct multiboot_tag_elf_sections) + section_hdr_info.section_entry_size * section_hdr_info.num;
+        size_t section_table_size = (size_t)section_hdr_info.section_entry_size * section_hdr_info.num;
+        if (section_hdr_info.section_offset > kernel_file_size ||
+            section_table_size > kernel_file_size - section_hdr_info.section_offset) {
+            panic(true, "multiboot2: ELF section headers out of bounds");
+        }
+
+        uint32_t size = sizeof(struct multiboot_tag_elf_sections) + section_table_size;
         struct multiboot_tag_elf_sections *tag = (struct multiboot_tag_elf_sections*)(mb2_info + info_idx);
 
         tag->type = MULTIBOOT_TAG_TYPE_ELF_SECTIONS;
@@ -489,7 +495,7 @@ reloc_fail:
         tag->entsize = section_hdr_info.section_entry_size;
         tag->shndx = section_hdr_info.str_section_idx;
 
-        memcpy(tag->sections, kernel + section_hdr_info.section_offset, section_hdr_info.section_entry_size * section_hdr_info.num);
+        memcpy(tag->sections, kernel + section_hdr_info.section_offset, section_table_size);
 
         int bits = elf_bits(kernel);
 
@@ -498,6 +504,11 @@ reloc_fail:
                 struct elf64_shdr *shdr = (void *)tag->sections + i * section_hdr_info.section_entry_size;
 
                 if (shdr->sh_addr != 0 || shdr->sh_size == 0) {
+                    continue;
+                }
+
+                if (shdr->sh_offset > kernel_file_size ||
+                    shdr->sh_size > kernel_file_size - shdr->sh_offset) {
                     continue;
                 }
 
@@ -514,6 +525,11 @@ reloc_fail:
                 struct elf32_shdr *shdr = (void *)tag->sections + i * section_hdr_info.section_entry_size;
 
                 if (shdr->sh_addr != 0 || shdr->sh_size == 0) {
+                    continue;
+                }
+
+                if (shdr->sh_offset > kernel_file_size ||
+                    shdr->sh_size > kernel_file_size - shdr->sh_offset) {
                     continue;
                 }
 
