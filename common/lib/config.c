@@ -506,7 +506,7 @@ next:
                 char *macro_name = ext_mem_alloc(1024);
                 i += 2;
                 size_t j;
-                for (j = 0; config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
+                for (j = 0; j < 1023 && config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
                     macro_name[j] = config_addr[i];
                 }
                 if (config_addr[i] != '}') {
