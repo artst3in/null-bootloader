@@ -216,16 +216,21 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
         mb1_info_alloc(&mb1_info_raw, sizeof(struct multiboot1_info));
 
     if (section_hdr_info_valid == true) {
+        size_t section_table_size = (size_t)section_hdr_info.section_entry_size * section_hdr_info.num;
+        if (section_hdr_info.section_offset > kernel_file_size ||
+            section_table_size > kernel_file_size - section_hdr_info.section_offset) {
+            panic(true, "multiboot1: ELF section headers out of bounds");
+        }
+
         multiboot1_info->elf_sect.num = section_hdr_info.num;
         multiboot1_info->elf_sect.size = section_hdr_info.section_entry_size;
         multiboot1_info->elf_sect.shndx = section_hdr_info.str_section_idx;
 
-        void *sections = mb1_info_alloc(&mb1_info_raw,
-            section_hdr_info.section_entry_size * section_hdr_info.num);
+        void *sections = mb1_info_alloc(&mb1_info_raw, section_table_size);
 
         multiboot1_info->elf_sect.addr = (uintptr_t)sections - mb1_info_slide;
 
-        memcpy(sections, kernel + section_hdr_info.section_offset, section_hdr_info.section_entry_size * section_hdr_info.num);
+        memcpy(sections, kernel + section_hdr_info.section_offset, section_table_size);
 
         int bits = elf_bits(kernel);
 
@@ -234,6 +239,11 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
                 struct elf64_shdr *shdr = (void *)sections + i * section_hdr_info.section_entry_size;
 
                 if (shdr->sh_addr != 0 || shdr->sh_size == 0) {
+                    continue;
+                }
+
+                if (shdr->sh_offset > kernel_file_size ||
+                    shdr->sh_size > kernel_file_size - shdr->sh_offset) {
                     continue;
                 }
 
@@ -253,6 +263,11 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
                     continue;
                 }
 
+                if (shdr->sh_offset > kernel_file_size ||
+                    shdr->sh_size > kernel_file_size - shdr->sh_offset) {
+                    continue;
+                }
+
                 uint64_t section = (uint64_t)-1; /* no target preference, use top */
 
                 if (!elsewhere_append(true /* flexible target */,
@@ -260,7 +275,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
                         kernel + shdr->sh_offset, &section, shdr->sh_size)) {
                     panic(true, "multiboot1: Cannot allocate elf sections");
                 }
-                        
+
                 shdr->sh_addr = section;
             }
         }
