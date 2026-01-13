@@ -110,11 +110,20 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
         if (header.load_addr > header.header_addr)
             panic(true, "multiboot1: Illegal load address");
 
+        size_t addr_diff = header.header_addr - header.load_addr;
+        if (addr_diff > header_offset)
+            panic(true, "multiboot1: Address tag offset underflow");
+
+        size_t load_src = header_offset - addr_diff;
+
         size_t load_size;
-        if (header.load_end_addr)
+        if (header.load_end_addr) {
             load_size = header.load_end_addr - header.load_addr;
-        else
-            load_size = kernel_file_size;
+        } else {
+            if (load_src > kernel_file_size)
+                panic(true, "multiboot1: Load source exceeds kernel file size");
+            load_size = kernel_file_size - load_src;
+        }
 
         uint32_t bss_size = 0;
         if (header.bss_end_addr) {
@@ -129,8 +138,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
 
         void *elsewhere = ext_mem_alloc(full_size);
 
-        memcpy(elsewhere, kernel + (header_offset
-                - (header.header_addr - header.load_addr)), load_size);
+        memcpy(elsewhere, kernel + load_src, load_size);
 
         entry_point = header.entry_addr;
 
