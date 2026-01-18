@@ -11,10 +11,17 @@
 #include <pxe/tftp.h>
 #include <menu.h>
 #include <lib/getchar.h>
-#include <crypt/shake.h>
+#include <crypt/sha512.h>
 
-// URI hash length (was BLAKE3_OUT_LEN)
+// URI hash length (use first 32 bytes of SHA-512)
 #define URI_HASH_LEN 32
+
+// Helper to compute truncated SHA-512 (first 32 bytes)
+static void sha512_truncated_uri(uint8_t *out, size_t outlen, const uint8_t *data, size_t len) {
+    uint8_t full[SHA512_DIGEST_SIZE];
+    sha512(full, data, len);
+    memcpy(out, full, outlen < SHA512_DIGEST_SIZE ? outlen : SHA512_DIGEST_SIZE);
+}
 
 // A URI takes the form of: resource(root):/path#hash
 // The following function splits up a URI into its components.
@@ -262,7 +269,7 @@ struct file_handle *uri_open(char *uri) {
 #else
         void *file_buf = freadall(ret, MEMMAP_BOOTLOADER_RECLAIMABLE);
 #endif
-        shake256(out_buf, URI_HASH_LEN, file_buf, ret->size);
+        sha512_truncated_uri(out_buf, URI_HASH_LEN, file_buf, ret->size);
         uint8_t hash_buf[URI_HASH_LEN];
 
         for (size_t i = 0; i < sizeof(hash_buf); i++) {
@@ -271,9 +278,9 @@ struct file_handle *uri_open(char *uri) {
 
         if (memcmp(hash_buf, out_buf, sizeof(out_buf)) != 0) {
             if (hash_mismatch_panic) {
-                panic(true, "SHAKE256 hash for URI `%#` does not match!", uri);
+                panic(true, "SHA-512 hash for URI `%#` does not match!", uri);
             } else {
-                print("WARNING: SHAKE256 hash for URI `%#` does not match!\n"
+                print("WARNING: SHA-512 hash for URI `%#` does not match!\n"
                       "         Press Y to continue, press any other key to return to menu...", uri);
 
                 char ch = getchar();

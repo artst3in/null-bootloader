@@ -173,6 +173,12 @@ static void cswap(gf p[4], gf q[4], uint8_t b) {
     for (int i = 0; i < 4; i++) sel25519(p[i], q[i], b);
 }
 
+static int par25519(const gf a) {
+    uint8_t d[32];
+    pack25519(d, a);
+    return d[0] & 1;
+}
+
 static void pack(uint8_t *r, gf p[4]) {
     gf tx, ty, zi;
     inv25519(zi, p[2]);
@@ -182,10 +188,11 @@ static void pack(uint8_t *r, gf p[4]) {
     r[31] ^= par25519(tx) << 7;
 }
 
-static int par25519(const gf a) {
-    uint8_t d[32];
-    pack25519(d, a);
-    return d[0] & 1;
+static int neq25519(const gf a, const gf b) {
+    uint8_t c[32], d[32];
+    pack25519(c, a);
+    pack25519(d, b);
+    return vn(c, d, 32);
 }
 
 static int unpackneg(gf r[4], const uint8_t p[32]) {
@@ -221,13 +228,6 @@ static int unpackneg(gf r[4], const uint8_t p[32]) {
 
     M(r[3], r[0], r[1]);
     return 0;
-}
-
-static int neq25519(const gf a, const gf b) {
-    uint8_t c[32], d[32];
-    pack25519(c, a);
-    pack25519(d, b);
-    return vn(c, d, 32);
 }
 
 // ============================================================================

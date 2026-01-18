@@ -9,10 +9,17 @@
 #include <fs/file.h>
 #include <lib/print.h>
 #include <pxe/tftp.h>
-#include <crypt/shake.h>
+#include <crypt/sha512.h>
 
-// Config hash length (was BLAKE3_OUT_LEN)
+// Config hash length (use first 32 bytes of SHA-512)
 #define CONFIG_HASH_LEN 32
+
+// Helper to compute truncated SHA-512 (first 32 bytes)
+static void sha512_truncated(uint8_t *out, size_t outlen, const uint8_t *data, size_t len) {
+    uint8_t full[SHA512_DIGEST_SIZE];
+    sha512(full, data, len);
+    memcpy(out, full, outlen < SHA512_DIGEST_SIZE ? outlen : SHA512_DIGEST_SIZE);
+}
 #include <sys/cpu.h>
 
 #define CONFIG_B3SUM_SIGNATURE "++CONFIG_B3SUM_SIGNATURE++"
@@ -350,7 +357,7 @@ int init_config(size_t config_size) {
         editor_enabled = false;
 
         uint8_t out_buf[CONFIG_HASH_LEN];
-        shake256(out_buf, CONFIG_HASH_LEN, config_addr, config_size - 2);
+        sha512_truncated(out_buf, CONFIG_HASH_LEN, config_addr, config_size - 2);
         uint8_t hash_buf[CONFIG_HASH_LEN];
 
         for (size_t i = 0; i < CONFIG_HASH_LEN; i++) {

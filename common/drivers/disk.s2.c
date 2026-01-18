@@ -3,15 +3,15 @@
 #include <stdalign.h>
 #include <drivers/disk.h>
 #include <lib/libc.h>
+#include <crypt/sha512.h>
 #if defined (BIOS)
 #  include <lib/real.h>
 #elif defined (UEFI)
 #  include <efi.h>
-#  include <crypt/shake.h>
 #endif
 
-// Hash output size for volume identification (was BLAKE3_OUT_BYTES)
-#define VOLUME_HASH_BYTES 64
+// Hash output size for volume identification (SHA-512 = 64 bytes)
+#define VOLUME_HASH_BYTES SHA512_DIGEST_SIZE
 #include <lib/misc.h>
 #include <lib/print.h>
 #include <lib/rand.h>
@@ -547,7 +547,7 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
     }
 
     uint8_t b3[VOLUME_HASH_BYTES];
-    shake256(b3, VOLUME_HASH_BYTES, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+    sha512(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
     ret = volume_by_unique_sector(b3);
     if (ret != NULL) {
@@ -673,7 +673,7 @@ static void find_unique_sectors(void) {
         }
 
         uint8_t b3[VOLUME_HASH_BYTES];
-        shake256(b3, VOLUME_HASH_BYTES, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+        sha512(b3, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
         struct volume *collision = volume_by_unique_sector(b3);
         if (collision == NULL) {
