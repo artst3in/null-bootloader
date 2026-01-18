@@ -1,10 +1,13 @@
 // ============================================================================
-// Kernel Verification - Post-Quantum Signature Checking
+// Kernel Verification - Ed25519 Signature Checking
 // ============================================================================
 // Module for verifying kernel signatures before execution.
 // Integrates with the Limine protocol loader.
 //
-// Copyright 2025 The LunaOS Contributors
+// Note: Post-quantum cryptography has been removed per MLE analysis.
+// Now uses Ed25519 (128-bit security) and X25519 + ChaCha20-Poly1305.
+//
+// Copyright 2026 The LunaOS Contributors
 // SPDX-License-Identifier: BSD-2-Clause
 // ============================================================================
 
