@@ -7,7 +7,6 @@
 #  include <lib/real.h>
 #elif defined (UEFI)
 #  include <efi.h>
-#  include <crypt/blake2b.h>
 #endif
 #include <lib/misc.h>
 #include <lib/print.h>
@@ -419,23 +418,6 @@ static struct volume *pxe_from_efi_handle(EFI_HANDLE efi_handle) {
     return vol;
 }
 
-#define UNIQUE_SECTOR_POOL_SIZE 65536
-static uint8_t *unique_sector_pool;
-
-static struct volume *volume_by_unique_sector(void *b2b) {
-    for (size_t i = 0; i < volume_index_i; i++) {
-        if (volume_index[i]->unique_sector_valid == false) {
-            continue;
-        }
-
-        if (memcmp(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES) == 0) {
-            return volume_index[i];
-        }
-    }
-
-    return NULL;
-}
-
 static bool is_efi_handle_to_skip(EFI_HANDLE efi_handle) {
     EFI_STATUS status;
 
@@ -484,7 +466,7 @@ static bool is_efi_handle_to_skip(EFI_HANDLE efi_handle) {
     return false;
 }
 
-static bool is_efi_handle_hdd(EFI_HANDLE efi_handle) {
+static bool is_efi_handle_optical(EFI_HANDLE efi_handle) {
     EFI_STATUS status;
 
     EFI_GUID dp_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
@@ -500,21 +482,164 @@ static bool is_efi_handle_hdd(EFI_HANDLE efi_handle) {
             break;
         }
 
-        if (dp->Type == MEDIA_DEVICE_PATH) {
-            switch (dp->SubType) {
-                case MEDIA_HARDDRIVE_DP:
-                    return true;
-            }
-        }
-
         uint16_t len = *(uint16_t *)dp->Length;
         if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
             break;  // Malformed device path node
         }
+
+        if (dp->Type == MEDIA_DEVICE_PATH && dp->SubType == MEDIA_CDROM_DP) {
+            return true;
+        }
+
         dp = (void *)dp + len;
     }
 
     return false;
+}
+
+static EFI_DEVICE_PATH_PROTOCOL *get_device_path(EFI_HANDLE efi_handle) {
+    EFI_STATUS status;
+    EFI_GUID dp_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
+    EFI_DEVICE_PATH_PROTOCOL *dp = NULL;
+
+    status = gBS->HandleProtocol(efi_handle, &dp_guid, (void **)&dp);
+    if (status) {
+        return NULL;
+    }
+    return dp;
+}
+
+// Compare device paths up to (but not including) partition nodes
+static bool device_paths_match_disk(EFI_DEVICE_PATH_PROTOCOL *dp1,
+                                    EFI_DEVICE_PATH_PROTOCOL *dp2) {
+    if (dp1 == NULL || dp2 == NULL) {
+        return false;
+    }
+
+    while (!IsDevicePathEnd(dp1) && !IsDevicePathEnd(dp2)) {
+        // Stop at partition nodes
+        if (dp1->Type == MEDIA_DEVICE_PATH &&
+            (dp1->SubType == MEDIA_HARDDRIVE_DP || dp1->SubType == MEDIA_CDROM_DP)) {
+            break;
+        }
+        if (dp2->Type == MEDIA_DEVICE_PATH &&
+            (dp2->SubType == MEDIA_HARDDRIVE_DP || dp2->SubType == MEDIA_CDROM_DP)) {
+            break;
+        }
+
+        uint16_t len1 = DevicePathNodeLength(dp1);
+        uint16_t len2 = DevicePathNodeLength(dp2);
+
+        if (len1 != len2) {
+            return false;
+        }
+
+        if (memcmp(dp1, dp2, len1) != 0) {
+            return false;
+        }
+
+        dp1 = NextDevicePathNode(dp1);
+        dp2 = NextDevicePathNode(dp2);
+    }
+
+    return true;
+}
+
+static struct volume *volume_by_device_path(EFI_HANDLE query_handle) {
+    EFI_DEVICE_PATH_PROTOCOL *query_dp = get_device_path(query_handle);
+    if (query_dp == NULL) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < volume_index_i; i++) {
+        EFI_DEVICE_PATH_PROTOCOL *vol_dp = get_device_path(volume_index[i]->efi_handle);
+        if (vol_dp == NULL) {
+            continue;
+        }
+
+        if (device_paths_match_disk(query_dp, vol_dp)) {
+            EFI_DEVICE_PATH_PROTOCOL *qp = query_dp;
+            while (!IsDevicePathEnd(qp)) {
+                if (qp->Type == MEDIA_DEVICE_PATH && qp->SubType == MEDIA_HARDDRIVE_DP) {
+                    HARDDRIVE_DEVICE_PATH *query_hd = (HARDDRIVE_DEVICE_PATH *)qp;
+                    if (volume_index[i]->first_sect == query_hd->PartitionStart) {
+                        return volume_index[i];
+                    }
+                    break;
+                }
+                qp = NextDevicePathNode(qp);
+            }
+
+            if (IsDevicePathEnd(qp) && volume_index[i]->partition == 0) {
+                return volume_index[i];
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static struct volume *volume_by_partition_signature(EFI_HANDLE query_handle) {
+    EFI_DEVICE_PATH_PROTOCOL *dp = get_device_path(query_handle);
+    if (dp == NULL) {
+        return NULL;
+    }
+
+    while (!IsDevicePathEnd(dp)) {
+        uint16_t len = DevicePathNodeLength(dp);
+        if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
+            break;
+        }
+
+        if (dp->Type == MEDIA_DEVICE_PATH && dp->SubType == MEDIA_HARDDRIVE_DP) {
+            if (len < sizeof(HARDDRIVE_DEVICE_PATH)) {
+                break;
+            }
+
+            HARDDRIVE_DEVICE_PATH *hd = (HARDDRIVE_DEVICE_PATH *)dp;
+
+            // GPT: match by partition GUID
+            if (hd->SignatureType == SIGNATURE_TYPE_GUID) {
+                for (size_t i = 0; i < volume_index_i; i++) {
+                    if (volume_index[i]->guid_valid &&
+                        memcmp(&volume_index[i]->guid, hd->Signature, sizeof(EFI_GUID)) == 0) {
+                        return volume_index[i];
+                    }
+                }
+            }
+
+            // MBR: match by partition start LBA
+            if (hd->SignatureType == SIGNATURE_TYPE_MBR) {
+                for (size_t i = 0; i < volume_index_i; i++) {
+                    if (volume_index[i]->first_sect == hd->PartitionStart) {
+                        return volume_index[i];
+                    }
+                }
+            }
+
+            break;
+        }
+
+        dp = NextDevicePathNode(dp);
+    }
+
+    return NULL;
+}
+
+static struct volume *volume_by_media_match(EFI_BLOCK_IO *query_bio) {
+    for (size_t i = 0; i < volume_index_i; i++) {
+        EFI_BLOCK_IO *vol_bio = volume_index[i]->block_io;
+
+        if (vol_bio->Media->BlockSize == query_bio->Media->BlockSize &&
+            vol_bio->Media->LastBlock == query_bio->Media->LastBlock &&
+            vol_bio->Media->ReadOnly == query_bio->Media->ReadOnly &&
+            vol_bio->Media->RemovableMedia == query_bio->Media->RemovableMedia &&
+            vol_bio->Media->LogicalPartition == query_bio->Media->LogicalPartition) {
+            return volume_index[i];
+        }
+    }
+
+    return NULL;
 }
 
 struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
@@ -534,158 +659,22 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
         return pxe_from_efi_handle(efi_handle);
     }
 
-    uint64_t bdev_size = ((uint64_t)block_io->Media->LastBlock + 1) * (uint64_t)block_io->Media->BlockSize;
-    if (bdev_size < UNIQUE_SECTOR_POOL_SIZE) {
-        goto fallback;
-    }
-
-    status = block_io->ReadBlocks(block_io, block_io->Media->MediaId,
-                                  0,
-                                  UNIQUE_SECTOR_POOL_SIZE,
-                                  unique_sector_pool);
-    if (status != 0) {
-        goto fallback;
-    }
-
-    uint8_t b2b[BLAKE2B_OUT_BYTES];
-    blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
-
-    ret = volume_by_unique_sector(b2b);
+    ret = volume_by_device_path(efi_handle);
     if (ret != NULL) {
         return ret;
     }
 
-    // Fallback to read-back method
-fallback:;
-    if (!is_efi_handle_hdd(efi_handle)) {
-        return NULL;
+    ret = volume_by_partition_signature(efi_handle);
+    if (ret != NULL) {
+        return ret;
     }
 
-    uint64_t signature = rand64();
-    uint64_t new_signature;
-    do { new_signature = rand64(); } while (new_signature == signature);
-    uint64_t orig;
-
-    status = block_io->ReadBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-    orig = *(uint64_t *)unique_sector_pool;
-    if (status) {
-        return NULL;
-    }
-
-    *(uint64_t *)unique_sector_pool = signature;
-    status = block_io->WriteBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-    if (status) {
-        // Attempt to restore anyways, just in case.
-        *(uint64_t *)unique_sector_pool = orig;
-        block_io->WriteBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-        return NULL;
-    }
-
-    ret = NULL;
-    for (size_t i = 0; i < volume_index_i; i++) {
-        uint64_t compare;
-
-        status = volume_index[i]->block_io->ReadBlocks(volume_index[i]->block_io,
-                          volume_index[i]->block_io->Media->MediaId,
-                          (volume_index[i]->first_sect * 512) / volume_index[i]->sector_size,
-                          4096, unique_sector_pool);
-        compare = *(uint64_t *)unique_sector_pool;
-        if (status) {
-            continue;
-        }
-
-        if (compare == signature) {
-            // Double check
-            status = block_io->ReadBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-            if (status) {
-                break;
-            }
-            *(uint64_t *)unique_sector_pool = new_signature;
-            status = block_io->WriteBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-            if (status) {
-                break;
-            }
-
-            status = volume_index[i]->block_io->ReadBlocks(volume_index[i]->block_io,
-                          volume_index[i]->block_io->Media->MediaId,
-                          (volume_index[i]->first_sect * 512) / volume_index[i]->sector_size,
-                          4096, unique_sector_pool);
-            compare = *(uint64_t *)unique_sector_pool;
-            if (status) {
-                continue;
-            }
-
-            if (compare == new_signature) {
-                ret = volume_index[i];
-                break;
-            }
-
-            status = block_io->ReadBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-            if (status) {
-                break;
-            }
-            *(uint64_t *)unique_sector_pool = signature;
-            status = block_io->WriteBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-            if (status) {
-                break;
-            }
-        }
-    }
-
-    status = block_io->ReadBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-    if (status) {
-        return NULL;
-    }
-    *(uint64_t *)unique_sector_pool = orig;
-    status = block_io->WriteBlocks(block_io, block_io->Media->MediaId, 0, 4096, unique_sector_pool);
-    if (status) {
-        return NULL;
-    }
-
+    ret = volume_by_media_match(block_io);
     if (ret != NULL) {
         return ret;
     }
 
     return NULL;
-}
-
-static void find_unique_sectors(void) {
-    EFI_STATUS status;
-
-    for (size_t i = 0; i < volume_index_i; i++) {
-        if ((volume_index[i]->first_sect * 512) % volume_index[i]->sector_size) {
-            continue;
-        }
-
-        size_t first_sect = (volume_index[i]->first_sect * 512) / volume_index[i]->sector_size;
-
-        if (volume_index[i]->sect_count * volume_index[i]->sector_size < UNIQUE_SECTOR_POOL_SIZE) {
-            continue;
-        }
-
-        status = volume_index[i]->block_io->ReadBlocks(
-                            volume_index[i]->block_io,
-                            volume_index[i]->block_io->Media->MediaId,
-                            first_sect,
-                            UNIQUE_SECTOR_POOL_SIZE,
-                            unique_sector_pool);
-        if (status != 0) {
-            continue;
-        }
-
-        uint8_t b2b[BLAKE2B_OUT_BYTES];
-        blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
-
-        struct volume *collision = volume_by_unique_sector(b2b);
-        if (collision == NULL) {
-            volume_index[i]->unique_sector_valid = true;
-            memcpy(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES);
-            continue;
-        }
-
-        // Invalidate collision's unique sector
-        collision->unique_sector_valid = false;
-    }
 }
 
 static void find_part_handles(EFI_HANDLE *handles, size_t handle_count) {
@@ -700,8 +689,6 @@ static void find_part_handles(EFI_HANDLE *handles, size_t handle_count) {
 
 void disk_create_index(void) {
     EFI_STATUS status;
-
-    unique_sector_pool = ext_mem_alloc(UNIQUE_SECTOR_POOL_SIZE);
 
     EFI_HANDLE tmp_handles[1];
 
@@ -751,20 +738,12 @@ fail:
         if (drive->Media->LogicalPartition)
             continue;
 
-        drive->Media->WriteCaching = false;
-
-        status = drive->ReadBlocks(drive, drive->Media->MediaId, 0, 4096, unique_sector_pool);
-        if (status) {
-            continue;
-        }
-
-        status = drive->WriteBlocks(drive, drive->Media->MediaId, 0, 4096, unique_sector_pool);
-
-        drive->Media->WriteCaching = true;
-
         struct volume *block = ext_mem_alloc(sizeof(struct volume));
 
-        if ((status || drive->Media->ReadOnly) && drive->Media->BlockSize == 2048) {
+        bool is_optical = is_efi_handle_optical(handles[i]) ||
+                          (drive->Media->ReadOnly && drive->Media->BlockSize == 2048);
+
+        if (is_optical) {
             block->index = optical_indices++;
             block->is_optical = true;
         } else {
@@ -824,7 +803,6 @@ fail:
         }
     }
 
-    find_unique_sectors();
     find_part_handles(handles, handle_count);
 
     pmm_free(handles, handles_size);
