@@ -54,7 +54,8 @@ void fb_clear(struct fb_info *fb) {
             default: {
                 uint8_t *fbp = (void *)(uintptr_t)fb->framebuffer_addr;
                 size_t row = y * fb->framebuffer_pitch;
-                for (size_t x = 0; x < fb->framebuffer_width * fb->framebuffer_bpp; x++) {
+                size_t row_bytes = fb->framebuffer_width * (fb->framebuffer_bpp / 8);
+                for (size_t x = 0; x < row_bytes; x++) {
                     fbp[row + x] = 0;
                 }
                 break;

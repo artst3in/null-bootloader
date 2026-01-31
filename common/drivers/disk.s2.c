@@ -351,10 +351,14 @@ void disk_create_index(void) {
             struct volume *p = ext_mem_alloc(sizeof(struct volume));
             int ret = part_get(p, block, part);
 
-            if (ret == END_OF_TABLE || ret == INVALID_TABLE)
+            if (ret == END_OF_TABLE || ret == INVALID_TABLE) {
+                pmm_free(p, sizeof(struct volume));
                 break;
-            if (ret == NO_PARTITION)
+            }
+            if (ret == NO_PARTITION) {
+                pmm_free(p, sizeof(struct volume));
                 continue;
+            }
 
             volume_index = pmm_realloc(
                 volume_index,

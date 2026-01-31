@@ -197,7 +197,7 @@ bool init_config_smbios(void) {
 
     if (smbios_entry_64) {
         hdr = (void *)(uintptr_t) smbios_entry_64->table_address;
-        table_length = smbios_entry_64->max_structure_size;
+        table_length = smbios_entry_64->table_maximum_size;
     } else {
         hdr = (void *)(uintptr_t) smbios_entry_32->table_address;
         struct_count = smbios_entry_32->number_of_structures;
@@ -376,16 +376,17 @@ int init_config(size_t config_size) {
     for (size_t i = 0; i < config_size; i++) {
         size_t skip = 0;
         if (config_addr[i] == ' ' || config_addr[i] == '\t') {
-            while (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t') {
+            while (i + skip < config_size && (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t')) {
                 skip++;
             }
-            if (config_addr[i + skip] == '\n') {
+            if (i + skip < config_size && config_addr[i + skip] == '\n') {
                 goto skip_loop;
             }
             skip = 0;
         }
-        while ((config_addr[i + skip] == '\r')
-            || ((!i || config_addr[i - 1] == '\n') && (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t'))
+        while (i + skip < config_size
+            && ((config_addr[i + skip] == '\r')
+                || ((!i || config_addr[i - 1] == '\n') && (config_addr[i + skip] == ' ' || config_addr[i + skip] == '\t')))
         ) {
             skip++;
         }
@@ -449,6 +450,7 @@ skip_loop:
             }
 
             if (config_addr[i] == '\n' || config_addr[i] == 0 || config_addr[i+1] != '=') {
+                pmm_free(macro, sizeof(struct macro));
                 continue;
             }
             i += 2;
@@ -495,7 +497,7 @@ skip_loop:
                         panic(true, "config: Malformed macro usage");
                     }
                 }
-                if (config_addr[i++] != '=') {
+                if (i >= config_size || config_addr[i++] != '=') {
                     i = orig_i;
                     goto next;
                 }
@@ -514,7 +516,7 @@ next:
                 char *macro_name = ext_mem_alloc(1024);
                 i += 2;
                 size_t j;
-                for (j = 0; config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
+                for (j = 0; j < 1023 && config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
                     macro_name[j] = config_addr[i];
                 }
                 if (config_addr[i] != '}') {

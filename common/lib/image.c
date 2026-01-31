@@ -44,7 +44,8 @@ struct image *image_open(struct file_handle *file) {
 
     // Convert ABGR to XRGB
     uint32_t *pptr = (void *)image->img;
-    for (int i = 0; i < x * y; i++) {
+    size_t pixel_count = (size_t)x * (size_t)y;
+    for (size_t i = 0; i < pixel_count; i++) {
         pptr[i] = (pptr[i] & 0x0000ff00) | ((pptr[i] & 0x00ff0000) >> 16) | ((pptr[i] & 0x000000ff) << 16);
     }
 

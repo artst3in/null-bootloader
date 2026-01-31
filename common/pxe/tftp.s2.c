@@ -117,6 +117,15 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
         return NULL;
     }
 
+    // Validate server's negotiated packet size doesn't exceed our buffer
+    if (open.packet_size > mtu) {
+        print("tftp: Server requested packet size %u exceeds our MTU %u\n", open.packet_size, mtu);
+        pxe_call(TFTP_CLOSE, ((uint16_t)rm_seg(&(uint16_t){0})), (uint16_t)rm_off(&(uint16_t){0}));
+        pmm_free(handle->path, handle->path_len);
+        pmm_free(handle, sizeof(struct file_handle));
+        return NULL;
+    }
+
     uint16_t alloc_mtu = mtu;  // Save original MTU for allocation/free
     uint8_t *buf = conv_mem_alloc(alloc_mtu);
 
@@ -137,8 +146,8 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
             panic(false, "tftp: Read failure");
         }
 
-        // Validate read size doesn't overflow the buffer
-        if (read.bsize > mtu || progress + read.bsize > handle->size) {
+        // Validate read size doesn't overflow the buffer (use alloc_mtu, not server's mtu)
+        if (read.bsize > alloc_mtu || progress + read.bsize > handle->size) {
             panic(false, "tftp: Server sent more data than expected");
         }
 

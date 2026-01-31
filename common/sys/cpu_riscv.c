@@ -77,9 +77,15 @@ static struct riscv_hart *riscv_get_hart(size_t hartid) {
 static inline struct rhct_hart_info *rhct_get_hart_info(struct rhct *rhct, uint32_t acpi_uid) {
     uint32_t offset = rhct->nodes_offset;
     for (uint32_t i = 0; i < rhct->nodes_len; i++) {
+        if (offset + sizeof(struct rhct_header) > rhct->header.length) {
+            return NULL;
+        }
         struct rhct_hart_info *node = (void *)((uintptr_t)rhct + offset);
         if (node->header.type == RHCT_HART_INFO && node->acpi_processor_uid == acpi_uid) {
             return node;
+        }
+        if (node->header.size == 0) {
+            return NULL;
         }
         offset += node->header.size;
     }
@@ -94,7 +100,10 @@ static void init_riscv_acpi(void) {
     }
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-         (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length; madt_ptr += *(madt_ptr + 1)) {
+         (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length; madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         if (*madt_ptr != 0x18) {
             continue;
         }
@@ -119,12 +128,33 @@ static void init_riscv_acpi(void) {
         uint8_t flags = 0;
 
         for (uint32_t i = 0; i < hart_info->offsets_len; i++) {
-            const struct rhct_header *node = (void *)((uintptr_t)rhct + hart_info->offsets[i]);
+            uint32_t node_offset = hart_info->offsets[i];
+            if (node_offset + sizeof(struct rhct_header) > rhct->header.length) {
+                continue;
+            }
+            const struct rhct_header *node = (void *)((uintptr_t)rhct + node_offset);
+            if (node->size < sizeof(struct rhct_header) ||
+                node_offset + node->size > rhct->header.length) {
+                continue;
+            }
             switch (node->type) {
-                case RHCT_ISA_STRING:
-                    isa_string = ((struct rhct_isa_string *)node)->isa_string;
+                case RHCT_ISA_STRING: {
+                    if (node->size < sizeof(struct rhct_isa_string))
+                        break;
+                    struct rhct_isa_string *isa_node = (struct rhct_isa_string *)node;
+                    // Validate string is within node bounds and null-terminated
+                    uint16_t max_str_len = node->size - sizeof(struct rhct_isa_string);
+                    if (isa_node->isa_string_len > max_str_len)
+                        break;
+                    if (isa_node->isa_string_len == 0 ||
+                        isa_node->isa_string[isa_node->isa_string_len - 1] != '\0')
+                        break;
+                    isa_string = isa_node->isa_string;
                     break;
+                }
                 case RHCT_MMU:
+                    if (node->size < sizeof(struct rhct_mmu))
+                        break;
                     mmu_type = ((struct rhct_mmu *)node)->mmu_type;
                     flags |= RISCV_HART_HAS_MMU;
                     break;
@@ -137,7 +167,8 @@ static void init_riscv_acpi(void) {
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s", hartid, isa_string);
+            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            continue;
         }
 
         struct riscv_hart *hart = ext_mem_alloc(sizeof(struct riscv_hart));
@@ -205,7 +236,8 @@ static void init_riscv_fdt(const void *fdt) {
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s", hartid, isa_string);
+            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            continue;
         }
 
         struct riscv_hart *hart = ext_mem_alloc(sizeof(struct riscv_hart));

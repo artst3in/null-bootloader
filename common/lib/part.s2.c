@@ -84,10 +84,7 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
         }
     }
 
-    uint64_t block_size;
-    if (__builtin_mul_overflow(volume->fastest_xfer_size, volume->sector_size, &block_size)) {
-        return false;
-    }
+    uint64_t block_size = volume->fastest_xfer_size * volume->sector_size;
 
     uint64_t progress = 0;
     while (progress < count) {
@@ -156,7 +153,8 @@ bool gpt_get_guid(struct guid *guid, struct volume *volume) {
 
     for (size_t i = 0; i < SIZEOF_ARRAY(lb_guesses); i++) {
         // read header, located after the first block
-        volume_read(volume, &header, lb_guesses[i] * 1, sizeof(header));
+        if (!volume_read(volume, &header, lb_guesses[i] * 1, sizeof(header)))
+            continue;
 
         // check the header
         // 'EFI PART'
@@ -190,7 +188,8 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
 
     for (size_t i = 0; i < SIZEOF_ARRAY(lb_guesses); i++) {
         // read header, located after the first block
-        volume_read(volume, &header, lb_guesses[i] * 1, sizeof(header));
+        if (!volume_read(volume, &header, lb_guesses[i] * 1, sizeof(header)))
+            continue;
 
         // check the header
         // 'EFI PART'
@@ -230,7 +229,9 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
     }
 
     struct gpt_entry entry = {0};
-    volume_read(volume, &entry, entry_offset, sizeof(entry));
+    if (!volume_read(volume, &entry, entry_offset, sizeof(entry))) {
+        return END_OF_TABLE;
+    }
 
     struct guid empty_guid = {0};
     if (!memcmp(&entry.unique_partition_guid, &empty_guid, sizeof(struct guid)))
@@ -313,33 +314,42 @@ bool is_valid_mbr(struct volume *volume) {
     // Check if actually valid mbr
     uint16_t hint = 0;
 
-    volume_read(volume, &hint, 446, sizeof(uint8_t));
+    if (!volume_read(volume, &hint, 446, sizeof(uint8_t)))
+        return false;
     if ((uint8_t)hint != 0x00 && (uint8_t)hint != 0x80)
         return false;
-    volume_read(volume, &hint, 462, sizeof(uint8_t));
+    if (!volume_read(volume, &hint, 462, sizeof(uint8_t)))
+        return false;
     if ((uint8_t)hint != 0x00 && (uint8_t)hint != 0x80)
         return false;
-    volume_read(volume, &hint, 478, sizeof(uint8_t));
+    if (!volume_read(volume, &hint, 478, sizeof(uint8_t)))
+        return false;
     if ((uint8_t)hint != 0x00 && (uint8_t)hint != 0x80)
         return false;
-    volume_read(volume, &hint, 494, sizeof(uint8_t));
+    if (!volume_read(volume, &hint, 494, sizeof(uint8_t)))
+        return false;
     if ((uint8_t)hint != 0x00 && (uint8_t)hint != 0x80)
         return false;
 
     char hintc[64];
-    volume_read(volume, hintc, 3, 4);
+    if (!volume_read(volume, hintc, 3, 4))
+        return false;
     if (memcmp(hintc, "NTFS", 4) == 0)
         return false;
-    volume_read(volume, hintc, 54, 3);
+    if (!volume_read(volume, hintc, 54, 3))
+        return false;
     if (memcmp(hintc, "FAT", 3) == 0)
         return false;
-    volume_read(volume, hintc, 82, 3);
+    if (!volume_read(volume, hintc, 82, 3))
+        return false;
     if (memcmp(hintc, "FAT", 3) == 0)
         return false;
-    volume_read(volume, hintc, 3, 5);
+    if (!volume_read(volume, hintc, 3, 5))
+        return false;
     if (memcmp(hintc, "FAT32", 5) == 0)
         return false;
-    volume_read(volume, &hint, 1080, sizeof(uint16_t));
+    if (!volume_read(volume, &hint, 1080, sizeof(uint16_t)))
+        return false;
     if (hint == 0xef53)
         return false;
 
@@ -352,7 +362,9 @@ uint32_t mbr_get_id(struct volume *volume) {
     }
 
     uint32_t ret;
-    volume_read(volume, &ret, 0x1b8, sizeof(uint32_t));
+    if (!volume_read(volume, &ret, 0x1b8, sizeof(uint32_t))) {
+        return 0;
+    }
 
     return ret;
 }
@@ -375,7 +387,9 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
     for (int i = 0; i < partition; i++) {
         uint64_t entry_offset = ebr_sector * 512 + 0x1ce;
 
-        volume_read(extended_part, &entry, entry_offset, sizeof(struct mbr_entry));
+        if (!volume_read(extended_part, &entry, entry_offset, sizeof(struct mbr_entry))) {
+            return END_OF_TABLE;
+        }
 
         if (entry.type != 0x0f && entry.type != 0x05) {
             return END_OF_TABLE;
@@ -398,7 +412,9 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
 
     uint64_t entry_offset = ebr_sector * 512 + 0x1be;
 
-    volume_read(extended_part, &entry, entry_offset, sizeof(struct mbr_entry));
+    if (!volume_read(extended_part, &entry, entry_offset, sizeof(struct mbr_entry))) {
+        return END_OF_TABLE;
+    }
 
     if (entry.type == 0)
         return NO_PARTITION;
@@ -468,7 +484,9 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
         for (int i = 0; i < 4; i++) {
             uint64_t entry_offset = 0x1be + sizeof(struct mbr_entry) * i;
 
-            volume_read(volume, &entry, entry_offset, sizeof(struct mbr_entry));
+            if (!volume_read(volume, &entry, entry_offset, sizeof(struct mbr_entry))) {
+                continue;
+            }
 
             if (entry.type != 0x0f && entry.type != 0x05)
                 continue;
@@ -503,7 +521,9 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
 
     uint64_t entry_offset = 0x1be + sizeof(struct mbr_entry) * partition;
 
-    volume_read(volume, &entry, entry_offset, sizeof(struct mbr_entry));
+    if (!volume_read(volume, &entry, entry_offset, sizeof(struct mbr_entry))) {
+        return END_OF_TABLE;
+    }
 
     if (entry.type == 0)
         return NO_PARTITION;

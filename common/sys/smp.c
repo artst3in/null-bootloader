@@ -150,11 +150,18 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     size_t max_cpus = 0;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        // Prevent infinite loop on zero-length MADT entry
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 0: {
                 // Processor local xAPIC
+                if (*(madt_ptr + 1) < sizeof(struct madt_lapic))
+                    continue;
+
                 struct madt_lapic *lapic = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -166,6 +173,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
             case 9: {
                 // Processor local x2APIC
                 if (!x2apic)
+                    continue;
+
+                if (*(madt_ptr + 1) < sizeof(struct madt_x2apic))
                     continue;
 
                 struct madt_x2apic *x2lapic = (void *)madt_ptr;
@@ -190,11 +200,18 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     mtrr_save();
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        // Prevent infinite loop on zero-length MADT entry
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 0: {
                 // Processor local xAPIC
+                if (*(madt_ptr + 1) < sizeof(struct madt_lapic))
+                    continue;
+
                 struct madt_lapic *lapic = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -230,6 +247,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
             case 9: {
                 // Processor local x2APIC
                 if (!x2apic)
+                    continue;
+
+                if (*(madt_ptr + 1) < sizeof(struct madt_x2apic))
                     continue;
 
                 struct madt_x2apic *x2lapic = (void *)madt_ptr;
@@ -309,7 +329,8 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
     // Prepare the trampoline
     static void *trampoline = NULL;
     if (trampoline == NULL) {
-        trampoline = ext_mem_alloc(smp_trampoline_size);
+        // AArch64 trampoline expects 0x1000 byte buffer with passed_info at the end
+        trampoline = ext_mem_alloc(0x1000);
 
         memcpy(trampoline, smp_trampoline_start, smp_trampoline_size);
     }
@@ -421,12 +442,17 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     if (fadt == NULL)
         return NULL;
 
-    // Read the single field from the FADT without defining a struct for the whole table
-    uint16_t arm_boot_args;
-    memcpy(&arm_boot_args, fadt + 129, 2);
+    // Check FADT length before accessing ARM boot flags at offset 129
+    uint32_t fadt_length;
+    memcpy(&fadt_length, fadt + 4, 4);
+    if (fadt_length >= 131) {
+        // Read the single field from the FADT without defining a struct for the whole table
+        uint16_t arm_boot_args;
+        memcpy(&arm_boot_args, fadt + 129, 2);
 
-    if (arm_boot_args & 1) // PSCI compliant?
-        boot_method = arm_boot_args & 2 ? BOOT_WITH_PSCI_HVC : BOOT_WITH_PSCI_SMC;
+        if (arm_boot_args & 1) // PSCI compliant?
+            boot_method = arm_boot_args & 2 ? BOOT_WITH_PSCI_HVC : BOOT_WITH_PSCI_SMC;
+    }
 
     // Search for MADT table
     struct madt *madt = acpi_get_table("APIC", 0);
@@ -450,11 +476,17 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     size_t max_cpus = 0;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 11: {
                 // GIC CPU Interface
+                if (*(madt_ptr + 1) < sizeof(struct madt_gicc))
+                    continue;
+
                 struct madt_gicc *gicc = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -471,11 +503,17 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
 
     // Try to start all APs
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
-      (uintptr_t)madt_ptr < (uintptr_t)madt + madt->header.length;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
         switch (*madt_ptr) {
             case 11: {
                 // GIC CPU Interface
+                if (*(madt_ptr + 1) < sizeof(struct madt_gicc))
+                    continue;
+
                 struct madt_gicc *gicc = (void *)madt_ptr;
 
                 // Check if we can actually try to start the AP
@@ -544,8 +582,9 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
     int psci = fdt_path_offset(dtb, "/psci");
 
     if (psci > 0 && !fdt_node_check_compatible(dtb, psci, "arm,psci")) {
+        int prop_len;
         const void *prop;
-        if (!(prop = fdt_getprop(dtb, psci, "cpu_on", NULL))) {
+        if (!(prop = fdt_getprop(dtb, psci, "cpu_on", &prop_len)) || prop_len < 4) {
             printv("smp: failed to find PSCI cpu_on prop\n");
             return NULL;
         }
@@ -588,12 +627,13 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
 
     fdt_for_each_subnode(node, dtb, cpus) {
         const void *prop;
+        int prop_len;
 
         if (!(prop = fdt_getprop(dtb, node, "device_type", NULL)) || strcmp(prop, "cpu")) {
             continue;
         }
 
-        if (!(prop = fdt_getprop(dtb, node, "reg", NULL))) {
+        if (!(prop = fdt_getprop(dtb, node, "reg", &prop_len)) || prop_len < address_cells * 4) {
             continue;
         }
 
@@ -644,7 +684,10 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
 
             const void *psci_method = fdt_getprop(dtb, psci, "method", NULL);
 
-            if (!strcmp(psci_method, "smc")) {
+            if (psci_method == NULL) {
+                printv("smp: PSCI method property not found\n");
+                continue;
+            } else if (!strcmp(psci_method, "smc")) {
                 boot_method = BOOT_WITH_PSCI_SMC;
             } else if (!strcmp(psci_method, "hvc")) {
                 boot_method = BOOT_WITH_PSCI_HVC;
@@ -655,7 +698,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
         } else if (!strcmp(prop, "spin-table")) {
             boot_method = BOOT_WITH_SPIN_TBL;
 
-            if (!(prop = fdt_getprop(dtb, node, "cpu-release-addr", NULL))) {
+            if (!(prop = fdt_getprop(dtb, node, "cpu-release-addr", &prop_len)) || prop_len < 8) {
                 printv("smp: missing cpu-release-addr\n");
                 continue;
             }

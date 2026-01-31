@@ -15,7 +15,7 @@ int tolower(int c);
 int abs(int i);
 
 void *memset(void *, int, size_t);
-void *memcpy(void *, const void *, size_t);
+void *memcpy(void *restrict, const void *restrict, size_t);
 int memcmp(const void *, const void *, size_t);
 void *memmove(void *, const void *, size_t);
 void *memchr(const void *, int, size_t);

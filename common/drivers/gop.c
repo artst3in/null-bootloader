@@ -89,7 +89,7 @@ static bool mode_to_fb_info(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *g
     }
 
     ret->memory_model = 0x06;
-    ret->framebuffer_pitch = mode_info->PixelsPerScanLine * (ret->framebuffer_bpp / 8);
+    ret->framebuffer_pitch = (uint64_t)mode_info->PixelsPerScanLine * (ret->framebuffer_bpp / 8);
     ret->framebuffer_width = mode_info->HorizontalResolution;
     ret->framebuffer_height = mode_info->VerticalResolution;
 
@@ -167,7 +167,7 @@ static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL
     pmm_free(ret, modes_count * sizeof(struct fb_info));
     ret = tmp;
 
-    *count = modes_count;
+    *count = actual_count;
     return ret;
 }
 

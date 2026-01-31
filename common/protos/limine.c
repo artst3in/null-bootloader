@@ -41,10 +41,10 @@ enum executable_format {
     EXECUTABLE_FORMAT_PE,
 };
 
-static enum executable_format detect_kernel_format(uint8_t *kernel) {
+static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kernel_size) {
     if (elf_bits(kernel) != -1) {
         return EXECUTABLE_FORMAT_ELF;
-    } else if (pe_bits(kernel) != -1) {
+    } else if (pe_bits(kernel, kernel_size) != -1) {
         return EXECUTABLE_FORMAT_PE;
     } else {
         panic(true, "limine: Unknown kernel executable format");
@@ -444,6 +444,10 @@ noreturn void limine_load(char *config, char *cmdline) {
     strcpy(k_path_copy, kernel_path);
     char *k_resource = NULL, *k_root = NULL, *k_path = NULL, *k_hash = NULL;
     uri_resolve(k_path_copy, &k_resource, &k_root, &k_path, &k_hash);
+    // Copy k_resource and k_root since uri_resolve returns pointers to a static
+    // buffer that gets overwritten by subsequent uri_open/uri_resolve calls
+    k_resource = strdup(k_resource);
+    k_root = strdup(k_root);
     char *k_path_ = ext_mem_alloc(strlen(k_path) + 2);
     k_path_[0] = '/';
     strcpy(k_path_ + 1, k_path);
@@ -479,7 +483,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint64_t image_size_before_bss;
     bool is_reloc;
 
-    enum executable_format kernel_format = detect_kernel_format(kernel);
+    enum executable_format kernel_format = detect_kernel_format(kernel, kernel_file->size);
     switch (kernel_format) {
         case EXECUTABLE_FORMAT_ELF:
             if (!elf64_load(kernel, &entry_point, &slide,
@@ -492,7 +496,7 @@ noreturn void limine_load(char *config, char *cmdline) {
             }
             break;
         case EXECUTABLE_FORMAT_PE:
-            if (!pe64_load(kernel, &entry_point, &slide,
+            if (!pe64_load(kernel, kernel_file->size, &entry_point, &slide,
                             MEMMAP_KERNEL_AND_MODULES, kaslr,
                             &ranges, &ranges_count,
                             &physical_base, &virtual_base, NULL,
@@ -557,6 +561,9 @@ noreturn void limine_load(char *config, char *cmdline) {
     requests_count = 0;
     if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
+            if (i >= MAX_REQUESTS) {
+                panic(true, "limine: Maximum requests exceeded");
+            }
             if (limine_reqs[i] == 0) {
                 break;
             }
@@ -1187,7 +1194,10 @@ FEAT_START
             module_path_abs_p += k_root_len;
             memcpy(module_path_abs_p, "):", 2);
             module_path_abs_p += 2;
-            get_absolute_path(module_path_abs_p, module_path, k_path);
+            size_t remaining_size = 1024 - (module_path_abs_p - module_path_abs);
+            if (!get_absolute_path(module_path_abs_p, module_path, k_path, remaining_size)) {
+                panic(true, "limine: Internal module path too long");
+            }
 
             module_path = module_path_abs;
             module_path_allocated = true;

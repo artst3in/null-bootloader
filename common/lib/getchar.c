@@ -138,6 +138,9 @@ static int input_sequence(void) {
             break;
         }
 
+        if (val > 999) {
+            break;
+        }
         val *= 10;
         val += ret - '0';
     }
@@ -236,6 +239,9 @@ static int input_sequence(bool ext,
             break;
         }
 
+        if (val > 999) {
+            break;
+        }
         val *= 10;
         val += kd.Key.UnicodeChar - '0';
     }

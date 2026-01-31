@@ -111,7 +111,7 @@ static bool align_entry(uint64_t *base, uint64_t *length) {
     *length -= (*base - orig_base);
     *length =  ALIGN_DOWN(*length, PAGE_SIZE);
 
-    if (!length)
+    if (*length == 0)
         return false;
 
     return true;
@@ -375,7 +375,10 @@ void init_memmap(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length = entry->NumberOfPages * 4096;
+        uint64_t length;
+        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
+            panic(false, "pmm: EFI memory descriptor size overflow");
+        }
 
         memmap[memmap_entries].base = base;
         memmap[memmap_entries].length = length;
@@ -465,7 +468,10 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
             uint64_t base = r->base;
             uint64_t top = base + r->length;
             uint64_t efi_base = entry->PhysicalStart;
-            uint64_t efi_size = entry->NumberOfPages * 4096;
+            uint64_t efi_size;
+            if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &efi_size)) {
+                continue;  // Skip malformed entry
+            }
 
             if (efi_base < base) {
                 if (efi_size <= base - efi_base)
@@ -800,14 +806,21 @@ bool memmap_alloc_range_in(struct memmap_entry *m, size_t *_count,
         return true;
     }
 
-    uint64_t top = base + length;
+    uint64_t top;
+    if (__builtin_add_overflow(base, length, &top)) {
+        if (do_panic)
+            panic(false, "Memory allocation overflow.");
+        return false;
+    }
 
     for (size_t i = 0; i < count; i++) {
         if (overlay_type != 0 && m[i].type != overlay_type)
             continue;
 
         uint64_t entry_base = m[i].base;
-        uint64_t entry_top  = m[i].base + m[i].length;
+        uint64_t entry_top;
+        if (__builtin_add_overflow(m[i].base, m[i].length, &entry_top))
+            continue;
 
         if (base >= entry_base && base < entry_top && top <= entry_top) {
             if (simulation)

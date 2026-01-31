@@ -7,6 +7,16 @@
 #include <sys/cpu.h>
 #include <lib/real.h>
 
+#define A20_KBC_TIMEOUT 50000
+
+static bool a20_kbc_wait(uint8_t mask, uint8_t expected) {
+    for (int i = 0; i < A20_KBC_TIMEOUT; i++) {
+        if ((inb(0x64) & mask) == expected)
+            return true;
+    }
+    return false;
+}
+
 bool a20_check(void) {
     bool ret = false;
     uint16_t orig = mminw(0x7dfe);
@@ -45,23 +55,25 @@ bool a20_enable(void) {
     if (a20_check())
         return true;
 
-    // Keyboard controller method
-    while (inb(0x64) & 2);
+    // Keyboard controller method (with timeout for systems without KBC)
+    if (!a20_kbc_wait(2, 0)) goto kbc_failed;
     outb(0x64, 0xad);
-    while (inb(0x64) & 2);
+    if (!a20_kbc_wait(2, 0)) goto kbc_failed;
     outb(0x64, 0xd0);
-    while (!(inb(0x64) & 1));
+    if (!a20_kbc_wait(1, 1)) goto kbc_failed;
     uint8_t b = inb(0x60);
-    while (inb(0x64) & 2);
+    if (!a20_kbc_wait(2, 0)) goto kbc_failed;
     outb(0x64, 0xd1);
-    while (inb(0x64) & 2);
+    if (!a20_kbc_wait(2, 0)) goto kbc_failed;
     outb(0x60, b | 2);
-    while (inb(0x64) & 2);
+    if (!a20_kbc_wait(2, 0)) goto kbc_failed;
     outb(0x64, 0xae);
-    while (inb(0x64) & 2);
+    if (!a20_kbc_wait(2, 0)) goto kbc_failed;
 
     if (a20_check())
         return true;
+
+kbc_failed:
 
     // Fast A20 method
     b = inb(0x92);
