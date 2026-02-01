@@ -7,6 +7,7 @@
 #  include <lib/real.h>
 #elif defined (UEFI)
 #  include <efi.h>
+#  include <crypt/blake2b.h>
 #endif
 #include <lib/misc.h>
 #include <lib/print.h>
@@ -418,6 +419,23 @@ static struct volume *pxe_from_efi_handle(EFI_HANDLE efi_handle) {
     return vol;
 }
 
+#define UNIQUE_SECTOR_POOL_SIZE 65536
+static uint8_t *unique_sector_pool;
+
+static struct volume *volume_by_unique_sector(void *b2b) {
+    for (size_t i = 0; i < volume_index_i; i++) {
+        if (volume_index[i]->unique_sector_valid == false) {
+            continue;
+        }
+
+        if (memcmp(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES) == 0) {
+            return volume_index[i];
+        }
+    }
+
+    return NULL;
+}
+
 static bool is_efi_handle_to_skip(EFI_HANDLE efi_handle) {
     EFI_STATUS status;
 
@@ -659,6 +677,23 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
         return pxe_from_efi_handle(efi_handle);
     }
 
+    uint64_t bdev_size = ((uint64_t)block_io->Media->LastBlock + 1) * (uint64_t)block_io->Media->BlockSize;
+    if (bdev_size >= UNIQUE_SECTOR_POOL_SIZE) {
+        status = block_io->ReadBlocks(block_io, block_io->Media->MediaId,
+                                      0,
+                                      UNIQUE_SECTOR_POOL_SIZE,
+                                      unique_sector_pool);
+        if (status == 0) {
+            uint8_t b2b[BLAKE2B_OUT_BYTES];
+            blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+
+            ret = volume_by_unique_sector(b2b);
+            if (ret != NULL) {
+                return ret;
+            }
+        }
+    }
+
     ret = volume_by_device_path(efi_handle);
     if (ret != NULL) {
         return ret;
@@ -677,6 +712,44 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
     return NULL;
 }
 
+static void find_unique_sectors(void) {
+    EFI_STATUS status;
+
+    for (size_t i = 0; i < volume_index_i; i++) {
+        if ((volume_index[i]->first_sect * 512) % volume_index[i]->sector_size) {
+            continue;
+        }
+
+        size_t first_sect = (volume_index[i]->first_sect * 512) / volume_index[i]->sector_size;
+
+        if (volume_index[i]->sect_count * volume_index[i]->sector_size < UNIQUE_SECTOR_POOL_SIZE) {
+            continue;
+        }
+
+        status = volume_index[i]->block_io->ReadBlocks(
+                            volume_index[i]->block_io,
+                            volume_index[i]->block_io->Media->MediaId,
+                            first_sect,
+                            UNIQUE_SECTOR_POOL_SIZE,
+                            unique_sector_pool);
+        if (status != 0) {
+            continue;
+        }
+
+        uint8_t b2b[BLAKE2B_OUT_BYTES];
+        blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
+
+        struct volume *collision = volume_by_unique_sector(b2b);
+        if (collision == NULL) {
+            volume_index[i]->unique_sector_valid = true;
+            memcpy(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES);
+            continue;
+        }
+
+        collision->unique_sector_valid = false;
+    }
+}
+
 static void find_part_handles(EFI_HANDLE *handles, size_t handle_count) {
     for (size_t i = 0; i < handle_count; i++) {
         struct volume *vol = disk_volume_from_efi_handle(handles[i]);
@@ -689,6 +762,8 @@ static void find_part_handles(EFI_HANDLE *handles, size_t handle_count) {
 
 void disk_create_index(void) {
     EFI_STATUS status;
+
+    unique_sector_pool = ext_mem_alloc(UNIQUE_SECTOR_POOL_SIZE);
 
     EFI_HANDLE tmp_handles[1];
 
@@ -803,6 +878,7 @@ fail:
         }
     }
 
+    find_unique_sectors();
     find_part_handles(handles, handle_count);
 
     pmm_free(handles, handles_size);

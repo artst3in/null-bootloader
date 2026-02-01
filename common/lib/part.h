@@ -7,6 +7,7 @@
 #include <lib/guid.h>
 #if defined (UEFI)
 #  include <efi.h>
+#  include <crypt/blake2b.h>
 #endif
 
 #define NO_PARTITION  (-1)
@@ -23,6 +24,9 @@ struct volume {
 
     // PXE
     EFI_PXE_BASE_CODE_PROTOCOL *pxe_base_code;
+
+    bool unique_sector_valid;
+    uint8_t unique_sector_b2b[BLAKE2B_OUT_BYTES];
 #elif defined (BIOS)
     int drive;
 #endif
