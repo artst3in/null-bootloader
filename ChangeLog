@@ -1,3 +1,17 @@
+2026-02-02  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.6.4 ***
+
+    Noteworthy changes compared to the previous release, 10.6.3:
+
+    Bug fixes:
+        - Strip out all code relying on disk writes from the codebase. This
+          gets rid of the (remote) possibility of disk corruption and the (even
+          more remote) possibility of firmware/flash corruption. This also
+          sorts out an issue on Apple Silicon where m1n1/U-boot appears to
+          leave the NVMe controller in an inconsistent state after write
+          operations are attempted.
+
 2026-01-14  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.6.3 ***
