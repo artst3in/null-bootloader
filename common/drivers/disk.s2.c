@@ -500,15 +500,14 @@ static bool is_efi_handle_optical(EFI_HANDLE efi_handle) {
             break;
         }
 
-        uint16_t len = *(uint16_t *)dp->Length;
-        if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
-            break;  // Malformed device path node
-        }
-
         if (dp->Type == MEDIA_DEVICE_PATH && dp->SubType == MEDIA_CDROM_DP) {
             return true;
         }
 
+        uint16_t len = *(uint16_t *)dp->Length;
+        if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
+            break;  // Malformed device path node
+        }
         dp = (void *)dp + len;
     }
 
@@ -552,12 +551,16 @@ static bool device_paths_match_disk(EFI_DEVICE_PATH_PROTOCOL *dp1,
             return false;
         }
 
+        if (len1 < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
+            return false;
+        }
+
         if (memcmp(dp1, dp2, len1) != 0) {
             return false;
         }
 
-        dp1 = NextDevicePathNode(dp1);
-        dp2 = NextDevicePathNode(dp2);
+        dp1 = (void *)dp1 + len1;
+        dp2 = (void *)dp2 + len2;
     }
 
     return true;
@@ -576,16 +579,42 @@ static struct volume *volume_by_device_path(EFI_HANDLE query_handle) {
         }
 
         if (device_paths_match_disk(query_dp, vol_dp)) {
+            // Convert first_sect from 512-byte sectors to device LBAs
+            int sector_size = volume_index[i]->sector_size;
+            if ((volume_index[i]->first_sect * 512) % sector_size) {
+                continue;  // Misaligned, skip this volume
+            }
+            uint64_t first_sect_lba = (volume_index[i]->first_sect * 512) / sector_size;
+
             EFI_DEVICE_PATH_PROTOCOL *qp = query_dp;
             while (!IsDevicePathEnd(qp)) {
                 if (qp->Type == MEDIA_DEVICE_PATH && qp->SubType == MEDIA_HARDDRIVE_DP) {
+                    uint16_t len = DevicePathNodeLength(qp);
+                    if (len < sizeof(HARDDRIVE_DEVICE_PATH)) {
+                        break;
+                    }
                     HARDDRIVE_DEVICE_PATH *query_hd = (HARDDRIVE_DEVICE_PATH *)qp;
-                    if (volume_index[i]->first_sect == query_hd->PartitionStart) {
+                    if (first_sect_lba == query_hd->PartitionStart) {
                         return volume_index[i];
                     }
                     break;
                 }
-                qp = NextDevicePathNode(qp);
+                if (qp->Type == MEDIA_DEVICE_PATH && qp->SubType == MEDIA_CDROM_DP) {
+                    uint16_t len = DevicePathNodeLength(qp);
+                    if (len < sizeof(CDROM_DEVICE_PATH)) {
+                        break;
+                    }
+                    CDROM_DEVICE_PATH *query_cd = (CDROM_DEVICE_PATH *)qp;
+                    if (first_sect_lba == query_cd->PartitionStart) {
+                        return volume_index[i];
+                    }
+                    break;
+                }
+                uint16_t len = DevicePathNodeLength(qp);
+                if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
+                    break;
+                }
+                qp = (void *)qp + len;
             }
 
             if (IsDevicePathEnd(qp) && volume_index[i]->partition == 0) {
@@ -597,72 +626,7 @@ static struct volume *volume_by_device_path(EFI_HANDLE query_handle) {
     return NULL;
 }
 
-static struct volume *volume_by_partition_signature(EFI_HANDLE query_handle) {
-    EFI_DEVICE_PATH_PROTOCOL *dp = get_device_path(query_handle);
-    if (dp == NULL) {
-        return NULL;
-    }
-
-    while (!IsDevicePathEnd(dp)) {
-        uint16_t len = DevicePathNodeLength(dp);
-        if (len < sizeof(EFI_DEVICE_PATH_PROTOCOL)) {
-            break;
-        }
-
-        if (dp->Type == MEDIA_DEVICE_PATH && dp->SubType == MEDIA_HARDDRIVE_DP) {
-            if (len < sizeof(HARDDRIVE_DEVICE_PATH)) {
-                break;
-            }
-
-            HARDDRIVE_DEVICE_PATH *hd = (HARDDRIVE_DEVICE_PATH *)dp;
-
-            // GPT: match by partition GUID
-            if (hd->SignatureType == SIGNATURE_TYPE_GUID) {
-                for (size_t i = 0; i < volume_index_i; i++) {
-                    if (volume_index[i]->guid_valid &&
-                        memcmp(&volume_index[i]->guid, hd->Signature, sizeof(EFI_GUID)) == 0) {
-                        return volume_index[i];
-                    }
-                }
-            }
-
-            // MBR: match by partition start LBA
-            if (hd->SignatureType == SIGNATURE_TYPE_MBR) {
-                for (size_t i = 0; i < volume_index_i; i++) {
-                    if (volume_index[i]->first_sect == hd->PartitionStart) {
-                        return volume_index[i];
-                    }
-                }
-            }
-
-            break;
-        }
-
-        dp = NextDevicePathNode(dp);
-    }
-
-    return NULL;
-}
-
-static struct volume *volume_by_media_match(EFI_BLOCK_IO *query_bio) {
-    for (size_t i = 0; i < volume_index_i; i++) {
-        EFI_BLOCK_IO *vol_bio = volume_index[i]->block_io;
-
-        if (vol_bio->Media->BlockSize == query_bio->Media->BlockSize &&
-            vol_bio->Media->LastBlock == query_bio->Media->LastBlock &&
-            vol_bio->Media->ReadOnly == query_bio->Media->ReadOnly &&
-            vol_bio->Media->RemovableMedia == query_bio->Media->RemovableMedia &&
-            vol_bio->Media->LogicalPartition == query_bio->Media->LogicalPartition) {
-            return volume_index[i];
-        }
-    }
-
-    return NULL;
-}
-
 struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
-    struct volume *ret;
-
     EFI_STATUS status;
 
     EFI_GUID block_io_guid = BLOCK_IO_PROTOCOL;
@@ -687,29 +651,14 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
             uint8_t b2b[BLAKE2B_OUT_BYTES];
             blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
-            ret = volume_by_unique_sector(b2b);
+            struct volume *ret = volume_by_unique_sector(b2b);
             if (ret != NULL) {
                 return ret;
             }
         }
     }
 
-    ret = volume_by_device_path(efi_handle);
-    if (ret != NULL) {
-        return ret;
-    }
-
-    ret = volume_by_partition_signature(efi_handle);
-    if (ret != NULL) {
-        return ret;
-    }
-
-    ret = volume_by_media_match(block_io);
-    if (ret != NULL) {
-        return ret;
-    }
-
-    return NULL;
+    return volume_by_device_path(efi_handle);
 }
 
 static void find_unique_sectors(void) {
@@ -746,6 +695,7 @@ static void find_unique_sectors(void) {
             continue;
         }
 
+        // Invalidate collision's unique sector
         collision->unique_sector_valid = false;
     }
 }
