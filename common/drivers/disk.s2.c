@@ -141,39 +141,6 @@ int disk_read_sectors(struct volume *volume, void *buf, uint64_t block, size_t c
     return DISK_SUCCESS;
 }
 
-static int disk_write_sectors(struct volume *volume, void *buf, uint64_t block, size_t count) {
-    struct dap dap = {0};
-
-    if (count * volume->sector_size > XFER_BUF_SIZE)
-        panic(false, "XFER");
-
-    if (xfer_buf == NULL)
-        xfer_buf = conv_mem_alloc(XFER_BUF_SIZE);
-
-    dap.size    = 16;
-    dap.count   = count;
-    dap.segment = rm_seg(xfer_buf);
-    dap.offset  = rm_off(xfer_buf);
-    dap.lba     = block;
-
-    struct rm_regs r = {0};
-    r.eax = 0x4301;
-    r.edx = volume->drive;
-    r.esi = (uint32_t)rm_off(&dap);
-    r.ds  = rm_seg(&dap);
-
-    if (buf != NULL)
-        memcpy(xfer_buf, buf, count * volume->sector_size);
-
-    rm_int(0x13, &r, &r);
-
-    if (r.eflags & EFLAGS_CF) {
-        return DISK_FAILURE;
-    }
-
-    return DISK_SUCCESS;
-}
-
 static bool detect_sector_size(struct volume *volume) {
     struct dap dap = {0};
 
@@ -311,11 +278,9 @@ void disk_create_index(void) {
             continue;
         }
 
-        if (disk_read_sectors(block, xfer_buf, 0, 1) != DISK_SUCCESS) {
-            continue;
-        }
-
-        block->is_optical = (disk_write_sectors(block, xfer_buf, 0, 1) != DISK_SUCCESS) && block->sector_size == 2048;
+        // Detect optical drives via DPTE ATAPI bit (bit 6) or sector size heuristic
+        bool is_atapi = (dpte != NULL && (dpte->flags & (1 << 6)));
+        block->is_optical = is_atapi || (block->sector_size == 2048 && is_removable);
 
         if (!is_removable && !block->is_optical) {
             if (consumed_bda_disks == bda_disk_count) {
