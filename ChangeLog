@@ -1,3 +1,26 @@
+2026-02-04  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.6.5 ***
+
+    Noteworthy changes compared to the previous release, 10.6.4:
+
+    Bug fixes:
+        - Work around PicoEFI structure definition issue related to padding
+          that would cause volume_by_device_path() to always fail for
+          non-optical media.
+        - Fix issue that would cause unique sector detection on systems with 3+
+          collisions to fail and misreport unique sectors.
+        - Add extra layer of verification for unique sector matches to minimise
+          the chance of volume mismatches.
+
+    Miscellaneous:
+        - RISC-V: Implement Flanterm refresh path for SoCs not exposing Zicbom
+          in the device tree or ACPI (often the case with U-boot).
+        - Use volume_by_device_path() as primary disk_volume_from_efi_handle()
+          detection method.
+        - Lazily discover unique sectors only when the fallback requiring this
+          procedure is actually used.
+
 2026-02-02  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.6.4 ***
