@@ -393,6 +393,9 @@ static struct volume *pxe_from_efi_handle(EFI_HANDLE efi_handle) {
 
 #define UNIQUE_SECTOR_POOL_SIZE 65536
 static uint8_t *unique_sector_pool;
+static bool unique_sectors_calculated = false;
+
+static void find_unique_sectors(void);
 
 static struct volume *volume_by_unique_sector(void *b2b) {
     for (size_t i = 0; i < volume_index_i; i++) {
@@ -645,6 +648,8 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
                                       UNIQUE_SECTOR_POOL_SIZE,
                                       unique_sector_pool);
         if (status == 0) {
+            find_unique_sectors();
+
             uint8_t b2b[BLAKE2B_OUT_BYTES];
             blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
@@ -664,6 +669,11 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
 }
 
 static void find_unique_sectors(void) {
+    if (unique_sectors_calculated) {
+        return;
+    }
+    unique_sectors_calculated = true;
+
     EFI_STATUS status;
 
     for (size_t i = 0; i < volume_index_i; i++) {
@@ -838,7 +848,6 @@ fail:
         }
     }
 
-    find_unique_sectors();
     find_part_handles(handles, handle_count);
 
     pmm_free(handles, handles_size);
