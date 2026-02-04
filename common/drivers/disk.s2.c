@@ -555,7 +555,8 @@ static struct volume *volume_by_device_path(EFI_HANDLE query_handle) {
             while (!IsDevicePathEnd(qp)) {
                 if (qp->Type == MEDIA_DEVICE_PATH && qp->SubType == MEDIA_HARDDRIVE_DP) {
                     uint16_t len = DevicePathNodeLength(qp);
-                    if (len < sizeof(HARDDRIVE_DEVICE_PATH)) {
+                    // UEFI spec size is 42 bytes, but sizeof() may be larger due to padding
+                    if (len < 42) {
                         break;
                     }
                     HARDDRIVE_DEVICE_PATH *query_hd = (HARDDRIVE_DEVICE_PATH *)qp;
