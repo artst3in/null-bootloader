@@ -631,6 +631,13 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
         return pxe_from_efi_handle(efi_handle);
     }
 
+    // Try device path matching first (primary method)
+    struct volume *ret = volume_by_device_path(efi_handle);
+    if (ret != NULL) {
+        return ret;
+    }
+
+    // Fallback to unique sector matching
     uint64_t bdev_size = ((uint64_t)block_io->Media->LastBlock + 1) * (uint64_t)block_io->Media->BlockSize;
     if (bdev_size >= UNIQUE_SECTOR_POOL_SIZE) {
         status = block_io->ReadBlocks(block_io, block_io->Media->MediaId,
@@ -641,14 +648,14 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
             uint8_t b2b[BLAKE2B_OUT_BYTES];
             blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
-            struct volume *ret = volume_by_unique_sector(b2b);
+            ret = volume_by_unique_sector(b2b);
             if (ret != NULL) {
                 return ret;
             }
         }
     }
 
-    return volume_by_device_path(efi_handle);
+    return NULL;
 }
 
 static void find_unique_sectors(void) {
