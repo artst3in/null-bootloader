@@ -271,11 +271,18 @@ void disk_create_index(void) {
         block->drive = drive;
         block->partition = 0;
         block->first_sect = 0;
-        block->sect_count = drive_params.lba_count;
         block->max_partition = -1;
 
         if (!detect_sector_size(block)) {
             continue;
+        }
+
+        // Normalize sect_count to 512-byte sectors for consistency with partitions
+        // Preserve (uint64_t)-1 sentinel value (means "unknown size")
+        if (drive_params.lba_count == (uint64_t)-1 || drive_params.lba_count == 0) {
+            block->sect_count = (uint64_t)-1;
+        } else {
+            block->sect_count = drive_params.lba_count * (block->sector_size / 512);
         }
 
         // Detect optical drives via DPTE ATAPI bit (bit 6) or sector size heuristic
@@ -654,7 +661,8 @@ static void find_unique_sectors(void) {
 
         size_t first_sect = (volume_index[i]->first_sect * 512) / volume_index[i]->sector_size;
 
-        if (volume_index[i]->sect_count * volume_index[i]->sector_size < UNIQUE_SECTOR_POOL_SIZE) {
+        // sect_count is always in 512-byte sectors
+        if (volume_index[i]->sect_count * 512 < UNIQUE_SECTOR_POOL_SIZE) {
             continue;
         }
 
@@ -769,7 +777,8 @@ fail:
         block->partition = 0;
         block->sector_size = drive->Media->BlockSize;
         block->first_sect = 0;
-        block->sect_count = drive->Media->LastBlock + 1;
+        // Normalize sect_count to 512-byte sectors for consistency with partitions
+        block->sect_count = (drive->Media->LastBlock + 1) * (drive->Media->BlockSize / 512);
         block->max_partition = -1;
 
         if (drive->Revision >= EFI_BLOCK_IO_PROTOCOL_REVISION3) {

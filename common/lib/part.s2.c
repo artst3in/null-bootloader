@@ -75,8 +75,9 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
     }
 
     if (volume->sect_count != (uint64_t)-1) {
+        // sect_count is always in 512-byte sectors for both whole disks and partitions
         uint64_t part_size;
-        if (__builtin_mul_overflow(volume->sect_count, volume->sector_size, &part_size)) {
+        if (__builtin_mul_overflow(volume->sect_count, (uint64_t)512, &part_size)) {
             return false;
         }
         if (loc >= part_size || count > part_size - loc) {
