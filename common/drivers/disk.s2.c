@@ -401,6 +401,23 @@ static struct volume *volume_by_unique_sector(void *b2b) {
     return NULL;
 }
 
+// Search for matching hash including invalidated volumes (for collision detection)
+static struct volume *volume_by_sector_hash(void *b2b) {
+    for (size_t i = 0; i < volume_index_i; i++) {
+        if (volume_index[i]->unique_sector_valid == false
+         && memcmp(volume_index[i]->unique_sector_b2b, (uint8_t[BLAKE2B_OUT_BYTES]){0}, BLAKE2B_OUT_BYTES) == 0) {
+            // Hash was never set, skip
+            continue;
+        }
+
+        if (memcmp(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES) == 0) {
+            return volume_index[i];
+        }
+    }
+
+    return NULL;
+}
+
 static bool is_efi_handle_to_skip(EFI_HANDLE efi_handle) {
     EFI_STATUS status;
 
@@ -654,15 +671,21 @@ static void find_unique_sectors(void) {
         uint8_t b2b[BLAKE2B_OUT_BYTES];
         blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
 
-        struct volume *collision = volume_by_unique_sector(b2b);
+        // Check for collision BEFORE storing hash (so we don't find ourselves)
+        // This searches all volumes including previously invalidated ones
+        struct volume *collision = volume_by_sector_hash(b2b);
+
+        // Always store the hash so future volumes can detect collisions
+        memcpy(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES);
+
         if (collision == NULL) {
             volume_index[i]->unique_sector_valid = true;
-            memcpy(volume_index[i]->unique_sector_b2b, b2b, BLAKE2B_OUT_BYTES);
             continue;
         }
 
-        // Invalidate collision's unique sector
+        // Collision found - invalidate both volumes
         collision->unique_sector_valid = false;
+        volume_index[i]->unique_sector_valid = false;
     }
 }
 
