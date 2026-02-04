@@ -650,7 +650,12 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
 
             ret = volume_by_unique_sector(b2b);
             if (ret != NULL) {
-                return ret;
+                // Verify size, block size, and partition status match
+                if (block_io->Media->BlockSize == (uint32_t)ret->sector_size
+                 && bdev_size == ret->sect_count * 512
+                 && block_io->Media->LogicalPartition == (ret->partition != 0)) {
+                    return ret;
+                }
             }
         }
     }
