@@ -782,6 +782,12 @@ fail:
         if (drive->Media->LogicalPartition)
             continue;
 
+        // Read test to ensure device is responsive (skipping this causes hangs on some systems)
+        status = drive->ReadBlocks(drive, drive->Media->MediaId, 0, 4096, unique_sector_pool);
+        if (status) {
+            continue;
+        }
+
         struct volume *block = ext_mem_alloc(sizeof(struct volume));
 
         bool is_optical = is_efi_handle_optical(handles[i]) ||
