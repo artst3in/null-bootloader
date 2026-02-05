@@ -1,3 +1,17 @@
+2026-02-05  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.6.6 ***
+
+    Noteworthy changes compared to the previous release, 10.6.5:
+
+    Bug fixes:
+        - Re-add a mistakenly removed check for EFI volume responsiveness. Lack
+          of this check would indirectly cause hangs due to EFI volumes being
+          indexed despite their non-responsiveness.
+
+    Miscellaneous:
+        - Replace suboptimal code to handle reads close to the end of a volume.
+
 2026-02-04  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.6.5 ***
