@@ -46,7 +46,11 @@ static bool cache_block(struct volume *volume, uint64_t block) {
 
     // Clamp xfer_size to remaining sectors in volume
     if (volume->sect_count != (uint64_t)-1) {
-        uint64_t end_sector = first_sect + volume->sect_count / (volume->sector_size / 512);
+        uint64_t volume_sectors = volume->sect_count / (volume->sector_size / 512);
+        uint64_t end_sector;
+        if (__builtin_add_overflow(first_sect, volume_sectors, &end_sector)) {
+            end_sector = UINT64_MAX;
+        }
         if (read_sector >= end_sector) {
             return false;
         }
