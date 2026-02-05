@@ -44,25 +44,23 @@ static bool cache_block(struct volume *volume, uint64_t block) {
         return false;
     }
 
-    for (;;) {
-        int ret = disk_read_sectors(volume, volume->cache,
-                           read_sector,
-                           xfer_size);
-
-        switch (ret) {
-            case DISK_NO_MEDIA:
-                return false;
-            case DISK_SUCCESS:
-                goto disk_success;
-        }
-
-        xfer_size--;
-        if (xfer_size == 0) {
+    // Clamp xfer_size to remaining sectors in volume
+    if (volume->sect_count != (uint64_t)-1) {
+        uint64_t end_sector = first_sect + volume->sect_count / (volume->sector_size / 512);
+        if (read_sector >= end_sector) {
             return false;
+        }
+        uint64_t remaining = end_sector - read_sector;
+        if (xfer_size > remaining) {
+            xfer_size = remaining;
         }
     }
 
-disk_success:
+    int ret = disk_read_sectors(volume, volume->cache, read_sector, xfer_size);
+    if (ret != DISK_SUCCESS) {
+        return false;
+    }
+
     volume->cache_status = CACHE_READY;
     volume->cached_block = block;
 
