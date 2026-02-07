@@ -404,10 +404,10 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                     goto reloc_fail;
                 }
             } else {
-                relocated_base -= reloc_tag.align;
-                if (relocated_base < reloc_tag.min_addr) {
+                if (relocated_base - reloc_tag.min_addr < reloc_tag.align) {
                     goto reloc_fail;
                 }
+                relocated_base -= reloc_tag.align;
             }
         }
 
