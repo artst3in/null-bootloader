@@ -522,7 +522,11 @@ reloc_fail:
             if (bits == 64)  {
                 struct elf64_shdr *shdr = (void *)tag->sections + i * section_hdr_info.section_entry_size;
 
-                if (shdr->sh_addr != 0 || shdr->sh_size == 0) {
+                if (shdr->sh_addr != 0) {
+                    shdr->sh_addr += reloc_slide;
+                    continue;
+                }
+                if (shdr->sh_size == 0) {
                     continue;
                 }
 
@@ -543,7 +547,11 @@ reloc_fail:
             } else {
                 struct elf32_shdr *shdr = (void *)tag->sections + i * section_hdr_info.section_entry_size;
 
-                if (shdr->sh_addr != 0 || shdr->sh_size == 0) {
+                if (shdr->sh_addr != 0) {
+                    shdr->sh_addr += (int32_t)reloc_slide;
+                    continue;
+                }
+                if (shdr->sh_size == 0) {
                     continue;
                 }
 
