@@ -33,7 +33,7 @@ uint64_t strtoui(const char *s, const char **end, int base) {
     uint64_t n = 0;
     for (size_t i = 0; ; i++) {
         int d = digit_to_int(s[i]);
-        if (d == -1) {
+        if (d == -1 || d >= base) {
             if (end != NULL)
                 *end = &s[i];
             break;
