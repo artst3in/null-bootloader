@@ -318,6 +318,11 @@ again:
         uintptr_t section_base = *physical_base + section->VirtualAddress;
         uint32_t section_raw_size = section->VirtualSize < section->SizeOfRawData ? section->VirtualSize : section->SizeOfRawData;
 
+        // Validate section doesn't write past the image buffer
+        if ((uint64_t)section->VirtualAddress + section_raw_size > image_size) {
+            panic(true, "pe: Section %zu exceeds image bounds", i);
+        }
+
         // Validate section data doesn't exceed file bounds
         if ((uint64_t)section->PointerToRawData + section_raw_size > file_size) {
             panic(true, "pe: Section %zu data extends beyond file bounds", i);
