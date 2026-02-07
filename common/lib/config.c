@@ -53,7 +53,11 @@ static bool init_efi_app_path(size_t *len_out) {
             goto found;
         }
 
-        path = (void *)path + *((uint16_t *)&path->Length[0]);
+        uint16_t node_length = *((uint16_t *)&path->Length[0]);
+        if (node_length < 4) {
+            return false;
+        }
+        path = (void *)path + node_length;
     }
 
     return false;
