@@ -7,8 +7,7 @@
 
 static bool elsewhere_overlap_check(uint64_t base1, uint64_t top1,
                               uint64_t base2, uint64_t top2) {
-    return ((base1 >= base2 && base1 <  top2)
-         || (top1  >  base2 && top1  <= top2));
+    return (base1 < top2 && base2 < top1);
 }
 
 bool elsewhere_append(
