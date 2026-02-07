@@ -13,8 +13,8 @@ struct image {
     int pitch;
     size_t img_width; // x_size = scaled size, img_width = bitmap size
     size_t img_height;
-    size_t x_displacement;
-    size_t y_displacement;
+    int64_t x_displacement;
+    int64_t y_displacement;
     uint32_t back_colour;
 };
 
