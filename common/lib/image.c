@@ -9,8 +9,8 @@
 void image_make_centered(struct image *image, int frame_x_size, int frame_y_size, uint32_t back_colour) {
     image->type = IMAGE_CENTERED;
 
-    image->x_displacement = frame_x_size / 2 - image->x_size / 2;
-    image->y_displacement = frame_y_size / 2 - image->y_size / 2;
+    image->x_displacement = (int64_t)frame_x_size / 2 - (int64_t)image->x_size / 2;
+    image->y_displacement = (int64_t)frame_y_size / 2 - (int64_t)image->y_size / 2;
     image->back_colour = back_colour;
 }
 

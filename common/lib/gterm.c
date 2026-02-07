@@ -374,23 +374,23 @@ __attribute__((always_inline)) static inline void genloop(struct fb_info *fb, si
 
     case IMAGE_CENTERED:
         for (size_t y = ystart; y < yend; y++) {
-            size_t image_y = y - background->y_displacement;
-            const size_t off = img_pitch * image_y;
+            int64_t image_y = (int64_t)y - background->y_displacement;
             size_t canvas_off = fb->framebuffer_width * y;
-            if (image_y >= background->y_size) { /* external part */
+            if (image_y < 0 || (uint64_t)image_y >= background->y_size) { /* external part */
                 for (size_t x = xstart; x < xend; x++) {
                     uint32_t i = blend(fb, x, y, background->back_colour);
                     bg_canvas[canvas_off + x] = i;
                 }
             }
             else { /* internal part */
+                const size_t off = img_pitch * (size_t)image_y;
                 for (size_t x = xstart; x < xend; x++) {
                     uint32_t pixel;
-                    if (x < background->x_displacement || x - background->x_displacement >= background->x_size) {
+                    int64_t image_x = (int64_t)x - background->x_displacement;
+                    if (image_x < 0 || (uint64_t)image_x >= background->x_size) {
                         pixel = background->back_colour;
                     } else {
-                        size_t image_x = x - background->x_displacement;
-                        pixel = *(uint32_t*)(img + image_x * colsize + off);
+                        pixel = *(uint32_t*)(img + (size_t)image_x * colsize + off);
                     }
                     uint32_t i = blend(fb, x, y, pixel);
                     bg_canvas[canvas_off + x] = i;
