@@ -478,7 +478,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     enum executable_format kernel_format = detect_kernel_format(kernel, kernel_file->size);
     switch (kernel_format) {
         case EXECUTABLE_FORMAT_ELF:
-            if (!elf64_load(kernel, &entry_point, &slide,
+            if (!elf64_load(kernel, kernel_file->size, &entry_point, &slide,
                             MEMMAP_KERNEL_AND_MODULES, kaslr,
                             &ranges, &ranges_count,
                             &physical_base, &virtual_base, NULL,
