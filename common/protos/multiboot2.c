@@ -350,6 +350,10 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
     int64_t reloc_slide = 0;
 
     if (has_reloc_header) {
+        if (reloc_tag.align == 0) {
+            panic(true, "multiboot2: Relocatable tag has align=0");
+        }
+
         bool reloc_ascend;
         uint64_t relocated_base;
 
