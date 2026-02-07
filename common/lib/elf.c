@@ -995,8 +995,9 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
             min_paddr = phdr->p_paddr;
         }
 
-        if (phdr->p_paddr + phdr->p_memsz > max_paddr) {
-            max_paddr = phdr->p_paddr + phdr->p_memsz;
+        uint64_t top = (uint64_t)phdr->p_paddr + phdr->p_memsz;
+        if (top > max_paddr) {
+            max_paddr = top;
         }
     }
     image_size = max_paddr - min_paddr;
@@ -1064,8 +1065,12 @@ bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
             min_paddr = phdr->p_paddr;
         }
 
-        if (phdr->p_paddr + phdr->p_memsz > max_paddr) {
-            max_paddr = phdr->p_paddr + phdr->p_memsz;
+        uint64_t top;
+        if (__builtin_add_overflow(phdr->p_paddr, phdr->p_memsz, &top)) {
+            panic(true, "elf: p_paddr + p_memsz overflow");
+        }
+        if (top > max_paddr) {
+            max_paddr = top;
         }
     }
     image_size = max_paddr - min_paddr;
