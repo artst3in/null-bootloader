@@ -72,7 +72,7 @@ static void prn_char(char *print_buf, size_t *print_buf_i, char c) {
 
 static void prn_i(char *print_buf, size_t *print_buf_i, int64_t x) {
     int i;
-    char buf[20] = {0};
+    char buf[21] = {0};
 
     if (!x) {
         prn_char(print_buf, print_buf_i, '0');
@@ -80,11 +80,11 @@ static void prn_i(char *print_buf, size_t *print_buf_i, int64_t x) {
     }
 
     int sign = x < 0;
-    if (sign) x = -x;
+    uint64_t ux = sign ? (uint64_t)0 - (uint64_t)x : (uint64_t)x;
 
-    for (i = 18; x; i--) {
-        buf[i] = (x % 10) + 0x30;
-        x = x / 10;
+    for (i = 19; ux; i--) {
+        buf[i] = (ux % 10) + 0x30;
+        ux = ux / 10;
     }
     if (sign)
         buf[i] = '-';
