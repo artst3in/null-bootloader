@@ -180,9 +180,6 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                         case MULTIBOOT_TAG_TYPE_EFI32_IH:
                         case MULTIBOOT_TAG_TYPE_EFI64:
                         case MULTIBOOT_TAG_TYPE_EFI64_IH:
-                            if (is_required) {
-                                panic(true, "multiboot2: EFI entry point tag handling is required but Limine does not support it");
-                            }
                             break;
                         #endif
                         case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
