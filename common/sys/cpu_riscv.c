@@ -261,11 +261,16 @@ static void init_riscv_fdt(const void *fdt) {
 }
 
 void init_riscv(const char *config) {
-    while (hart_list != NULL && current_config != config) {
+    if (current_config == config && hart_list != NULL) {
+        return;
+    }
+
+    while (hart_list != NULL) {
         void *cur_hart = hart_list;
         hart_list = hart_list->next;
         pmm_free(cur_hart, sizeof(struct riscv_hart));
     }
+    bsp_hart = NULL;
 
     if (riscv_fdt != NULL) {
         pmm_free(riscv_fdt, fdt_totalsize(riscv_fdt));
