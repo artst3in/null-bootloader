@@ -688,7 +688,6 @@ reloc_fail:
         struct multiboot_tag_framebuffer *tag = (struct multiboot_tag_framebuffer *)(mb2_info + info_idx);
 
         tag->common.type = MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
-        tag->common.size = sizeof(struct multiboot_tag_framebuffer);
 
         term_notready();
 
@@ -731,6 +730,7 @@ textmode:
                 tag->common.framebuffer_height = 25;
                 tag->common.framebuffer_bpp = 16;
                 tag->common.framebuffer_type = MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT;
+                tag->common.size = sizeof(struct multiboot_tag_framebuffer_common);
 #elif defined (UEFI)
                 if (is_framebuffer_required) {
                     panic(true, "multiboot2: Failed to set video mode");
@@ -745,6 +745,7 @@ textmode:
                 tag->common.framebuffer_height = fbs[0].framebuffer_height;
                 tag->common.framebuffer_bpp = fbs[0].framebuffer_bpp;
                 tag->common.framebuffer_type = MULTIBOOT_FRAMEBUFFER_TYPE_RGB; // We only support RGB for VBE
+                tag->common.size = sizeof(struct multiboot_tag_framebuffer);
 
                 tag->framebuffer_red_field_position = fbs[0].red_mask_shift;
                 tag->framebuffer_red_mask_size = fbs[0].red_mask_size;
