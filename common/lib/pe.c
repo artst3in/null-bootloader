@@ -288,9 +288,10 @@ bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t
     *physical_base = (uintptr_t)ext_mem_alloc_type_aligned(image_size, alloc_type, alignment);
     *virtual_base = image_base;
 
-    // Validate SizeOfHeaders doesn't exceed file size
-    if (nt_hdrs->OptionalHeader.SizeOfHeaders > file_size) {
-        panic(true, "pe: SizeOfHeaders exceeds file size");
+    // Validate SizeOfHeaders doesn't exceed file size or image size
+    if (nt_hdrs->OptionalHeader.SizeOfHeaders > file_size
+     || nt_hdrs->OptionalHeader.SizeOfHeaders > image_size) {
+        panic(true, "pe: SizeOfHeaders exceeds file or image size");
     }
 
     memcpy((void *)(uintptr_t)*physical_base, image, nt_hdrs->OptionalHeader.SizeOfHeaders);
