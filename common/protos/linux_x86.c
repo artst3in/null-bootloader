@@ -437,7 +437,9 @@ noreturn void linux_load(char *config, char *cmdline) {
         if ((module = uri_open(module_path)) == NULL)
             panic(true, "linux: Failed to open module with path `%s`. Is the path correct?", module_path);
 
-        size_of_all_modules += module->size;
+        if (__builtin_add_overflow(size_of_all_modules, module->size, &size_of_all_modules)) {
+            panic(true, "linux: Total module size overflow");
+        }
 
         modules[i] = module;
     }
@@ -450,6 +452,9 @@ noreturn void linux_load(char *config, char *cmdline) {
         modules_mem_base = setup_header->initrd_addr_max + 1;
     }
 
+    if (size_of_all_modules > modules_mem_base) {
+        panic(true, "linux: Total module size exceeds available address space");
+    }
     modules_mem_base -= size_of_all_modules;
     modules_mem_base = ALIGN_DOWN(modules_mem_base, 0x100000);
 
