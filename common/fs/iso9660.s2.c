@@ -385,13 +385,11 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
             // Use the current directory's extent info
             // For root, this was set from ret->context->root
             // For subdirs, it was set from the last matched entry
-            if (first) {
-                // Still at root - return NULL as we can't return root as a file
-                pmm_free(ret, sizeof(struct iso9660_file_handle));
-                return NULL;
+            if (!first) {
+                pmm_free(current, current_size);
             }
-            // Otherwise next_sector/next_size already set from last entry
-            break;
+            pmm_free(ret, sizeof(struct iso9660_file_handle));
+            return NULL;
         }
 
         char *aux = filename;
