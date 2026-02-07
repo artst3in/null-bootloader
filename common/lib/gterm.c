@@ -367,7 +367,7 @@ __attribute__((always_inline)) static inline void genloop(struct fb_info *fb, si
                 uint32_t img_pixel = *(uint32_t*)(img + image_x * colsize + off);
                 uint32_t i = blend(fb, x, y, img_pixel);
                 bg_canvas[canvas_off + x] = i;
-                if (image_x++ == img_width) image_x = 0; // image_x = x % img_width, but modulo is too expensive
+                if (++image_x == img_width) image_x = 0; // image_x = x % img_width, but modulo is too expensive
             }
         }
         break;
