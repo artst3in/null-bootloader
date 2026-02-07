@@ -782,6 +782,22 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
         panic(true, "elf: ELF file not of type ET_EXEC nor ET_DYN");
     }
 
+    if (hdr->phdr_size < sizeof(struct elf64_phdr)) {
+        panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
+    }
+
+    // Validate program header count is reasonable (max 256 segments)
+    if (hdr->ph_num > 256) {
+        panic(true, "elf: Too many program headers (%u)", hdr->ph_num);
+    }
+
+    // Validate program header offset and size don't overflow
+    uint64_t phdr_table_end;
+    if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
+        __builtin_add_overflow(phdr_table_end, hdr->phoff, &phdr_table_end)) {
+        panic(true, "elf: Program header table size overflow");
+    }
+
     if (is_reloc) {
         *is_reloc = false;
     }
@@ -800,22 +816,6 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
     uint64_t max_align = elf64_max_align(elf);
 
     uint64_t image_size = 0;
-
-    if (hdr->phdr_size < sizeof(struct elf64_phdr)) {
-        panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
-    }
-
-    // Validate program header count is reasonable (max 256 segments)
-    if (hdr->ph_num > 256) {
-        panic(true, "elf: Too many program headers (%u)", hdr->ph_num);
-    }
-
-    // Validate program header offset and size don't overflow
-    uint64_t phdr_table_end;
-    if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
-        __builtin_add_overflow(phdr_table_end, hdr->phoff, &phdr_table_end)) {
-        panic(true, "elf: Program header table size overflow");
-    }
 
     bool lower_to_higher = false;
 
