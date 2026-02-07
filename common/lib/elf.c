@@ -752,7 +752,7 @@ static void elf64_get_ranges(uint8_t *elf, uint64_t slide, struct mem_range **_r
     *_ranges = ranges;
 }
 
-bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t alloc_type, bool kaslr, struct mem_range **ranges, uint64_t *ranges_count, uint64_t *physical_base, uint64_t *virtual_base, uint64_t *_image_size, uint64_t *_image_size_before_bss, bool *is_reloc) {
+bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t *_slide, uint32_t alloc_type, bool kaslr, struct mem_range **ranges, uint64_t *ranges_count, uint64_t *physical_base, uint64_t *virtual_base, uint64_t *_image_size, uint64_t *_image_size_before_bss, bool *is_reloc) {
     struct elf64_hdr *hdr = (void *)elf;
 
     elf64_validate(hdr);
@@ -914,10 +914,13 @@ again:
             panic(true, "elf: p_filesz > p_memsz");
         }
 
-        // Validate p_offset + p_filesz doesn't overflow
+        // Validate p_offset + p_filesz doesn't overflow or exceed file size
         uint64_t offset_end;
         if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)) {
             panic(true, "elf: p_offset + p_filesz overflow");
+        }
+        if (offset_end > file_size) {
+            panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
         uint64_t load_addr = *physical_base + (phdr->p_vaddr - *virtual_base);
@@ -965,7 +968,7 @@ again:
     return true;
 }
 
-bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
+bool elf32_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
                           struct elsewhere_range **ranges) {
     struct elf32_hdr *hdr = (void *)elf;
 
@@ -1020,6 +1023,9 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
         }
+        if ((uint64_t)phdr->p_offset + phdr->p_filesz > file_size) {
+            panic(true, "elf: p_offset + p_filesz exceeds file size");
+        }
 
         memcpy(elsewhere + (phdr->p_paddr - min_paddr), elf + phdr->p_offset, phdr->p_filesz);
 
@@ -1035,7 +1041,7 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
     return true;
 }
 
-bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
+bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
                           struct elsewhere_range **ranges) {
     struct elf64_hdr *hdr = (void *)elf;
 
@@ -1092,6 +1098,11 @@ bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
         // Sanity checks
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
+        }
+        uint64_t offset_end;
+        if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)
+            || offset_end > file_size) {
+            panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
         memcpy(elsewhere + (phdr->p_paddr - min_paddr), elf + phdr->p_offset, phdr->p_filesz);
