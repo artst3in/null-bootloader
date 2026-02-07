@@ -250,14 +250,14 @@ static inline size_t icache_line_size(void) {
     uint64_t ctr;
     asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
 
-    return (ctr & 0b1111) << 4;
+    return 4 << (ctr & 0b1111);
 }
 
 static inline size_t dcache_line_size(void) {
     uint64_t ctr;
     asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
 
-    return ((ctr >> 16) & 0b1111) << 4;
+    return 4 << ((ctr >> 16) & 0b1111);
 }
 
 static inline bool is_icache_pipt(void) {
