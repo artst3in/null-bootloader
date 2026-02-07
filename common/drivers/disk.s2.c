@@ -806,6 +806,9 @@ fail:
         block->sector_size = drive->Media->BlockSize;
         block->first_sect = 0;
         // Normalize sect_count to 512-byte sectors for consistency with partitions
+        if (drive->Media->LastBlock == UINT64_MAX) {
+            continue;
+        }
         block->sect_count = (drive->Media->LastBlock + 1) * (drive->Media->BlockSize / 512);
         block->max_partition = -1;
 
