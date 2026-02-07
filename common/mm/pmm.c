@@ -31,17 +31,9 @@ bool check_usable_memory(uint64_t base, uint64_t top) {
         }
 
         // Count how many bytes from a real-RAM entry overlap our range
-        if ((memmap[i].base >= base && memmap[i].base < top)
-         || (memmap_top > base && memmap_top <= top)) {
-            uint64_t overlap_bottom = base;
-            if (memmap[i].base >= base && memmap[i].base < top) {
-                overlap_bottom = memmap[i].base;
-            }
-
-            uint64_t overlap_top = top;
-            if (memmap_top > base && memmap_top <= top) {
-                overlap_top = memmap_top;
-            }
+        if (memmap[i].base < top && memmap_top > base) {
+            uint64_t overlap_bottom = memmap[i].base > base ? memmap[i].base : base;
+            uint64_t overlap_top = memmap_top < top ? memmap_top : top;
 
             uint64_t overlap_size = overlap_top - overlap_bottom;
             overlap_remaining -= overlap_size;
