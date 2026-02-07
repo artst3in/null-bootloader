@@ -806,6 +806,7 @@ no_load_font:;
 
         if (bg_canvas != NULL) {
             pmm_free(bg_canvas, bg_canvas_size);
+            bg_canvas = NULL;
         }
     }
 
