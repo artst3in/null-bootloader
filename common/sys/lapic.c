@@ -114,6 +114,8 @@ void init_io_apics(void) {
         }
         switch (*madt_ptr) {
             case 1: {
+                if (*(madt_ptr + 1) < sizeof(struct madt_io_apic))
+                    continue;
                 max_io_apics++;
                 continue;
             }
@@ -131,6 +133,8 @@ void init_io_apics(void) {
         }
         switch (*madt_ptr) {
             case 1: {
+                if (*(madt_ptr + 1) < sizeof(struct madt_io_apic))
+                    continue;
                 io_apics[max_io_apics++] = (void *)madt_ptr;
                 continue;
             }
