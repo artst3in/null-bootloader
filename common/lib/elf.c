@@ -539,9 +539,12 @@ end_of_pt_segment:
                 if (symtab_offset == 0 || symtab_ent == 0) {
                     panic(true, "elf: Relocation requires symbol table but none present");
                 }
+                if (symtab_size == 0) {
+                    panic(true, "elf: Symtab vaddr translation failed");
+                }
                 // Validate symbol index is within bounds
                 uint64_t sym_offset = symtab_ent * (uint64_t)relocation->r_symbol;
-                if (symtab_size != 0 && sym_offset + sizeof(struct elf64_sym) > symtab_size) {
+                if (sym_offset + sizeof(struct elf64_sym) > symtab_size) {
                     panic(true, "elf: Symbol index %u out of bounds", relocation->r_symbol);
                 }
                 struct elf64_sym *s = (void *)elf + symtab_offset + sym_offset;
@@ -550,8 +553,11 @@ end_of_pt_segment:
                         *ptr = 0;
                         break;
                     }
+                    if (strtab_size == 0) {
+                        panic(true, "elf: Strtab vaddr translation failed");
+                    }
                     // Validate string table access
-                    if (strtab_size != 0 && s->st_name >= strtab_size) {
+                    if (s->st_name >= strtab_size) {
                         panic(true, "elf: Symbol name offset out of bounds");
                     }
                     panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
@@ -576,9 +582,12 @@ end_of_pt_segment:
                 if (symtab_offset == 0 || symtab_ent == 0) {
                     panic(true, "elf: Relocation requires symbol table but none present");
                 }
+                if (symtab_size == 0) {
+                    panic(true, "elf: Symtab vaddr translation failed");
+                }
                 // Validate symbol index is within bounds
                 uint64_t sym_offset = symtab_ent * (uint64_t)relocation->r_symbol;
-                if (symtab_size != 0 && sym_offset + sizeof(struct elf64_sym) > symtab_size) {
+                if (sym_offset + sizeof(struct elf64_sym) > symtab_size) {
                     panic(true, "elf: Symbol index %u out of bounds", relocation->r_symbol);
                 }
                 struct elf64_sym *s = (void *)elf + symtab_offset + sym_offset;
@@ -587,8 +596,11 @@ end_of_pt_segment:
                         *ptr = 0;
                         break;
                     }
+                    if (strtab_size == 0) {
+                        panic(true, "elf: Strtab vaddr translation failed");
+                    }
                     // Validate string table access
-                    if (strtab_size != 0 && s->st_name >= strtab_size) {
+                    if (s->st_name >= strtab_size) {
                         panic(true, "elf: Symbol name offset out of bounds");
                     }
                     panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
