@@ -729,8 +729,9 @@ static void elf64_get_ranges(uint8_t *elf, uint64_t slide, struct mem_range **_r
         uint64_t load_addr = phdr->p_vaddr + slide;
         uint64_t this_top = load_addr + phdr->p_memsz;
 
-        ranges[r].base = load_addr & ~(phdr->p_align - 1);
-        ranges[r].length = ALIGN_UP(this_top - ranges[r].base, phdr->p_align);
+        uint64_t align = phdr->p_align <= 1 ? 1 : phdr->p_align;
+        ranges[r].base = load_addr & ~(align - 1);
+        ranges[r].length = ALIGN_UP(this_top - ranges[r].base, align);
 
         if (phdr->p_flags & ELF_PF_X) {
             ranges[r].permissions |= MEM_RANGE_X;
@@ -926,7 +927,8 @@ again:
 
         uint64_t mem_base, mem_size;
 
-        mem_base = load_addr & ~(phdr->p_align - 1);
+        uint64_t align = phdr->p_align <= 1 ? 1 : phdr->p_align;
+        mem_base = load_addr & ~(align - 1);
         mem_size = this_top - mem_base;
 #endif
 
