@@ -331,6 +331,10 @@ again:
         memcpy((void *)section_base, image + section->PointerToRawData, section_raw_size);
     }
 
+    if (nt_hdrs->OptionalHeader.NumberOfRvaAndSizes < IMAGE_DIRECTORY_ENTRY_BASERELOC + 1) {
+        panic(true, "pe: NumberOfRvaAndSizes too small for import/reloc directories");
+    }
+
     IMAGE_DATA_DIRECTORY *import_dir = &nt_hdrs->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
     IMAGE_DATA_DIRECTORY *reloc_dir = &nt_hdrs->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
 
@@ -351,6 +355,10 @@ again:
             // Validate SizeOfBlock to prevent infinite loop (if 0) and underflow (if too small)
             if (block->SizeOfBlock < sizeof(IMAGE_BASE_RELOCATION_BLOCK)) {
                 panic(true, "pe: Invalid relocation block size");
+            }
+
+            if (block->VirtualAddress >= image_size) {
+                panic(true, "pe: Relocation block VirtualAddress out of bounds");
             }
 
             uintptr_t block_base = *physical_base + block->VirtualAddress;
