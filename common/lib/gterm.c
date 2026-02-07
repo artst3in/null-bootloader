@@ -437,7 +437,15 @@ static void generate_canvas(struct fb_info *fb) {
         bg_canvas_size = fb->framebuffer_width * fb->framebuffer_height * sizeof(uint32_t);
         bg_canvas = ext_mem_alloc(bg_canvas_size);
 
-        int64_t margin_no_gradient = (int64_t)margin - margin_gradient;
+        // Clamp margin to half the framebuffer dimensions to prevent underflow
+        size_t max_margin = fb->framebuffer_width / 2;
+        if (fb->framebuffer_height / 2 < max_margin) {
+            max_margin = fb->framebuffer_height / 2;
+        }
+        size_t effective_margin = margin > max_margin ? max_margin : margin;
+        size_t effective_margin_gradient = margin_gradient > effective_margin ? effective_margin : margin_gradient;
+
+        int64_t margin_no_gradient = (int64_t)effective_margin - effective_margin_gradient;
 
         if (margin_no_gradient < 0) {
             margin_no_gradient = 0;
@@ -451,17 +459,17 @@ static void generate_canvas(struct fb_info *fb) {
         loop_external(fb, 0, margin_no_gradient, margin_no_gradient, scan_stop_y);
         loop_external(fb, scan_stop_x, fb->framebuffer_width, margin_no_gradient, scan_stop_y);
 
-        size_t gradient_stop_x = fb->framebuffer_width - margin;
-        size_t gradient_stop_y = fb->framebuffer_height - margin;
+        size_t gradient_stop_x = fb->framebuffer_width - effective_margin;
+        size_t gradient_stop_y = fb->framebuffer_height - effective_margin;
 
-        if (margin_gradient) {
-            loop_margin(fb, margin_no_gradient, scan_stop_x, margin_no_gradient, margin);
+        if (effective_margin_gradient) {
+            loop_margin(fb, margin_no_gradient, scan_stop_x, margin_no_gradient, effective_margin);
             loop_margin(fb, margin_no_gradient, scan_stop_x, gradient_stop_y, scan_stop_y);
-            loop_margin(fb, margin_no_gradient, margin, margin, gradient_stop_y);
-            loop_margin(fb, gradient_stop_x, scan_stop_x, margin, gradient_stop_y);
+            loop_margin(fb, margin_no_gradient, effective_margin, effective_margin, gradient_stop_y);
+            loop_margin(fb, gradient_stop_x, scan_stop_x, effective_margin, gradient_stop_y);
         }
 
-        loop_internal(fb, margin, gradient_stop_x, margin, gradient_stop_y);
+        loop_internal(fb, effective_margin, gradient_stop_x, effective_margin, gradient_stop_y);
     } else {
         bg_canvas = NULL;
     }
@@ -664,6 +672,10 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
     char *theme_margin_gradient = config_get_value(config, 0, "TERM_MARGIN_GRADIENT");
     if (theme_margin_gradient != NULL) {
         margin_gradient = strtoui(theme_margin_gradient, NULL, 10);
+    }
+
+    if (margin_gradient > margin) {
+        margin_gradient = margin;
     }
 
     size_t font_width = 8;
