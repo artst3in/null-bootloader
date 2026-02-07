@@ -134,6 +134,10 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
             bss_size = header.bss_end_addr - bss_addr;
         }
 
+        if (load_src + load_size > kernel_file_size) {
+            panic(true, "multiboot1: load_src + load_size exceeds kernel file size");
+        }
+
         size_t full_size = load_size + bss_size;
 
         void *elsewhere = ext_mem_alloc(full_size);
