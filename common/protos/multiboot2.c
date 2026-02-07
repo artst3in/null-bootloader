@@ -196,6 +196,9 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                         case MULTIBOOT_TAG_TYPE_ELF_SECTIONS:
                             is_elf_info_requested = is_required;
                             break;
+                        case MULTIBOOT_TAG_TYPE_LOAD_BASE_ADDR:
+                        case MULTIBOOT_TAG_TYPE_NETWORK:
+                            break;
                         default:
                             if (is_required)
                                 panic(true, "multiboot2: Requested tag `%d` which is not supported", r);
