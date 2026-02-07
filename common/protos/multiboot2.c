@@ -118,6 +118,10 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
         panic(true, "multiboot2: Header checksum is invalid");
     }
 
+    if (header->architecture != MULTIBOOT_ARCHITECTURE_I386) {
+        panic(true, "multiboot2: Unsupported architecture %u (expected i386)", header->architecture);
+    }
+
     size_t header_offset_in_file = (uintptr_t)header - (uintptr_t)kernel;
     if (header->header_length > kernel_file_size - header_offset_in_file) {
         panic(true, "multiboot2: Header length exceeds kernel file size");
