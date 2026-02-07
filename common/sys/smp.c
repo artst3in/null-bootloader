@@ -71,7 +71,7 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     passed_info->smp_tpl_hhdm = hhdm;
     passed_info->smp_tpl_bsp_apic_addr_msr = rdmsr(0x1b);
     passed_info->smp_tpl_mtrr_restore = (uint64_t)(uintptr_t)mtrr_restore;
-    passed_info->smp_tpl_temp_stack = (uint64_t)(uintptr_t)temp_stack;
+    passed_info->smp_tpl_temp_stack = (uint64_t)(uintptr_t)temp_stack + 8192;
 
     asm volatile ("" ::: "memory");
 
