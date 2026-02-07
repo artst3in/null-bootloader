@@ -449,7 +449,7 @@ noreturn void linux_load(char *config, char *cmdline) {
     if (setup_header->version <= 0x202 || setup_header->initrd_addr_max == 0) {
         modules_mem_base = 0x38000000;
     } else {
-        modules_mem_base = setup_header->initrd_addr_max + 1;
+        modules_mem_base = (uintptr_t)setup_header->initrd_addr_max + 1;
     }
 
     if (size_of_all_modules > modules_mem_base) {
