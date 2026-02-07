@@ -486,11 +486,23 @@ static void riscv_flush_callback(volatile void *base, size_t length) {
     }
 }
 static void riscv_flush_callback_nozicbom(volatile void *base, size_t length) {
-    volatile uint64_t *p = (volatile uint64_t *)base;
-    for (size_t i = 0; i < (length * 2) / sizeof(uint64_t); i += (64 / sizeof(uint64_t))) {
+    (void)base;
+    (void)length;
+
+    // Without Zicbom, there is no portable instruction to flush dirty cache lines.
+    // Read through a dedicated eviction buffer to create cache pressure and displace
+    // dirty framebuffer lines. 128 KB covers typical RISC-V L1 D-caches (32-64 KB).
+    static volatile uint8_t *eviction_buf = NULL;
+    #define EVICTION_BUF_SIZE (128 * 1024)
+    if (eviction_buf == NULL) {
+        eviction_buf = ext_mem_alloc(EVICTION_BUF_SIZE);
+    }
+
+    volatile uint64_t *p = (volatile uint64_t *)eviction_buf;
+    for (size_t i = 0; i < EVICTION_BUF_SIZE / sizeof(uint64_t); i += (64 / sizeof(uint64_t))) {
         (void)p[i];
     }
-    asm volatile ("fence r, r" ::: "memory");
+    asm volatile ("fence rw, rw" ::: "memory");
 }
 #elif defined (__aarch64__)
 static void aarch64_flush_callback(volatile void *base, size_t length) {
