@@ -343,30 +343,41 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
 end_of_pt_segment:
 
     if (rela_offset != 0) {
+        bool rela_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= rela_offset && _phdr->p_vaddr + _phdr->p_filesz > rela_offset) {
                 rela_offset -= _phdr->p_vaddr;
                 rela_offset += _phdr->p_offset;
+                rela_translated = true;
                 break;
             }
+        }
+        if (!rela_translated) {
+            panic(true, "elf: RELA vaddr not in any PT_LOAD segment");
         }
     }
 
     if (relr_offset != 0) {
+        bool relr_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= relr_offset && _phdr->p_vaddr + _phdr->p_filesz > relr_offset) {
                 relr_offset -= _phdr->p_vaddr;
                 relr_offset += _phdr->p_offset;
+                relr_translated = true;
                 break;
             }
+        }
+        if (!relr_translated) {
+            panic(true, "elf: RELR vaddr not in any PT_LOAD segment");
         }
     }
 
     if (symtab_offset != 0) {
+        bool symtab_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
@@ -375,12 +386,17 @@ end_of_pt_segment:
                 symtab_size = _phdr->p_filesz - (symtab_offset - _phdr->p_vaddr);
                 symtab_offset -= _phdr->p_vaddr;
                 symtab_offset += _phdr->p_offset;
+                symtab_translated = true;
                 break;
             }
+        }
+        if (!symtab_translated) {
+            panic(true, "elf: SYMTAB vaddr not in any PT_LOAD segment");
         }
     }
 
     if (strtab_offset != 0) {
+        bool strtab_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
@@ -389,20 +405,29 @@ end_of_pt_segment:
                 strtab_size = _phdr->p_filesz - (strtab_offset - _phdr->p_vaddr);
                 strtab_offset -= _phdr->p_vaddr;
                 strtab_offset += _phdr->p_offset;
+                strtab_translated = true;
                 break;
             }
+        }
+        if (!strtab_translated) {
+            panic(true, "elf: STRTAB vaddr not in any PT_LOAD segment");
         }
     }
 
     if (dt_jmprel != 0) {
+        bool jmprel_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= dt_jmprel && _phdr->p_vaddr + _phdr->p_filesz > dt_jmprel) {
                 dt_jmprel -= _phdr->p_vaddr;
                 dt_jmprel += _phdr->p_offset;
+                jmprel_translated = true;
                 break;
             }
+        }
+        if (!jmprel_translated) {
+            panic(true, "elf: JMPREL vaddr not in any PT_LOAD segment");
         }
     }
 
