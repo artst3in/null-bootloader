@@ -487,7 +487,7 @@ end_of_pt_segment:
             continue;
 
         // Relocation is after buffer
-        if (vaddr + size < relocation->r_addr + 8)
+        if (size < 8 || relocation->r_addr > vaddr + size - 8)
             continue;
 
         // It's inside it, calculate where it is
