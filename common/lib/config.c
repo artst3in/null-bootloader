@@ -223,7 +223,10 @@ bool init_config_smbios(void) {
 
             size_t prefix_len = sizeof("limine:config:") - 1;
             if (string_area_size > prefix_len && !strncmp(string_data, "limine:config:", prefix_len)) {
-                size_t config_size = strnlen(string_data, string_area_size) - prefix_len + 1;
+                size_t total_len = strnlen(string_data, string_area_size);
+                if (total_len <= prefix_len)
+                    continue;
+                size_t config_size = total_len - prefix_len + 1;
                 config_addr = ext_mem_alloc(config_size);
                 memcpy(config_addr, &string_data[prefix_len], config_size - 1);
                 config_addr[config_size - 1] = '\0';
