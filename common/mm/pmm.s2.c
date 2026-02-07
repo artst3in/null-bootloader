@@ -143,6 +143,12 @@ void pmm_sanitise_entries(struct memmap_entry *m, size_t *_count, bool align_ent
             uint64_t res_length = m[j].length;
             uint64_t res_top    = res_base + res_length;
 
+            // Non-usable entry fully contains usable entry
+            if (res_base <= base && res_top >= top) {
+                base = top;
+                break;
+            }
+
             if ( (res_base >= base && res_base < top)
               && (res_top  >= base && res_top  < top) ) {
                 // TODO actually handle splitting off usable chunks
