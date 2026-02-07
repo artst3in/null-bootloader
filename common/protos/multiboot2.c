@@ -118,6 +118,11 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
         panic(true, "multiboot2: Header checksum is invalid");
     }
 
+    size_t header_offset_in_file = (uintptr_t)header - (uintptr_t)kernel;
+    if (header->header_length > kernel_file_size - header_offset_in_file) {
+        panic(true, "multiboot2: Header length exceeds kernel file size");
+    }
+
     struct multiboot_header_tag_address *addresstag = NULL;
     struct multiboot_header_tag_framebuffer *fbtag = NULL;
 
@@ -424,7 +429,7 @@ reloc_fail:
 
         char *module_cmdline = conf_tuple.value2;
         if (!module_cmdline) module_cmdline = "";
-        modules_size += sizeof(struct multiboot_tag_module) + strlen(module_cmdline) + 1;
+        modules_size += ALIGN_UP(sizeof(struct multiboot_tag_module) + strlen(module_cmdline) + 1, MULTIBOOT_TAG_ALIGN);
     }
 
     struct smbios_entry_point_32* smbios_entry_32 = NULL;
@@ -435,9 +440,9 @@ reloc_fail:
     uint32_t smbios_tag_size = 0;
 
     if (smbios_entry_32 != NULL)
-        smbios_tag_size += sizeof(struct multiboot_tag_smbios) + smbios_entry_32->length;
+        smbios_tag_size += ALIGN_UP(sizeof(struct multiboot_tag_smbios) + smbios_entry_32->length, MULTIBOOT_TAG_ALIGN);
     if (smbios_entry_64 != NULL)
-        smbios_tag_size += sizeof(struct multiboot_tag_smbios) + smbios_entry_64->length;
+        smbios_tag_size += ALIGN_UP(sizeof(struct multiboot_tag_smbios) + smbios_entry_64->length, MULTIBOOT_TAG_ALIGN);
 
     size_t mb2_info_size = get_multiboot2_info_size(
         cmdline,
