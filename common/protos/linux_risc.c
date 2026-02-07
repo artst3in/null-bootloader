@@ -424,8 +424,17 @@ noreturn void linux_load(char *config, char *cmdline) {
     }
 
     p.kernel_size = kernel_file->size;
+    size_t kernel_alloc_size = p.kernel_size;
+    // Read image_size from kernel header for total memory including BSS
+    if (p.kernel_size >= sizeof(struct linux_header)) {
+        struct linux_header tmp_hdr;
+        fread(kernel_file, &tmp_hdr, 0, sizeof(tmp_hdr));
+        if (tmp_hdr.image_size > kernel_alloc_size) {
+            kernel_alloc_size = tmp_hdr.image_size;
+        }
+    }
     p.kernel_base = ext_mem_alloc_type_aligned(
-                ALIGN_UP(p.kernel_size, 4096),
+                ALIGN_UP(kernel_alloc_size, 4096),
                 MEMMAP_KERNEL_AND_MODULES, 2 * 1024 * 1024);
     fread(kernel_file, p.kernel_base, 0, p.kernel_size);
     fclose(kernel_file);
