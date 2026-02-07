@@ -357,6 +357,10 @@ again:
                 panic(true, "pe: Invalid relocation block size");
             }
 
+            if (block->SizeOfBlock > reloc_dir->Size - reloc_block_offset) {
+                panic(true, "pe: Relocation block size exceeds directory");
+            }
+
             if (block->VirtualAddress >= image_size) {
                 panic(true, "pe: Relocation block VirtualAddress out of bounds");
             }
