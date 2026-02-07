@@ -610,7 +610,7 @@ end_of_pt_segment:
     return true;
 }
 
-bool elf64_load_section(uint8_t *elf, void *buffer, const char *name, size_t limit, uint64_t slide) {
+bool elf64_load_section(uint8_t *elf, size_t file_size, void *buffer, const char *name, size_t limit, uint64_t slide) {
     struct elf64_hdr *hdr = (void *)elf;
 
     elf64_validate(hdr);
@@ -627,14 +627,35 @@ bool elf64_load_section(uint8_t *elf, void *buffer, const char *name, size_t lim
         return false;
     }
 
+    // Validate section header table is within file bounds
+    uint64_t shdr_table_end = (uint64_t)hdr->shoff + (uint64_t)hdr->sh_num * hdr->shdr_size;
+    if (shdr_table_end > file_size) {
+        return false;
+    }
+
     struct elf64_shdr *shstrtab = (void *)elf + (hdr->shoff + hdr->shstrndx * hdr->shdr_size);
+
+    // Validate shstrtab offset and size are within file bounds
+    if (shstrtab->sh_offset >= file_size || shstrtab->sh_size > file_size - shstrtab->sh_offset) {
+        return false;
+    }
 
     char *names = (void *)elf + shstrtab->sh_offset;
 
     for (uint16_t i = 0; i < hdr->sh_num; i++) {
         struct elf64_shdr *section = (void *)elf + (hdr->shoff + i * hdr->shdr_size);
 
+        // Validate sh_name is within the string table
+        if (section->sh_name >= shstrtab->sh_size) {
+            continue;
+        }
+
         if (strcmp(&names[section->sh_name], name) == 0) {
+            // Validate section data is within file bounds
+            if (section->sh_offset >= file_size || section->sh_size > file_size - section->sh_offset) {
+                return false;
+            }
+
             if (limit == 0) {
                 *(void **)buffer = ext_mem_alloc(section->sh_size);
                 buffer = *(void **)buffer;
