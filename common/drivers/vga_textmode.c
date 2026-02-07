@@ -141,6 +141,7 @@ static void text_move_character(struct flanterm_context *_ctx, size_t new_x, siz
     }
 
     ctx->back_buffer[new_y * VD_COLS + new_x * 2] = ctx->back_buffer[old_y * VD_COLS + old_x * 2];
+    ctx->back_buffer[new_y * VD_COLS + new_x * 2 + 1] = ctx->back_buffer[old_y * VD_COLS + old_x * 2 + 1];
 }
 
 static void text_set_cursor_pos(struct flanterm_context *_ctx, size_t x, size_t y) {
