@@ -347,7 +347,7 @@ noreturn void chainload(char *config, char *cmdline) {
 
     new_handle_loaded_image->FilePath = efi_file_path;
 
-    new_handle_loaded_image->LoadOptionsSize = cmdline_len * sizeof(CHAR16);
+    new_handle_loaded_image->LoadOptionsSize = (cmdline_len + 1) * sizeof(CHAR16);
     new_handle_loaded_image->LoadOptions = new_cmdline;
 
     bli_on_boot();
