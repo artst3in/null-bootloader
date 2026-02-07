@@ -876,6 +876,11 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
             }
         }
 
+        uint64_t phdr_end;
+        if (__builtin_add_overflow(phdr->p_vaddr, phdr->p_memsz, &phdr_end)) {
+            panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", i);
+        }
+
         // check for overlapping phdrs
         for (uint16_t j = 0; j < hdr->ph_num; j++) {
             struct elf64_phdr *phdr_in = (void *)elf + (hdr->phoff + j * hdr->phdr_size);
@@ -894,19 +899,24 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
                 continue;
             }
 
+            uint64_t phdr_in_end;
+            if (__builtin_add_overflow(phdr_in->p_vaddr, phdr_in->p_memsz, &phdr_in_end)) {
+                panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", j);
+            }
+
             if ((phdr_in->p_vaddr >= phdr->p_vaddr
-              && phdr_in->p_vaddr < phdr->p_vaddr + phdr->p_memsz)
+              && phdr_in->p_vaddr < phdr_end)
                 ||
-                (phdr_in->p_vaddr + phdr_in->p_memsz > phdr->p_vaddr
-              && phdr_in->p_vaddr + phdr_in->p_memsz <= phdr->p_vaddr + phdr->p_memsz)) {
+                (phdr_in_end > phdr->p_vaddr
+              && phdr_in_end <= phdr_end)) {
                 panic(true, "elf: Attempted to load ELF file with overlapping PHDRs (%u and %u overlap)", i, j);
             }
 
             if (ranges != NULL) {
                 uint64_t page_rounded_base = ALIGN_DOWN(phdr->p_vaddr, 4096);
-                uint64_t page_rounded_top = ALIGN_UP(phdr->p_vaddr + phdr->p_memsz, 4096);
+                uint64_t page_rounded_top = ALIGN_UP(phdr_end, 4096);
                 uint64_t page_rounded_base_in = ALIGN_DOWN(phdr_in->p_vaddr, 4096);
-                uint64_t page_rounded_top_in = ALIGN_UP(phdr_in->p_vaddr + phdr_in->p_memsz, 4096);
+                uint64_t page_rounded_top_in = ALIGN_UP(phdr_in_end, 4096);
 
                 if ((page_rounded_base >= page_rounded_base_in
                   && page_rounded_base < page_rounded_top_in)
@@ -924,8 +934,8 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
             min_vaddr = phdr->p_vaddr;
         }
 
-        if (phdr->p_vaddr + phdr->p_memsz > max_vaddr) {
-            max_vaddr = phdr->p_vaddr + phdr->p_memsz;
+        if (phdr_end > max_vaddr) {
+            max_vaddr = phdr_end;
         }
     }
 
