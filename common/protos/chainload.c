@@ -112,6 +112,11 @@ noreturn void chainload(char *config, char *cmdline) {
     }
 
     struct volume *p = volume_get_by_coord(false, drive, part);
+    if (p == NULL && config_get_value(config, 0, "GPT_GUID") == NULL
+                  && config_get_value(config, 0, "GPT_UUID") == NULL
+                  && config_get_value(config, 0, "MBR_ID") == NULL) {
+        panic(true, "bios: Specified drive/partition not found");
+    }
 
     char *gpt_guid_s = config_get_value(config, 0, "GPT_GUID");
     if (gpt_guid_s == NULL) {
