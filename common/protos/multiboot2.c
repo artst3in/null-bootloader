@@ -231,7 +231,12 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
             }
             // We always align the modules ;^)
             case MULTIBOOT_HEADER_TAG_MODULE_ALIGN:
+                break;
             case MULTIBOOT_HEADER_TAG_EFI_BS:
+                print("multiboot2: Warning: EFI_BS tag requested but not supported\n");
+                if (is_required) {
+                    panic(true, "multiboot2: EFI_BS tag is required but not supported");
+                }
                 break;
 
             case MULTIBOOT_HEADER_TAG_RELOCATABLE: {
