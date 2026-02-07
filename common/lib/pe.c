@@ -377,6 +377,19 @@ again:
                     continue;
                 }
 
+                size_t write_size;
+                switch (type) {
+                    case IMAGE_REL_BASED_HIGHLOW: write_size = 4; break;
+                    case IMAGE_REL_BASED_DIR64: write_size = 8; break;
+                    default:
+                        panic(true, "pe: Unsupported relocation type %u", type);
+                        __builtin_unreachable();
+                }
+
+                if ((uint64_t)block->VirtualAddress + offset + write_size > image_size) {
+                    panic(true, "pe: Relocation offset out of bounds");
+                }
+
                 switch (type) {
                     case IMAGE_REL_BASED_HIGHLOW:
                         *(uint32_t *)(block_base + offset) += slide;
@@ -384,8 +397,6 @@ again:
                     case IMAGE_REL_BASED_DIR64:
                         *(uint64_t *)(block_base + offset) += slide;
                         break;
-                    default:
-                        panic(true, "pe: Unsupported relocation type %u", type);
                 }
             }
 
