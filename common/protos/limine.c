@@ -507,6 +507,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     // Determine base revision
     uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(0);
     int base_revision = 0;
+    bool base_revision_found = false;
     uint64_t *base_rev_p1_ptr = NULL;
     uint64_t *base_rev_p2_ptr = NULL;
     for (size_t i = 0; i < ALIGN_DOWN(image_size_before_bss, 8); i += 8) {
@@ -516,6 +517,7 @@ noreturn void limine_load(char *config, char *cmdline) {
         if (p[0] == limine_requests_start_marker[0] && p[1] == limine_requests_start_marker[1]
          && p[2] == limine_requests_start_marker[2] && p[3] == limine_requests_start_marker[3]) {
             base_revision = 0;
+            base_revision_found = false;
             base_rev_p1_ptr = NULL;
             base_rev_p2_ptr = NULL;
             continue;
@@ -527,9 +529,10 @@ noreturn void limine_load(char *config, char *cmdline) {
         }
 
         if (p[0] == limine_base_revision[0] && p[1] == limine_base_revision[1]) {
-            if (base_revision != 0) {
+            if (base_revision_found) {
                 panic(true, "limine: Duplicated base revision tag");
             }
+            base_revision_found = true;
             base_revision = p[2];
             if (p[2] <= SUPPORTED_BASE_REVISION) {
                 // Set to 0 to mean "supported"
