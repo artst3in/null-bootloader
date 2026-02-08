@@ -369,6 +369,8 @@ int init_config(size_t config_size) {
     // add trailing newline if not present
     config_addr[config_size - 2] = '\n';
 
+    size_t config_alloc_size = config_size;
+
     // remove windows carriage returns and spaces at the start and end of lines, if any
     for (size_t i = 0; i < config_size; i++) {
         size_t skip = 0;
@@ -554,7 +556,7 @@ overflow:
             new_config[in++] = config_addr[i++];
         }
 
-        pmm_free(config_addr, config_size);
+        pmm_free(config_addr, config_alloc_size);
 
         config_addr = new_config;
         config_size = in;
