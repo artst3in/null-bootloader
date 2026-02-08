@@ -57,7 +57,7 @@ void map_pages(pagemap_t pagemap, uint64_t virt, uint64_t phys, uint64_t flags, 
 #define PT_TABLE_FLAGS   (PT_FLAG_VALID | PT_FLAG_WRITE | PT_FLAG_USER)
 #define PT_IS_TABLE(x) (((x) & (PT_FLAG_VALID | PT_FLAG_LARGE)) == PT_FLAG_VALID)
 #define PT_IS_LARGE(x) (((x) & (PT_FLAG_VALID | PT_FLAG_LARGE)) == (PT_FLAG_VALID | PT_FLAG_LARGE))
-#define PT_TO_VMM_FLAGS(x) ((x) & (PT_FLAG_WRITE | PT_FLAG_NX))
+#define PT_TO_VMM_FLAGS(x) ((x) & (PT_FLAG_WRITE | PT_FLAG_NX | VMM_FLAG_FB))
 
 #define pte_new(addr, flags)    ((pt_entry_t)(addr) | (flags))
 #define pte_addr(pte)           ((pte) & PT_PADDR_MASK)
