@@ -274,6 +274,7 @@ void disk_create_index(void) {
         block->max_partition = -1;
 
         if (!detect_sector_size(block)) {
+            pmm_free(block, sizeof(struct volume));
             continue;
         }
 
