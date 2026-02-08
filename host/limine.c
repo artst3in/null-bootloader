@@ -883,8 +883,11 @@ static int bios_install(int argc, char *argv[]) {
         }
 
         // ... nuke secondary GPT.
-        for (size_t i = 0; i < 33; i++) {
-            device_write(empty_lba, ((ENDSWAP(gpt_header.alternate_lba) - 32) + i) * lb_size, lb_size);
+        uint64_t alt_lba = ENDSWAP(gpt_header.alternate_lba);
+        if (alt_lba >= 32) {
+            for (size_t i = 0; i < 33; i++) {
+                device_write(empty_lba, (alt_lba - 32 + i) * lb_size, lb_size);
+            }
         }
 
         free(empty_lba);
