@@ -292,7 +292,7 @@ int pit_sleep_and_quit_on_keypress(int seconds) {
 
     gBS->CreateEvent(EVT_TIMER, TPL_CALLBACK, NULL, NULL, &events[1]);
 
-    gBS->SetTimer(events[1], TimerRelative, 10000000 * seconds);
+    gBS->SetTimer(events[1], TimerRelative, (uint64_t)10000000 * seconds);
 
 again:
     memset(&kd, 0, sizeof(EFI_KEY_DATA));
