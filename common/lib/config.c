@@ -488,12 +488,14 @@ skip_loop:
              || (config_size - i >= 2 && i == 0 && memcmp(config_addr, "${", 2) == 0)) {
                 size_t orig_i = i;
                 i += i ? 3 : 2;
-                while (config_addr[i++] != '}') {
-                    if (i >= config_size) {
-                        bad_config = true;
-                        panic(true, "config: Malformed macro usage");
-                    }
+                while (i < config_size && config_addr[i] != '}') {
+                    i++;
                 }
+                if (i >= config_size) {
+                    bad_config = true;
+                    panic(true, "config: Malformed macro usage");
+                }
+                i++; // skip '}'
                 if (i >= config_size || config_addr[i++] != '=') {
                     i = orig_i;
                     goto next;
