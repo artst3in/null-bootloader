@@ -41,6 +41,11 @@ retry:
     for (size_t i = 0; i < *ranges_count; i++) {
         uint64_t t_top = *target + t_length;
 
+        // Ensure allocation stays within 32-bit address space.
+        if (t_top > 0x100000000) {
+            return false;
+        }
+
         // Does it overlap with other elsewhere ranges targets?
         {
             uint64_t base = ranges[i].target;
