@@ -552,6 +552,11 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
         }
     }
 
+    if (*cpu_count == 0) {
+        pmm_free(ret, max_cpus * sizeof(struct limine_mp_info));
+        return NULL;
+    }
+
     return ret;
 }
 
