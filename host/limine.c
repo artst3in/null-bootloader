@@ -806,12 +806,18 @@ static int bios_install(int argc, char *argv[]) {
         } part_to_conv[4];
         size_t part_to_conv_i = 0;
 
+        uint64_t part_entry_base;
+        if (__builtin_mul_overflow(ENDSWAP(gpt_header.partition_entry_lba), lb_size, &part_entry_base)) {
+            goto no_mbr_conv;
+        }
+
         for (int64_t i = 0; i < (int64_t)ENDSWAP(gpt_header.number_of_partition_entries); i++) {
             struct gpt_entry gpt_entry;
-            device_read(&gpt_entry,
-                        (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
-                        + (i * ENDSWAP(gpt_header.size_of_partition_entry)),
-                        sizeof(struct gpt_entry));
+            uint64_t entry_offset = (uint64_t)i * ENDSWAP(gpt_header.size_of_partition_entry);
+            if (__builtin_add_overflow(part_entry_base, entry_offset, &entry_offset)) {
+                goto no_mbr_conv;
+            }
+            device_read(&gpt_entry, entry_offset, sizeof(struct gpt_entry));
 
             if (gpt_entry.unique_partition_guid[0] == 0 &&
                 gpt_entry.unique_partition_guid[1] == 0) {
@@ -1034,6 +1040,12 @@ part_too_low:
         struct gpt_entry gpt_entry;
         uint32_t partition_num;
 
+        uint64_t gpt_part_entry_base;
+        if (__builtin_mul_overflow(ENDSWAP(gpt_header.partition_entry_lba), lb_size, &gpt_part_entry_base)) {
+            fprintf(stderr, "error: GPT partition entry LBA overflows.\n");
+            goto cleanup;
+        }
+
         if (part_ndx != NULL) {
             if (sscanf(part_ndx, "%" SCNu32, &partition_num) != 1) {
                 fprintf(stderr, "error: Invalid partition number format.\n");
@@ -1045,10 +1057,12 @@ part_too_low:
                 goto cleanup;
             }
 
-            device_read(&gpt_entry,
-                (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
-                + (partition_num * ENDSWAP(gpt_header.size_of_partition_entry)),
-                sizeof(struct gpt_entry));
+            uint64_t entry_off = (uint64_t)partition_num * ENDSWAP(gpt_header.size_of_partition_entry);
+            if (__builtin_add_overflow(gpt_part_entry_base, entry_off, &entry_off)) {
+                fprintf(stderr, "error: GPT partition entry offset overflows.\n");
+                goto cleanup;
+            }
+            device_read(&gpt_entry, entry_off, sizeof(struct gpt_entry));
 
             if (gpt_entry.unique_partition_guid[0] == 0 &&
               gpt_entry.unique_partition_guid[1] == 0) {
@@ -1065,10 +1079,12 @@ part_too_low:
         } else {
             // Try to autodetect the BIOS boot partition
             for (partition_num = 0; partition_num < ENDSWAP(gpt_header.number_of_partition_entries); partition_num++) {
-                device_read(&gpt_entry,
-                    (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
-                    + (partition_num * ENDSWAP(gpt_header.size_of_partition_entry)),
-                    sizeof(struct gpt_entry));
+                uint64_t entry_off = (uint64_t)partition_num * ENDSWAP(gpt_header.size_of_partition_entry);
+                if (__builtin_add_overflow(gpt_part_entry_base, entry_off, &entry_off)) {
+                    fprintf(stderr, "error: GPT partition entry offset overflows.\n");
+                    goto cleanup;
+                }
+                device_read(&gpt_entry, entry_off, sizeof(struct gpt_entry));
 
                 if (memcmp("Hah!IdontNeedEFI", &gpt_entry.partition_type_guid, 16) == 0) {
                     if (!quiet) {
