@@ -693,6 +693,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
                 boot_method = BOOT_WITH_PSCI_HVC;
             } else {
                 printv("smp: illegal PSCI method: '%s'\n", psci_method);
+                continue;
             }
 
         } else if (!strcmp(prop, "spin-table")) {
