@@ -71,7 +71,7 @@ static struct riscv_hart *riscv_get_hart(size_t hartid) {
             return hart;
         }
     }
-    panic(false, "no `struct riscv_hart` for hartid %u", hartid);
+    panic(false, "no `struct riscv_hart` for hartid %U", (uint64_t)hartid);
 }
 
 static inline struct rhct_hart_info *rhct_get_hart_info(struct rhct *rhct, uint32_t acpi_uid) {
@@ -120,7 +120,7 @@ static void init_riscv_acpi(void) {
 
         struct rhct_hart_info *hart_info = rhct_get_hart_info(rhct, acpi_uid);
         if (hart_info == NULL) {
-            panic(false, "riscv: missing rhct node for hartid %u", hartid);
+            panic(false, "riscv: missing rhct node for hartid %U", (uint64_t)hartid);
         }
 
         const char *isa_string = NULL;
@@ -162,12 +162,12 @@ static void init_riscv_acpi(void) {
         }
 
         if (isa_string == NULL) {
-            print("riscv: missing isa string for hartid %u, skipping.\n", hartid);
+            print("riscv: missing isa string for hartid %U, skipping.\n", (uint64_t)hartid);
             continue;
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            print("riscv: skipping hartid %U with invalid isa string: %s\n", (uint64_t)hartid, isa_string);
             continue;
         }
 
@@ -231,12 +231,12 @@ static void init_riscv_fdt(const void *fdt) {
 
         const char *isa_string = fdt_getprop(fdt, node, "riscv,isa", NULL);
         if (isa_string == NULL) {
-            print("riscv: missing isa string for hartid %u, skipping.\n", hartid);
+            print("riscv: missing isa string for hartid %U, skipping.\n", (uint64_t)hartid);
             continue;
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            print("riscv: skipping hartid %U with invalid isa string: %s\n", (uint64_t)hartid, isa_string);
             continue;
         }
 

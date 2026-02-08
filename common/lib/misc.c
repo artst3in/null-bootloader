@@ -197,7 +197,7 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
     }
 
     if (dtb) {
-        printv("dtb: dtb has size %x\n", size);
+        printv("dtb: dtb has size %X\n", (uint64_t)size);
 
         void *new_tab = ext_mem_alloc(size + extra_size);
 

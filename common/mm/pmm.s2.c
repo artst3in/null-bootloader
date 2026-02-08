@@ -545,7 +545,7 @@ void pmm_release_uefi_mem(void) {
         status = gBS->FreePages(untouched_memmap[i].base, untouched_memmap[i].length / 4096);
 
         if (status) {
-            panic(false, "pmm: FreePages failure (%x)", status);
+            panic(false, "pmm: FreePages failure (%X)", (uint64_t)status);
         }
     }
 

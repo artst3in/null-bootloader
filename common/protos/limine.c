@@ -632,7 +632,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     printv("limine: Slide:           %X\n", slide);
     printv("limine: ELF entry point: %X\n", entry_point);
     printv("limine: Base revision:   %u\n", base_revision);
-    printv("limine: Requests count:  %u\n", requests_count);
+    printv("limine: Requests count:  %U\n", (uint64_t)requests_count);
     printv("limine: Top of HHDM:     %X\n", hhdm_span_top);
 
     // Paging Mode

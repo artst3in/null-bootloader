@@ -441,7 +441,7 @@ skip_loop:
             for (j = 0; config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
                 if (j >= sizeof(macro->name) - 1) {
                     bad_config = true;
-                    panic(true, "config: Macro name too long (max %u)", sizeof(macro->name) - 1);
+                    panic(true, "config: Macro name too long (max %U)", (uint64_t)(sizeof(macro->name) - 1));
                 }
                 macro->name[j] = config_addr[i];
             }
@@ -457,7 +457,7 @@ skip_loop:
             for (j = 0; config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
                 if (j >= sizeof(macro->value) - 1) {
                     bad_config = true;
-                    panic(true, "config: Macro value too long (max %u)", sizeof(macro->value) - 1);
+                    panic(true, "config: Macro value too long (max %U)", (uint64_t)(sizeof(macro->value) - 1));
                 }
                 macro->value[j] = config_addr[i];
             }
