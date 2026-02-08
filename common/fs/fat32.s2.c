@@ -155,6 +155,11 @@ bytes_per_sector_valid:;
         return 1;
     }
 
+    // The boot sector itself occupies at least sector 0
+    if (bpb.reserved_sectors == 0) {
+        return 1;
+    }
+
     // The following mess to identify the FAT type is from the FAT spec
     // at paragraph 3.5
     size_t root_dir_sects = ((bpb.root_entries_count * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector;
@@ -192,6 +197,11 @@ bytes_per_sector_valid:;
     context->root_directory_cluster = bpb.root_directory_cluster;
     context->fat_start_lba = bpb.reserved_sectors;
     context->root_entries = bpb.root_entries_count;
+
+    // FAT12/16 require a non-zero root directory entry count
+    if (context->type != 32 && context->root_entries == 0) {
+        return 1;
+    }
 
     // Calculate root_start with overflow check
     uint64_t root_start_64 = (uint64_t)context->reserved_sectors + (uint64_t)context->number_of_fats * context->sectors_per_fat;
