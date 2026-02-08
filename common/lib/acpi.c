@@ -334,29 +334,34 @@ no_rsdt:;
     if (fadt == NULL) {
         return;
     }
-    uint32_t fadt_length = *(uint32_t *)(fadt + 4);
+    uint32_t fadt_length;
+    memcpy(&fadt_length, fadt + 4, sizeof(fadt_length));
 
     // Read the single fields from the FADT without defining a struct for the whole table
     if (fadt_length >= 132 + 8) {
-        uint64_t x_facs = *(uint64_t *)(fadt + 132);
+        uint64_t x_facs;
+        memcpy(&x_facs, fadt + 132, sizeof(x_facs));
         if (x_facs != 0) {
             map_single_table(x_facs, (uint32_t)-1);
         }
     }
     if (fadt_length >= 140 + 8) {
-        uint64_t x_dsdt = *(uint64_t *)(fadt + 140);
+        uint64_t x_dsdt;
+        memcpy(&x_dsdt, fadt + 140, sizeof(x_dsdt));
         if (x_dsdt != 0) {
             map_single_table(x_dsdt, (uint32_t)-1);
         }
     }
     if (fadt_length >= 36 + 4) {
-        uint32_t facs = *(uint32_t *)(fadt + 36);
+        uint32_t facs;
+        memcpy(&facs, fadt + 36, sizeof(facs));
         if (facs != 0) {
             map_single_table(facs, (uint32_t)-1);
         }
     }
     if (fadt_length >= 40 + 4) {
-        uint32_t dsdt = *(uint32_t *)(fadt + 40);
+        uint32_t dsdt;
+        memcpy(&dsdt, fadt + 40, sizeof(dsdt));
         if (dsdt != 0) {
             map_single_table(dsdt, (uint32_t)-1);
         }
