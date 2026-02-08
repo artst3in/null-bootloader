@@ -209,7 +209,8 @@ void *acpi_get_table(const char *signature, int index) {
         return NULL;
 
     bool use_xsdt = false;
-    if (rsdp->rev >= 2 && rsdp->xsdt_addr)
+    if (rsdp->rev >= 2 && rsdp->xsdt_addr
+     && (sizeof(uintptr_t) >= 8 || rsdp->xsdt_addr <= UINT32_MAX))
         use_xsdt = true;
 
     struct rsdt *rsdt;
