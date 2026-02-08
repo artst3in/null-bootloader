@@ -84,13 +84,16 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     }
     delay(10000000);
 
-    // Send the Startup IPI
-    if (x2apic) {
-        x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) |
-                                     ((size_t)trampoline / 4096) | 0x4600);
-    } else {
-        lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
-        lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
+    // Send two Startup IPIs per Intel SDM recommendation (Vol 3, 8.4.4.1)
+    for (int j = 0; j < 2; j++) {
+        if (x2apic) {
+            x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) |
+                                         ((size_t)trampoline / 4096) | 0x4600);
+        } else {
+            lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
+            lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
+        }
+        delay(200000); // ~200 us
     }
 
     for (int i = 0; i < 100; i++) {
