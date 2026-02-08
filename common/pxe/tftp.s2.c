@@ -104,7 +104,7 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     struct pxenv_open open = {
         .status = 0,
         .sip = server_ip,
-        .port = (server_port) << 8,
+        .port = (server_port >> 8) | (server_port << 8),
         .packet_size = mtu
     };
     memcpy(open.name, name, name_len + 1);
