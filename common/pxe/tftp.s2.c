@@ -25,7 +25,9 @@ static uint32_t get_boot_server_info(void) {
     }
     struct bootph *ph = (struct bootph*)(void *) (((((uint32_t)cachedinfo.buffer) >> 16) << 4) + (((uint32_t)cachedinfo.buffer) & 0xFFFF));
     if (!cached_dhcp_ack_valid) {
-        memcpy(cached_dhcp_packet, ph, DHCP_ACK_PACKET_LEN);
+        size_t copy_len = cachedinfo.buffer_size < DHCP_ACK_PACKET_LEN
+                        ? cachedinfo.buffer_size : DHCP_ACK_PACKET_LEN;
+        memcpy(cached_dhcp_packet, ph, copy_len);
         cached_dhcp_ack_valid = true;
     }
     return ph->sip;
