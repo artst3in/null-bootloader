@@ -521,6 +521,11 @@ reloc_fail:
 
         int bits = elf_bits(kernel);
 
+        if ((bits == 64 && section_hdr_info.section_entry_size < sizeof(struct elf64_shdr)) ||
+            (bits == 32 && section_hdr_info.section_entry_size < sizeof(struct elf32_shdr))) {
+            panic(true, "multiboot2: ELF section entry size too small");
+        }
+
         for (size_t i = 0; i < section_hdr_info.num; i++) {
             if (bits == 64)  {
                 struct elf64_shdr *shdr = (void *)tag->sections + i * section_hdr_info.section_entry_size;
