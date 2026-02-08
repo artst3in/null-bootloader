@@ -120,7 +120,8 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     // Validate server's negotiated packet size doesn't exceed our buffer
     if (open.packet_size > mtu) {
         print("tftp: Server requested packet size %u exceeds our MTU %u\n", open.packet_size, mtu);
-        pxe_call(TFTP_CLOSE, ((uint16_t)rm_seg(&(uint16_t){0})), (uint16_t)rm_off(&(uint16_t){0}));
+        uint16_t close = 0;
+        pxe_call(TFTP_CLOSE, ((uint16_t)rm_seg(&close)), (uint16_t)rm_off(&close));
         pmm_free(handle->path, handle->path_len);
         pmm_free(handle, sizeof(struct file_handle));
         return NULL;
