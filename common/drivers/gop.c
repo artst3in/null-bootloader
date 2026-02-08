@@ -24,11 +24,14 @@ static uint16_t linear_masks_to_bpp(uint32_t red_mask, uint32_t green_mask,
 static void linear_mask_to_mask_shift(
                 uint8_t *mask, uint8_t *shift, uint32_t linear_mask) {
     *shift = 0;
+    *mask = 0;
+    if (linear_mask == 0) {
+        return;
+    }
     while ((linear_mask & 1) == 0) {
         (*shift)++;
         linear_mask >>= 1;
     }
-    *mask = 0;
     while ((linear_mask & 1) == 1) {
         (*mask)++;
         linear_mask >>= 1;
@@ -69,6 +72,12 @@ static bool mode_to_fb_info(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *g
             ret->blue_mask_shift = 16;
             break;
         case PixelBitMask:
+            if ((mode_info->PixelInformation.RedMask
+               | mode_info->PixelInformation.GreenMask
+               | mode_info->PixelInformation.BlueMask
+               | mode_info->PixelInformation.ReservedMask) == 0) {
+                return false;
+            }
             ret->framebuffer_bpp = linear_masks_to_bpp(
                                       mode_info->PixelInformation.RedMask,
                                       mode_info->PixelInformation.GreenMask,
