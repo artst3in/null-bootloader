@@ -379,7 +379,12 @@ again:
 
                 size_t write_size;
                 switch (type) {
-                    case IMAGE_REL_BASED_HIGHLOW: write_size = 4; break;
+                    case IMAGE_REL_BASED_HIGHLOW:
+                        if (lower_to_higher) {
+                            panic(true, "pe: 32-bit relocations are incompatible with higher-half loading");
+                        }
+                        write_size = 4;
+                        break;
                     case IMAGE_REL_BASED_DIR64: write_size = 8; break;
                     default:
                         panic(true, "pe: Unsupported relocation type %u", type);
