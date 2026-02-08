@@ -710,7 +710,7 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
 
         if (tmp_font_size > FONT_MAX) {
-            print("Font would be too large (%u bytes, %u bytes allowed). Not loading.\n", tmp_font_size, FONT_MAX);
+            print("Font would be too large (%U bytes, %u bytes allowed). Not loading.\n", (uint64_t)tmp_font_size, FONT_MAX);
             goto no_load_font;
         }
 

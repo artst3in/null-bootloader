@@ -328,12 +328,12 @@ again:
 
         // Validate section doesn't write past the image buffer
         if ((uint64_t)section->VirtualAddress + section_raw_size > image_size) {
-            panic(true, "pe: Section %zu exceeds image bounds", i);
+            panic(true, "pe: Section %U exceeds image bounds", (uint64_t)i);
         }
 
         // Validate section data doesn't exceed file bounds
         if ((uint64_t)section->PointerToRawData + section_raw_size > file_size) {
-            panic(true, "pe: Section %zu data extends beyond file bounds", i);
+            panic(true, "pe: Section %U data extends beyond file bounds", (uint64_t)i);
         }
 
         memcpy((void *)section_base, image + section->PointerToRawData, section_raw_size);

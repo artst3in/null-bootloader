@@ -160,7 +160,7 @@ void acpi_get_smbios(void **smbios32, void **smbios64) {
         if (acpi_checksum((void *)ptr, ptr->length) != 0)
             continue;
 
-        printv("acpi: Found SMBIOS 32-bit entry point at %X\n", ptr);
+        printv("acpi: Found SMBIOS 32-bit entry point at %p\n", ptr);
 
         *smbios32 = (void *)ptr;
 
@@ -179,7 +179,7 @@ void acpi_get_smbios(void **smbios32, void **smbios64) {
         if (acpi_checksum((void *)ptr, ptr->length) != 0)
             continue;
 
-        printv("acpi: Found SMBIOS 64-bit entry point at %X\n", ptr);
+        printv("acpi: Found SMBIOS 64-bit entry point at %p\n", ptr);
 
         *smbios64 = (void *)ptr;
 
@@ -245,7 +245,7 @@ void *acpi_get_table(const char *signature, int index) {
         if (!memcmp(ptr->signature, signature, 4)
          && !acpi_checksum(ptr, ptr->length)
          && cnt++ == index) {
-            printv("acpi: Found \"%s\" at %x\n", signature, ptr);
+            printv("acpi: Found \"%s\" at %p\n", signature, ptr);
             return ptr;
         }
     }

@@ -831,7 +831,7 @@ struct limine_mp_info *init_smp(size_t *cpu_count, pagemap_t pagemap, uint64_t h
             continue;
         }
 
-        printv("smp: Found candidate AP for bring-up. Hart ID: %u\n", hart->hartid);
+        printv("smp: Found candidate AP for bring-up. Hart ID: %U\n", (uint64_t)hart->hartid);
 
         // Try to start the AP.
         size_t satp = make_satp(pagemap.paging_mode, pagemap.top_level);

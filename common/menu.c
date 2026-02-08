@@ -1090,8 +1090,8 @@ refresh:
         for (size_t i = timeout; i; i--) {
             set_cursor_pos_helper(0, terms[0]->rows - 1);
             FOR_TERM(TERM->scroll_enabled = false);
-            print("\e[2K%sBooting automatically in %s%u%s, press any key to stop the countdown...\e[0m",
-                  interface_help_colour, interface_help_colour_bright, i, interface_help_colour);
+            print("\e[2K%sBooting automatically in %s%U%s, press any key to stop the countdown...\e[0m",
+                  interface_help_colour, interface_help_colour_bright, (uint64_t)i, interface_help_colour);
             FOR_TERM(TERM->scroll_enabled = true);
             FOR_TERM(TERM->double_buffer_flush(TERM));
             if ((c = pit_sleep_and_quit_on_keypress(1))) {

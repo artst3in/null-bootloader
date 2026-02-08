@@ -138,7 +138,7 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
         }
     }
 
-    printv("gop: Found matching mode %x, attempting to set...\n", mode);
+    printv("gop: Found matching mode %X, attempting to set...\n", (uint64_t)mode);
 
     if (mode == gop->Mode->Mode) {
         printv("gop: Mode was already set, perfect!\n");
@@ -146,7 +146,7 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
         status = gop->SetMode(gop, mode);
 
         if (status) {
-            printv("gop: Failed to set video mode %x, moving on...\n", mode);
+            printv("gop: Failed to set video mode %X, moving on...\n", (uint64_t)mode);
             return false;
         }
     }

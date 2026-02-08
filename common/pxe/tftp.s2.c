@@ -230,7 +230,7 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
 
     // Validate file size from TFTP server (max 1GB)
     if (file_size == 0 || file_size > (1024 * 1024 * 1024)) {
-        print("tftp: Invalid file size from server: %llu\n", (unsigned long long)file_size);
+        print("tftp: Invalid file size from server: %U\n", file_size);
         return NULL;
     }
 

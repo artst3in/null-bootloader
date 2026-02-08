@@ -369,7 +369,7 @@ static void prepare_mmap(struct boot_param *p) {
 
 noreturn static void jump_to_kernel(struct boot_param *p) {
 #if defined(__riscv)
-    printv("linux: bsp hart %d, device tree blob at %p\n", bsp_hartid, p->dtb);
+    printv("linux: bsp hart %U, device tree blob at %p\n", (uint64_t)bsp_hartid, p->dtb);
 
     void (*kernel_entry)(uint64_t hartid, uint64_t dtb) = p->kernel_base;
     asm ("csrci   sstatus, 0x2\n\t"

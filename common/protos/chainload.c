@@ -329,7 +329,7 @@ noreturn void chainload(char *config, char *cmdline) {
                             (EFI_DEVICE_PATH *)memdev_path,
                             ptr, image_size, &new_handle);
     if (status) {
-        panic(false, "efi: LoadImage failure (%x)", status);
+        panic(false, "efi: LoadImage failure (%X)", (uint64_t)status);
     }
 
     EFI_GUID loaded_img_prot_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
@@ -338,7 +338,7 @@ noreturn void chainload(char *config, char *cmdline) {
     status = gBS->HandleProtocol(new_handle, &loaded_img_prot_guid,
                                  (void **)&new_handle_loaded_image);
     if (status) {
-        panic(false, "efi: HandleProtocol failure (%x)", status);
+        panic(false, "efi: HandleProtocol failure (%X)", (uint64_t)status);
     }
 
     if (efi_part_handle != 0) {
@@ -358,7 +358,7 @@ noreturn void chainload(char *config, char *cmdline) {
 
     status = gBS->Exit(efi_image_handle, exit_status, exit_data_size, exit_data);
     if (status) {
-        panic(false, "efi: Exit failure (%x)", status);
+        panic(false, "efi: Exit failure (%X)", (uint64_t)status);
     }
 
     __builtin_unreachable();
