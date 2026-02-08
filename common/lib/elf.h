@@ -16,7 +16,7 @@ struct elf_section_hdr_info {
     uint32_t section_entry_size;
     uint32_t str_section_idx;
     uint32_t num;
-    uint32_t section_offset;
+    uint64_t section_offset;
 };
 
 int elf_bits(uint8_t *elf);
