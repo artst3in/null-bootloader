@@ -347,6 +347,10 @@ again:
     IMAGE_DATA_DIRECTORY *reloc_dir = &nt_hdrs->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
 
     if (import_dir->Size != 0) {
+        if (import_dir->VirtualAddress >= image_size ||
+            sizeof(IMAGE_IMPORT_DESCRIPTOR) > image_size - import_dir->VirtualAddress) {
+            panic(true, "pe: Import directory VirtualAddress out of bounds");
+        }
         IMAGE_IMPORT_DESCRIPTOR *import_desc = (IMAGE_IMPORT_DESCRIPTOR *)((uintptr_t)*physical_base + import_dir->VirtualAddress);
 
         if (import_desc->Name != 0) {
@@ -355,6 +359,10 @@ again:
     }
 
     if (reloc_dir->VirtualAddress != 0) {
+        if (reloc_dir->VirtualAddress >= image_size ||
+            reloc_dir->Size > image_size - reloc_dir->VirtualAddress) {
+            panic(true, "pe: Relocation directory VirtualAddress out of bounds");
+        }
         size_t reloc_block_offset = 0;
 
         while (reloc_dir->Size - reloc_block_offset >= sizeof(IMAGE_BASE_RELOCATION_BLOCK)) {
