@@ -374,16 +374,27 @@ void init_riscv(const char *config);
 
 #elif defined (__loongarch64)
 
-#define LOONGARCH_CSR_TVAL 0x42
-
 static inline uint64_t rdtsc(void) {
     uint64_t v;
-    asm volatile ("csrrd %0, %1" : "=r" (v) : "i" (LOONGARCH_CSR_TVAL));
+    asm volatile ("rdtime.d %0, $zero" : "=r" (v));
+    return v;
+}
+
+static inline uint32_t loongarch_cpucfg(uint32_t reg) {
+    uint32_t v;
+    asm volatile ("cpucfg %0, %1" : "=r" (v) : "r" (reg));
     return v;
 }
 
 static inline uint64_t tsc_freq_arch(void) {
-    return 0; // FIXME
+    uint32_t cc_freq = loongarch_cpucfg(4);
+    uint32_t cc_cfg = loongarch_cpucfg(5);
+    uint32_t cc_mul = cc_cfg & 0xFFFF;
+    uint32_t cc_div = (cc_cfg >> 16) & 0xFFFF;
+    if (cc_freq == 0 || cc_mul == 0 || cc_div == 0) {
+        return 0;
+    }
+    return (uint64_t)cc_freq * cc_mul / cc_div;
 }
 
 #else
