@@ -1279,7 +1279,10 @@ static int enroll_config(int argc, char *argv[]) {
     const char *config_b2sum_sign = CONFIG_B2SUM_SIGNATURE;
     for (size_t i = 0; i < bootloader_size - min_size + 1; i++) {
         if (bootloader[i] != config_b2sum_sign[checked_count]) {
-            checked_count = 0;
+            if (checked_count > 0) {
+                checked_count = 0;
+                i--; // re-check current byte against start of signature
+            }
             continue;
         }
 
