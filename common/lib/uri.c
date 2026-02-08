@@ -28,7 +28,7 @@ bool uri_resolve(char *uri, char **resource, char **root, char **path, char **ha
     memcpy(buf, uri, length);
     uri = buf;
 
-    *resource = *root = *path = NULL;
+    *resource = *root = *path = *hash = NULL;
 
     // Get resource
     for (size_t i = 0; ; i++) {
