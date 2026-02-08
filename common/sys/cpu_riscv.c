@@ -65,6 +65,12 @@ struct riscv_hart *hart_list = NULL;
 struct riscv_hart *bsp_hart;
 static const char *current_config = NULL;
 
+static uint64_t cached_time_base_freq = 0;
+
+uint64_t riscv_time_base_frequency(void) {
+    return cached_time_base_freq;
+}
+
 static struct riscv_hart *riscv_get_hart(size_t hartid) {
     for (struct riscv_hart *hart = hart_list; hart != NULL; hart = hart->next) {
         if (hart->hartid == hartid) {
@@ -98,6 +104,8 @@ static void init_riscv_acpi(void) {
     if (madt == NULL || rhct == NULL) {
         panic(false, "riscv: requires `APIC` and `RHCT` ACPI tables");
     }
+
+    cached_time_base_freq = rhct->time_base_frequency;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
          (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length; madt_ptr += *(madt_ptr + 1)) {
@@ -199,6 +207,16 @@ static void init_riscv_fdt(const void *fdt) {
     int cpus = fdt_path_offset(fdt, "/cpus");
     if (cpus < 0) {
         panic(false, "riscv: missing `/cpus` node");
+    }
+
+    int len;
+    const void *tbf = fdt_getprop(fdt, cpus, "timebase-frequency", &len);
+    if (tbf != NULL) {
+        if (len == 8) {
+            cached_time_base_freq = fdt64_ld(tbf);
+        } else if (len == 4) {
+            cached_time_base_freq = fdt32_ld(tbf);
+        }
     }
 
     int node;
