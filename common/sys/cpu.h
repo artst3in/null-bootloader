@@ -167,7 +167,7 @@ static inline uint64_t tsc_freq_arch(void) {
         return 0;
     if (eax == 0 || ebx == 0 || ecx == 0)
         return 0;
-    return ecx * ebx / eax;
+    return (uint64_t)ecx * ebx / eax;
 }
 
 #define rdrand(type) ({ \
