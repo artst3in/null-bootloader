@@ -842,6 +842,7 @@ no_load_font:;
     }
 
     if (terms_i == 0) {
+        pmm_free(terms, fbs_count * sizeof(void *));
         return false;
     }
 
