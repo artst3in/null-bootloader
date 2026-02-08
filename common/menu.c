@@ -847,7 +847,7 @@ noreturn void _menu(bool first_run) {
     if (interface_help_colour_str == NULL) {
         interface_help_colour_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOR");
     }
-    if (interface_help_colour_str != NULL) {
+    if (interface_help_colour_str != NULL && interface_help_colour_str[0] != '\0') {
         interface_help_colour[3] = interface_help_colour_str[0];
         interface_help_colour_bright[3] = interface_help_colour_str[0];
     }
