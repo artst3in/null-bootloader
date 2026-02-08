@@ -531,6 +531,10 @@ static void iso9660_read(struct file_handle *file, void *buf, uint64_t loc, uint
 
         extent_start = extent_end;
     }
+
+    if (count > 0) {
+        panic(false, "iso9660: read beyond end of file");
+    }
 }
 
 static void iso9660_close(struct file_handle *file) {
