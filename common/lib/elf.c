@@ -690,6 +690,11 @@ bool elf64_load_section(uint8_t *elf, size_t file_size, void *buffer, const char
             continue;
         }
 
+        // Ensure the string is NUL-terminated within the string table
+        if (!memchr(&names[section->sh_name], '\0', shstrtab->sh_size - section->sh_name)) {
+            continue;
+        }
+
         if (strcmp(&names[section->sh_name], name) == 0) {
             // Validate section data is within file bounds
             if (section->sh_offset >= file_size || section->sh_size > file_size - section->sh_offset) {
