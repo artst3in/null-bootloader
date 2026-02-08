@@ -360,6 +360,7 @@ struct riscv_hart {
 #define RISCV_HART_HAS_MMU ((uint8_t)1 << 1)  // `mmu_type` field is valid
 
 extern struct riscv_hart *hart_list;
+extern struct riscv_hart *bsp_hart;
 
 bool riscv_check_isa_extension_for(size_t hartid, const char *ext, size_t *maj, size_t *min);
 
