@@ -567,6 +567,7 @@ overflow:
             pmm_free(macro, sizeof(struct macro));
             macro = next;
         }
+        macros = NULL;
     }
 
     config_ready = true;
