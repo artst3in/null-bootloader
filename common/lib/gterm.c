@@ -291,7 +291,7 @@ static uint32_t *bg_canvas;
 #define R(rgb) (uint8_t)(rgb >> 16)
 #define G(rgb) (uint8_t)(rgb >> 8)
 #define B(rgb) (uint8_t)(rgb)
-#define ARGB(a, r, g, b) (a << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF)
+#define ARGB(a, r, g, b) (((a) << 24) | (((r) & 0xFF) << 16) | (((g) & 0xFF) << 8) | ((b) & 0xFF))
 
 static inline uint32_t colour_blend(uint32_t fg, uint32_t bg) {
     unsigned alpha = 255 - A(fg);
