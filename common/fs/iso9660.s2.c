@@ -488,18 +488,6 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
         }
     }
 
-    // Free the last directory buffer if we allocated one (not the cached root)
-    if (!first) {
-        pmm_free(current, current_size);
-    }
-
-    // Fallback path (trailing slash case) - create single extent
-    ret->extents = ext_mem_alloc(sizeof(struct iso9660_extent));
-    ret->extent_count = 1;
-    ret->total_size = next_size;
-    ret->extents[0].LBA = next_sector;
-    ret->extents[0].size = next_size;
-
 setup_handle:;
     struct file_handle *handle = ext_mem_alloc(sizeof(struct file_handle));
 
