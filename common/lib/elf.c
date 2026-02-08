@@ -45,6 +45,7 @@
 #define ARCH_RISCV   0xf3
 #define ARCH_LOONGARCH 0x102
 #define BITS_LE      0x01
+#define ELFCLASS32   0x01
 #define ELFCLASS64   0x02
 #define SHT_RELA     0x00000004
 #define SHN_UNDEF    0x00000000
@@ -193,7 +194,9 @@ int elf_bits(uint8_t *elf) {
             return 64;
         case ARCH_RISCV:
         case ARCH_LOONGARCH:
-            return (hdr->ident[EI_CLASS] == ELFCLASS64) ? 64 : 32;
+            if (hdr->ident[EI_CLASS] == ELFCLASS64) return 64;
+            if (hdr->ident[EI_CLASS] == ELFCLASS32) return 32;
+            return -1;
         case ARCH_X86_32:
             return 32;
         default:
