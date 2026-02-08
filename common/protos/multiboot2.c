@@ -632,7 +632,7 @@ reloc_fail:
         fclose(f);
 
         if (verbose) {
-            print("multiboot2: Requested module %u:\n", i);
+            print("multiboot2: Requested module %u:\n", (uint32_t)i);
             print("            Path:   %s\n", module_path);
             print("            String: \"%s\"\n", module_cmdline ?: "");
             print("            Begin:  %x\n", module_tag->mod_start);

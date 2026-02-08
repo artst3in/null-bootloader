@@ -340,7 +340,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
             fclose(f);
 
             if (verbose) {
-                print("multiboot1: Requested module %u:\n", i);
+                print("multiboot1: Requested module %u:\n", (uint32_t)i);
                 print("            Path:   %s\n", module_path);
                 print("            String: \"%s\"\n", module_cmdline ?: "");
                 print("            Begin:  %x\n", m->begin);
