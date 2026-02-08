@@ -35,7 +35,7 @@ read_sectors:
     mov word [si], 30       ; buf_size
     int 0x13
     jc .done
-    mov bp, word [si+24]    ; bytes_per_sect
+    movzx ebp, word [si+24] ; bytes_per_sect
 
     ; ECX byte count to CX sector count
     mov ax, cx
