@@ -1026,7 +1026,7 @@ refresh:
         max_entries = print_tree(tree_offset, terms[0]->rows - 8, tree_prefix, 0, 0, selected_entry, menu_tree,
                                  &selected_menu_entry, NULL, NULL);
 
-        pmm_free(tree_prefix, tree_prefix_len);
+        pmm_free(tree_prefix, tree_prefix_len + 1);
     }
 
     {
