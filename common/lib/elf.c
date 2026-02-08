@@ -842,6 +842,10 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
         panic(true, "elf: Program header table size overflow");
     }
 
+    if (phdr_table_end > file_size) {
+        panic(true, "elf: Program header table extends beyond file bounds");
+    }
+
     if (is_reloc) {
         *is_reloc = false;
     }
@@ -1060,6 +1064,10 @@ bool elf32_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
         panic(true, "elf: phdr_size < sizeof(struct elf32_phdr)");
     }
 
+    if ((uint64_t)hdr->phoff + (uint64_t)hdr->ph_num * hdr->phdr_size > file_size) {
+        panic(true, "elf: Program header table extends beyond file bounds");
+    }
+
     size_t image_size = 0;
     uint64_t min_paddr = (uint64_t)-1;
     uint64_t max_paddr = 0;
@@ -1131,6 +1139,10 @@ bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
 
     if (hdr->phdr_size < sizeof(struct elf64_phdr)) {
         panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
+    }
+
+    if ((uint64_t)hdr->phoff + (uint64_t)hdr->ph_num * hdr->phdr_size > file_size) {
+        panic(true, "elf: Program header table extends beyond file bounds");
     }
 
     size_t image_size = 0;
