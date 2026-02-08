@@ -1002,6 +1002,8 @@ noreturn void _menu(bool first_run) {
                              NULL,
                              &getvar_size,
                              last_entry_path) == 0 && getvar_size > 0) {
+            // Ensure NUL termination
+            last_entry_path[getvar_size < sizeof(last_entry_path) ? getvar_size : sizeof(last_entry_path) - 1] = '\0';
             // Find the entry with this path, expand directories, and get its index.
             struct menu_entry *found_entry = NULL;
             size_t found_index = 0;
