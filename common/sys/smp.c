@@ -329,8 +329,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
     // Prepare the trampoline
     static void *trampoline = NULL;
     if (trampoline == NULL) {
-        // AArch64 trampoline expects 0x1000 byte buffer with passed_info at the end
-        trampoline = ext_mem_alloc(0x1000);
+        trampoline = ext_mem_alloc(smp_trampoline_size);
 
         memcpy(trampoline, smp_trampoline_start, smp_trampoline_size);
     }
