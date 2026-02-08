@@ -196,7 +196,13 @@ static void prepare_device_tree_blob(struct boot_param *p) {
 }
 
 static void add_framebuffer(struct fb_info *fb) {
-    struct screen_info *screen_info = ext_mem_alloc(sizeof(struct screen_info));
+    struct screen_info *screen_info;
+
+    EFI_STATUS alloc_ret = gBS->AllocatePool(EfiLoaderData, sizeof(*screen_info), (void **)&screen_info);
+    if (alloc_ret != EFI_SUCCESS) {
+        panic(true, "linux: failed to allocate screen info table");
+    }
+    memset(screen_info, 0, sizeof(*screen_info));
 
     screen_info->capabilities   = VIDEO_CAPABILITY_64BIT_BASE | VIDEO_CAPABILITY_SKIP_QUIRKS;
     screen_info->flags          = VIDEO_FLAGS_NOCURSOR;
@@ -251,7 +257,13 @@ static void prepare_efi_tables(struct boot_param *p, char *config) {
 
 
     {
-        struct linux_efi_memreserve *rsv = ext_mem_alloc(sizeof(struct linux_efi_memreserve));
+        struct linux_efi_memreserve *rsv;
+
+        ret = gBS->AllocatePool(EfiLoaderData, sizeof(*rsv), (void **)&rsv);
+        if (ret != EFI_SUCCESS) {
+            panic(true, "linux: failed to allocate memory reservation table");
+        }
+        memset(rsv, 0, sizeof(*rsv));
 
         rsv->size = 0;
         rsv->count = 0;
