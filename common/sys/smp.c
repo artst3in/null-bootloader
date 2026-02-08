@@ -605,7 +605,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
     }
 
     int address_cells = fdt_address_cells(dtb, cpus);
-    if (address_cells < 0) {
+    if (address_cells < 1) {
         printv("smp: fdt_address_cells failed: %s\n", fdt_strerror(address_cells));
         return NULL;
     }
