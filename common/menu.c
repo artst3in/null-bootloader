@@ -177,6 +177,10 @@ static void putchar_tokencol(int type, char c) {
 static bool editor_no_term_reset = false;
 
 char *config_entry_editor(const char *title, const char *orig_entry) {
+    if (terms[0]->cols < 40 || terms[0]->rows < 16) {
+        panic(false, "Terminal too small (minimum 40x16 required)");
+    }
+
     FOR_TERM(TERM->autoflush = false);
 
     FOR_TERM(TERM->cursor_enabled = true);
@@ -968,6 +972,10 @@ noreturn void _menu(bool first_run) {
     }
 
     menu_init_term();
+
+    if (terms[0]->cols < 40 || terms[0]->rows < 16) {
+        panic(false, "Terminal too small (minimum 40x16 required)");
+    }
 
     size_t tree_offset = 0;
 
