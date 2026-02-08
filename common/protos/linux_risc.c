@@ -133,7 +133,7 @@ static void load_module(struct boot_param *p, char *config) {
 
         fread(module_file, p->module_base, 0, p->module_size);
         fclose(module_file);
-        printv("linux: loaded module `%s` at %x, size %u\n", module_path, p->module_base, p->module_size);
+        printv("linux: loaded module `%s` at %p, size %U\n", module_path, p->module_base, (uint64_t)p->module_size);
     }
 }
 
@@ -220,7 +220,7 @@ static void add_framebuffer(struct fb_info *fb) {
     EFI_STATUS ret = gBS->InstallConfigurationTable(&screen_info_table_guid, screen_info);
 
     if (ret != EFI_SUCCESS) {
-        panic(true, "linux: failed to install screen info configuration table: '%x'", ret);
+        panic(true, "linux: failed to install screen info configuration table: '%X'", (uint64_t)ret);
     }
 }
 
@@ -261,7 +261,7 @@ static void prepare_efi_tables(struct boot_param *p, char *config) {
         ret = gBS->InstallConfigurationTable(&memreserve_table_guid, rsv);
 
         if (ret != EFI_SUCCESS) {
-            panic(true, "linux: failed to install memory reservation configuration table: '%x'", ret);
+            panic(true, "linux: failed to install memory reservation configuration table: '%X'", (uint64_t)ret);
         }
     }
 
@@ -351,20 +351,20 @@ static void prepare_mmap(struct boot_param *p) {
 
     EFI_STATUS status = gRT->SetVirtualAddressMap(efi_mmap_size, efi_desc_size, efi_desc_ver, efi_mmap);
     if (status != EFI_SUCCESS) {
-        panic(false, "linux: failed to set UEFI virtual address map: '%x'", status);
+        panic(false, "linux: failed to set UEFI virtual address map: '%X'", (uint64_t)status);
     }
 }
 
 noreturn static void jump_to_kernel(struct boot_param *p) {
 #if defined(__riscv)
-    printv("linux: bsp hart %d, device tree blob at %x\n", bsp_hartid, p->dtb);
+    printv("linux: bsp hart %d, device tree blob at %p\n", bsp_hartid, p->dtb);
 
     void (*kernel_entry)(uint64_t hartid, uint64_t dtb) = p->kernel_base;
     asm ("csrci   sstatus, 0x2\n\t"
          "csrw    sie, zero\n\t");
     kernel_entry(bsp_hartid, (uint64_t)p->dtb);
 #elif defined(__aarch64__)
-    printv("linux: device tree blob at %x\n", p->dtb);
+    printv("linux: device tree blob at %p\n", p->dtb);
 
     void (*kernel_entry)(uint64_t dtb, uint64_t res0, uint64_t res1, uint64_t res2) = p->kernel_base;
     asm ("msr daifset, 0xF");
@@ -438,7 +438,7 @@ noreturn void linux_load(char *config, char *cmdline) {
                 MEMMAP_KERNEL_AND_MODULES, 2 * 1024 * 1024);
     fread(kernel_file, p.kernel_base, 0, p.kernel_size);
     fclose(kernel_file);
-    printv("linux: loaded kernel `%s` at %x, size %u\n", kernel_path, p.kernel_base, p.kernel_size);
+    printv("linux: loaded kernel `%s` at %p, size %U\n", kernel_path, p.kernel_base, (uint64_t)p.kernel_size);
 
     const char *reason = verify_kernel(&p);
     if (reason)
