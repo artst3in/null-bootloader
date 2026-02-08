@@ -312,12 +312,14 @@ static inline int current_el(void) {
 
 static inline uint64_t rdtsc(void) {
     uint64_t v;
-    asm volatile ("rdcycle %0" : "=r"(v));
+    asm volatile ("rdtime %0" : "=r"(v));
     return v;
 }
 
+uint64_t riscv_time_base_frequency(void);
+
 static inline uint64_t tsc_freq_arch(void) {
-    return 0; // FIXME
+    return riscv_time_base_frequency();
 }
 
 #define csr_read(csr) ({\
