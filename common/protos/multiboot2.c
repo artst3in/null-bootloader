@@ -386,6 +386,9 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                 break;
             case 2: // Prefer highest
                 reloc_ascend = false;
+                if (ranges->length > reloc_tag.max_addr) {
+                    goto reloc_fail;
+                }
                 relocated_base = ALIGN_DOWN(reloc_tag.max_addr - ranges->length, reloc_tag.align);
                 if (relocated_base < reloc_tag.min_addr) {
                     goto reloc_fail;
