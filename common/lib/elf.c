@@ -725,6 +725,10 @@ static uint64_t elf64_max_align(uint8_t *elf) {
             continue;
         }
 
+        if (phdr->p_align > 1 && (phdr->p_align & (phdr->p_align - 1)) != 0) {
+            panic(true, "elf: p_align is not a power of 2");
+        }
+
         if (phdr->p_align > ret) {
             ret = phdr->p_align;
         }
