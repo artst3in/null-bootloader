@@ -669,6 +669,9 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
         }
 
         if (expect_directory) {
+            if (!(current_file.attribute & FAT32_ATTRIBUTE_SUBDIRECTORY)) {
+                return NULL;
+            }
             _current_directory = current_file;
             current_directory = &_current_directory;
         } else {
