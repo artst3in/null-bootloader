@@ -62,7 +62,7 @@ void *riscv_fdt = NULL;
 
 size_t bsp_hartid;
 struct riscv_hart *hart_list = NULL;
-static struct riscv_hart *bsp_hart;
+struct riscv_hart *bsp_hart;
 static const char *current_config = NULL;
 
 static struct riscv_hart *riscv_get_hart(size_t hartid) {

@@ -339,38 +339,11 @@ int paging_mode_va_bits(int paging_mode) {
 
 int vmm_max_paging_mode(void)
 {
-    static int max_level;
-    if (max_level > 0)
-        goto done;
-
-    pt_entry_t *table = ext_mem_alloc(PT_SIZE);
-
-    // Test each paging mode starting with Sv57.
-    // Since writes to `satp` with an invalid MODE have no effect, and pages can be mapped at
-    // any level, we can identity map the entire lower half (very likely guaranteeing everything
-    // this code needs will be mapped) and check if enabling the paging mode succeeds.
-    int lvl = 4;
-    for (; lvl >= 2; lvl--) {
-        pt_entry_t entry = PT_FLAG_ACCESSED | PT_FLAG_DIRTY | PT_FLAG_RWX | PT_FLAG_VALID;
-        for (int i = 0; i < 256; i++) {
-            table[i] = entry;
-            entry += page_sizes[lvl] >> 2;
-        }
-
-        uint64_t satp = ((uint64_t)(6 + lvl) << 60) | ((uint64_t)table >> 12);
-        csr_write("satp", satp);
-        if (csr_read("satp") == satp) {
-            max_level = lvl;
-            break;
-        }
+    if (bsp_hart == NULL || !(bsp_hart->flags & RISCV_HART_HAS_MMU)) {
+        panic(false, "vmm: BSP hart does not advertise MMU support");
     }
-    csr_write("satp", 0);
-    pmm_free(table, PT_SIZE);
 
-    if (max_level == 0)
-        panic(false, "vmm: paging is not supported");
-done:
-    return 6 + max_level;
+    return PAGING_MODE_RISCV_SV39 + bsp_hart->mmu_type;
 }
 
 static pt_entry_t pbmt_nc = 0;
