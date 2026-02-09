@@ -1280,8 +1280,8 @@ static int enroll_config(int argc, char *argv[]) {
     for (size_t i = 0; i < bootloader_size - min_size + 1; i++) {
         if (bootloader[i] != config_b2sum_sign[checked_count]) {
             if (checked_count > 0) {
+                i -= checked_count; // restart after first byte of failed match
                 checked_count = 0;
-                i--; // re-check current byte against start of signature
             }
             continue;
         }
