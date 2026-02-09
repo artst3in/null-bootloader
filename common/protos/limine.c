@@ -551,7 +551,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint64_t *limine_reqs = NULL;
     requests = ext_mem_alloc(MAX_REQUESTS * sizeof(void *));
     requests_count = 0;
-    if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, &limine_reqs, ".limine_reqs", 0, slide)) {
+    if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, kernel_file->size, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
             if (i >= MAX_REQUESTS) {
                 panic(true, "limine: Maximum requests exceeded");
