@@ -145,7 +145,8 @@ void pmm_sanitise_entries(struct memmap_entry *m, size_t *_count, bool align_ent
 
             // Non-usable entry fully contains usable entry
             if (res_base <= base && res_top >= top) {
-                base = top;
+                m[i].base   = top;
+                m[i].length = 0;
                 break;
             }
 
