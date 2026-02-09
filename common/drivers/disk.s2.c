@@ -789,6 +789,13 @@ fail:
             continue;
         }
 
+        if (drive->Media->BlockSize == 0) {
+            continue;
+        }
+        if (drive->Media->LastBlock == UINT64_MAX) {
+            continue;
+        }
+
         struct volume *block = ext_mem_alloc(sizeof(struct volume));
 
         bool is_optical = is_efi_handle_optical(handles[i]) ||
@@ -805,14 +812,8 @@ fail:
         block->block_io = drive;
         block->partition = 0;
         block->sector_size = drive->Media->BlockSize;
-        if (block->sector_size == 0) {
-            continue;
-        }
         block->first_sect = 0;
         // Normalize sect_count to 512-byte sectors for consistency with partitions
-        if (drive->Media->LastBlock == UINT64_MAX) {
-            continue;
-        }
         block->sect_count = (drive->Media->LastBlock + 1) * (drive->Media->BlockSize / 512);
         block->max_partition = -1;
 
