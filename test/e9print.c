@@ -15,6 +15,9 @@ void e9_putc(char c) {
 #endif
 #if defined (_LIMINE_PROTO)
     if (ft_ctx != NULL) {
+        if (c == '\n') {
+            flanterm_write(ft_ctx, "\r", 1);
+        }
         flanterm_write(ft_ctx, &c, 1);
     }
 #endif
