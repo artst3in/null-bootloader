@@ -15,21 +15,8 @@
 static void s2_print(const char *s, size_t len) {
     for (size_t i = 0; i < len; i++) {
         struct rm_regs r = {0};
-        char c = s[i];
-
-        switch (c) {
-            case '\n':
-                r.eax = 0x0e00 | '\r';
-                rm_int(0x10, &r, &r);
-                r = (struct rm_regs){0};
-                r.eax = 0x0e00 | '\n';
-                rm_int(0x10, &r, &r);
-                break;
-            default:
-                r.eax = 0x0e00 | s[i];
-                rm_int(0x10, &r, &r);
-                break;
-        }
+        r.eax = 0x0e00 | s[i];
+        rm_int(0x10, &r, &r);
     }
 }
 #endif
@@ -145,8 +132,13 @@ void vprint(const char *fmt, va_list args) {
     size_t print_buf_i = 0;
 
     for (;;) {
-        while (*fmt && *fmt != '%')
+        while (*fmt && *fmt != '%') {
+            if (*fmt == '\n') {
+                prn_char(print_buf, &print_buf_i, '\r');
+            }
             prn_char(print_buf, &print_buf_i, *fmt++);
+        }
+
 
         if (!*fmt++)
             goto out;
@@ -238,17 +230,11 @@ out:
 #endif
 #if defined (BIOS)
         if (stage3_loaded && ((!quiet && serial) || COM_OUTPUT)) {
-            switch (print_buf[i]) {
-                case '\n':
-                    serial_out('\r');
-                    serial_out('\n');
-                    continue;
-                case '\e':
-                    serial_out('\e');
-                    continue;
-            }
             if (!isprint(print_buf[i])) {
-                continue;
+                switch (print_buf[i]) {
+                    case '\r': case '\n': case '\e': break;
+                    default: continue;
+                }
             }
             serial_out(print_buf[i]);
         }
