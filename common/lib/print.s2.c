@@ -25,36 +25,32 @@ static const char *base_digits = "0123456789abcdef";
 
 #define PRINT_BUF_MAX 4096
 
+static void prn_char(char *print_buf, size_t *print_buf_i, char c) {
+    if (c == '\n') {
+        prn_char(print_buf, print_buf_i, '\r');
+    }
+
+    if (*print_buf_i < (PRINT_BUF_MAX - 1)) {
+        print_buf[(*print_buf_i)++] = c;
+    }
+
+    print_buf[*print_buf_i] = 0;
+}
+
 static void prn_str(char *print_buf, size_t *print_buf_i, const char *string) {
     size_t i;
 
     for (i = 0; string[i]; i++) {
-        if (*print_buf_i == (PRINT_BUF_MAX - 1))
-            break;
-        print_buf[(*print_buf_i)++] = string[i];
+        prn_char(print_buf, print_buf_i, string[i]);
     }
-
-    print_buf[*print_buf_i] = 0;
 }
 
 static void prn_nstr(char *print_buf, size_t *print_buf_i, const char *string, size_t len) {
     size_t i;
 
     for (i = 0; i < len; i++) {
-        if (*print_buf_i == (PRINT_BUF_MAX - 1))
-            break;
-        print_buf[(*print_buf_i)++] = string[i];
+        prn_char(print_buf, print_buf_i, string[i]);
     }
-
-    print_buf[*print_buf_i] = 0;
-}
-
-static void prn_char(char *print_buf, size_t *print_buf_i, char c) {
-    if (*print_buf_i < (PRINT_BUF_MAX - 1)) {
-        print_buf[(*print_buf_i)++] = c;
-    }
-
-    print_buf[*print_buf_i] = 0;
 }
 
 static void prn_i(char *print_buf, size_t *print_buf_i, int64_t x) {
@@ -133,12 +129,8 @@ void vprint(const char *fmt, va_list args) {
 
     for (;;) {
         while (*fmt && *fmt != '%') {
-            if (*fmt == '\n') {
-                prn_char(print_buf, &print_buf_i, '\r');
-            }
             prn_char(print_buf, &print_buf_i, *fmt++);
         }
-
 
         if (!*fmt++)
             goto out;
