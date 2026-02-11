@@ -1,17 +1,17 @@
 # LunaOS Versioning Scheme
 
-> **TL;DR**: `2025.12.100` — Year.Month.Build. One number to increment. Zero entropy.
+> **TL;DR**: `2026.02.100` — Year.Month.Build. One number to increment. Zero entropy.
 
 ## The Scheme
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  OFFICIAL (public):        2025.12                          │
+│  OFFICIAL (public):        2026.02                          │
 ├─────────────────────────────────────────────────────────────┤
-│  VERSION (all):            2025.12.100                      │
+│  VERSION (all):            2026.02.100                      │
 │  └── YYYY.MM.BBB - bump BBB (100→101→102) per release       │
 ├─────────────────────────────────────────────────────────────┤
-│  BUILD DNA:                2025-12-27T14:32:15.123456789Z   │
+│  BUILD DNA:                2026-02-11T21:00:00.000000000Z   │
 │  └── Unique per compile, nanosecond precision               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -20,9 +20,9 @@
 
 | Component | Format | Example | Purpose |
 |-----------|--------|---------|---------|
-| **Official** | `YYYY.MM` | `2025.12` | Public-facing, marketing, docs |
-| **Version** | `YYYY.MM.BBB` | `2025.12.100` | VERSION file, compatible |
-| **Build DNA** | ISO-8601 ns | `2025-12-27T14:32:15.123456789Z` | Unique build identification |
+| **Official** | `YYYY.MM` | `2026.02` | Public-facing, marketing, docs |
+| **Version** | `YYYY.MM.BBB` | `2026.02.100` | VERSION file, compatible |
+| **Build DNA** | ISO-8601 ns | `2026-02-11T21:00:00.000000000Z` | Unique build identification |
 
 ### Release Workflow
 
@@ -73,15 +73,15 @@ Unified BBB:   █████░░░░░░░░░░░░░░░░�
 
 The `VERSION` file contains the current version:
 ```
-2025.12.100
+2026.02.100
 ```
 
 ### Information Channels
 
 ```
-User sees:     "Null 2025.12"               (clean, fresh)
-Build uses:    "2025.12.100"                (compatible)
-Debug shows:   "2025-12-27T14:32:15.123456789Z"  (exact build moment)
+User sees:     "Null 2026.02"               (clean, fresh)
+Build uses:    "2026.02.100"                (compatible)
+Debug shows:   "2026-02-11T21:00:00.000000000Z"  (exact build moment)
 ```
 
 ---
@@ -112,4 +112,4 @@ A: The month boundary reset serves as a natural "fresh start" signal. It also ke
 
 ---
 
-*Document created: 2025.12 | LunaOS Sovereign Release*
+*Document created: 2025.12 | Updated: 2026.02 | LunaOS Sovereign Release*
