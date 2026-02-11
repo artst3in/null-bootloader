@@ -172,6 +172,10 @@ static void putchar_tokencol(int type, char c) {
 static bool editor_no_term_reset = false;
 
 char *config_entry_editor(const char *title, const char *orig_entry) {
+    if (terms[0]->cols < 40 || terms[0]->rows < 16) {
+        panic(false, "Terminal too small (minimum 40x16 required)");
+    }
+
     FOR_TERM(TERM->autoflush = false);
 
     FOR_TERM(TERM->cursor_enabled = true);
@@ -838,7 +842,7 @@ noreturn void _menu(bool first_run) {
     if (interface_help_colour_str == NULL) {
         interface_help_colour_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOR");
     }
-    if (interface_help_colour_str != NULL) {
+    if (interface_help_colour_str != NULL && interface_help_colour_str[0] != '\0') {
         interface_help_colour[3] = interface_help_colour_str[0];
         interface_help_colour_bright[3] = interface_help_colour_str[0];
     }
@@ -964,6 +968,10 @@ noreturn void _menu(bool first_run) {
 
     menu_init_term();
 
+    if (terms[0]->cols < 40 || terms[0]->rows < 16) {
+        panic(false, "Terminal too small (minimum 40x16 required)");
+    }
+
     size_t tree_offset = 0;
 
 refresh:
@@ -1008,7 +1016,9 @@ refresh:
                              &selected_menu_entry, &max_tree_len, &max_tree_height);
 
     if (max_entries != 0) {
-        size_t tree_prefix_len = (terms[0]->cols / 2 - DIV_ROUNDUP(max_tree_len, 2)) - 2;
+        size_t half_cols = terms[0]->cols / 2;
+        size_t half_tree = DIV_ROUNDUP(max_tree_len, 2);
+        size_t tree_prefix_len = (half_cols > half_tree + 2) ? (half_cols - half_tree - 2) : 0;
         char *tree_prefix = ext_mem_alloc(tree_prefix_len + 1);
         memset(tree_prefix, ' ', tree_prefix_len);
 
@@ -1021,7 +1031,7 @@ refresh:
         max_entries = print_tree(tree_offset, terms[0]->rows - 8, tree_prefix, 0, 0, selected_entry, menu_tree,
                                  &selected_menu_entry, NULL, NULL);
 
-        pmm_free(tree_prefix, tree_prefix_len);
+        pmm_free(tree_prefix, tree_prefix_len + 1);
     }
 
     {
@@ -1077,8 +1087,8 @@ refresh:
         for (size_t i = timeout; i; i--) {
             set_cursor_pos_helper(0, terms[0]->rows - 1);
             FOR_TERM(TERM->scroll_enabled = false);
-            print("\e[2K%sBooting automatically in %s%u%s, press any key to stop the countdown...\e[0m",
-                  interface_help_colour, interface_help_colour_bright, i, interface_help_colour);
+            print("\e[2K%sBooting automatically in %s%U%s, press any key to stop the countdown...\e[0m",
+                  interface_help_colour, interface_help_colour_bright, (uint64_t)i, interface_help_colour);
             FOR_TERM(TERM->scroll_enabled = true);
             FOR_TERM(TERM->double_buffer_flush(TERM));
             if ((c = pit_sleep_and_quit_on_keypress(1))) {

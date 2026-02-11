@@ -1,5 +1,5 @@
 #undef IS_WINDOWS
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#if (defined(WIN32) || defined(_WIN32) || defined(__WIN32)) && !defined(__CYGWIN__)
 #define IS_WINDOWS 1
 #endif
 
@@ -806,12 +806,18 @@ static int bios_install(int argc, char *argv[]) {
         } part_to_conv[4];
         size_t part_to_conv_i = 0;
 
+        uint64_t part_entry_base;
+        if (__builtin_mul_overflow(ENDSWAP(gpt_header.partition_entry_lba), lb_size, &part_entry_base)) {
+            goto no_mbr_conv;
+        }
+
         for (int64_t i = 0; i < (int64_t)ENDSWAP(gpt_header.number_of_partition_entries); i++) {
             struct gpt_entry gpt_entry;
-            device_read(&gpt_entry,
-                        (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
-                        + (i * ENDSWAP(gpt_header.size_of_partition_entry)),
-                        sizeof(struct gpt_entry));
+            uint64_t entry_offset = (uint64_t)i * ENDSWAP(gpt_header.size_of_partition_entry);
+            if (__builtin_add_overflow(part_entry_base, entry_offset, &entry_offset)) {
+                goto no_mbr_conv;
+            }
+            device_read(&gpt_entry, entry_offset, sizeof(struct gpt_entry));
 
             if (gpt_entry.unique_partition_guid[0] == 0 &&
                 gpt_entry.unique_partition_guid[1] == 0) {
@@ -877,8 +883,11 @@ static int bios_install(int argc, char *argv[]) {
         }
 
         // ... nuke secondary GPT.
-        for (size_t i = 0; i < 33; i++) {
-            device_write(empty_lba, ((ENDSWAP(gpt_header.alternate_lba) - 32) + i) * lb_size, lb_size);
+        uint64_t alt_lba = ENDSWAP(gpt_header.alternate_lba);
+        if (alt_lba >= 32) {
+            for (size_t i = 0; i < 33; i++) {
+                device_write(empty_lba, (alt_lba - 32 + i) * lb_size, lb_size);
+            }
         }
 
         free(empty_lba);
@@ -1034,6 +1043,12 @@ part_too_low:
         struct gpt_entry gpt_entry;
         uint32_t partition_num;
 
+        uint64_t gpt_part_entry_base;
+        if (__builtin_mul_overflow(ENDSWAP(gpt_header.partition_entry_lba), lb_size, &gpt_part_entry_base)) {
+            fprintf(stderr, "error: GPT partition entry LBA overflows.\n");
+            goto cleanup;
+        }
+
         if (part_ndx != NULL) {
             if (sscanf(part_ndx, "%" SCNu32, &partition_num) != 1) {
                 fprintf(stderr, "error: Invalid partition number format.\n");
@@ -1045,10 +1060,12 @@ part_too_low:
                 goto cleanup;
             }
 
-            device_read(&gpt_entry,
-                (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
-                + (partition_num * ENDSWAP(gpt_header.size_of_partition_entry)),
-                sizeof(struct gpt_entry));
+            uint64_t entry_off = (uint64_t)partition_num * ENDSWAP(gpt_header.size_of_partition_entry);
+            if (__builtin_add_overflow(gpt_part_entry_base, entry_off, &entry_off)) {
+                fprintf(stderr, "error: GPT partition entry offset overflows.\n");
+                goto cleanup;
+            }
+            device_read(&gpt_entry, entry_off, sizeof(struct gpt_entry));
 
             if (gpt_entry.unique_partition_guid[0] == 0 &&
               gpt_entry.unique_partition_guid[1] == 0) {
@@ -1065,10 +1082,12 @@ part_too_low:
         } else {
             // Try to autodetect the BIOS boot partition
             for (partition_num = 0; partition_num < ENDSWAP(gpt_header.number_of_partition_entries); partition_num++) {
-                device_read(&gpt_entry,
-                    (ENDSWAP(gpt_header.partition_entry_lba) * lb_size)
-                    + (partition_num * ENDSWAP(gpt_header.size_of_partition_entry)),
-                    sizeof(struct gpt_entry));
+                uint64_t entry_off = (uint64_t)partition_num * ENDSWAP(gpt_header.size_of_partition_entry);
+                if (__builtin_add_overflow(gpt_part_entry_base, entry_off, &entry_off)) {
+                    fprintf(stderr, "error: GPT partition entry offset overflows.\n");
+                    goto cleanup;
+                }
+                device_read(&gpt_entry, entry_off, sizeof(struct gpt_entry));
 
                 if (memcmp("Hah!IdontNeedEFI", &gpt_entry.partition_type_guid, 16) == 0) {
                     if (!quiet) {
@@ -1173,12 +1192,12 @@ uninstall_mode_cleanup:
 }
 #endif
 
-#define CONFIG_B3SUM_SIGNATURE "++CONFIG_B3SUM_SIGNATURE++"
+#define CONFIG_B2SUM_SIGNATURE "++CONFIG_B2SUM_SIGNATURE++"
 
 static void enroll_config_usage(void) {
-    printf("usage: %s enroll-config <Null executable> <BLAKE3 hash of config file>\n", program_name);
+    printf("usage: %s enroll-config <Limine executable> <BLAKE2B of config file>\n", program_name);
     printf("\n");
-    printf("    --reset      Remove enrolled BLAKE3 hash, will not check config integrity\n");
+    printf("    --reset      Remove enrolled BLAKE2B, will not check config integrity\n");
     printf("\n");
     printf("    --quiet      Do not print verbose diagnostic messages\n");
     printf("\n");
@@ -1215,8 +1234,8 @@ static int enroll_config(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (!reset && strlen(argv[2]) != 64) {
-        fprintf(stderr, "error: BLAKE3 hash specified is not 64 characters long.\n");
+    if (!reset && strlen(argv[2]) != 128) {
+        fprintf(stderr, "error: BLAKE2B specified is not 128 characters long.\n");
         goto cleanup;
     }
 
@@ -1257,16 +1276,19 @@ static int enroll_config(int argc, char *argv[]) {
 
     char *checksum_loc = NULL;
     size_t checked_count = 0;
-    const char *config_b3sum_sign = CONFIG_B3SUM_SIGNATURE;
-    for (size_t i = 0; i < bootloader_size - ((sizeof(CONFIG_B3SUM_SIGNATURE) - 1) + 64) + 1; i++) {
-        if (bootloader[i] != config_b3sum_sign[checked_count]) {
-            checked_count = 0;
+    const char *config_b2sum_sign = CONFIG_B2SUM_SIGNATURE;
+    for (size_t i = 0; i < bootloader_size - min_size + 1; i++) {
+        if (bootloader[i] != config_b2sum_sign[checked_count]) {
+            if (checked_count > 0) {
+                i -= checked_count; // restart after first byte of failed match
+                checked_count = 0;
+            }
             continue;
         }
 
         checked_count++;
 
-        if (checked_count == sizeof(CONFIG_B3SUM_SIGNATURE) - 1) {
+        if (checked_count == sizeof(CONFIG_B2SUM_SIGNATURE) - 1) {
             checksum_loc = &bootloader[i + 1];
             break;
         }
@@ -1278,9 +1300,9 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (!reset) {
-        memcpy(checksum_loc, argv[2], 64);
+        memcpy(checksum_loc, argv[2], 128);
     } else {
-        memset(checksum_loc, '0', 64);
+        memset(checksum_loc, '0', 128);
     }
 
     if (fseek(bootloader_file, 0, SEEK_SET) != 0) {
@@ -1293,7 +1315,7 @@ static int enroll_config(int argc, char *argv[]) {
     }
 
     if (!quiet) {
-        fprintf(stderr, "Config file BLAKE3 hash successfully %s.\n", reset ? "reset" : "enrolled");
+        fprintf(stderr, "Config file BLAKE2B successfully %s.\n", reset ? "reset" : "enrolled");
     }
     ret = EXIT_SUCCESS;
 

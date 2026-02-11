@@ -44,25 +44,27 @@ static bool cache_block(struct volume *volume, uint64_t block) {
         return false;
     }
 
-    for (;;) {
-        int ret = disk_read_sectors(volume, volume->cache,
-                           read_sector,
-                           xfer_size);
-
-        switch (ret) {
-            case DISK_NO_MEDIA:
-                return false;
-            case DISK_SUCCESS:
-                goto disk_success;
+    // Clamp xfer_size to remaining sectors in volume
+    if (volume->sect_count != (uint64_t)-1) {
+        uint64_t volume_sectors = volume->sect_count / (volume->sector_size / 512);
+        uint64_t end_sector;
+        if (__builtin_add_overflow(first_sect, volume_sectors, &end_sector)) {
+            end_sector = UINT64_MAX;
         }
-
-        xfer_size--;
-        if (xfer_size == 0) {
+        if (read_sector >= end_sector) {
             return false;
+        }
+        uint64_t remaining = end_sector - read_sector;
+        if (xfer_size > remaining) {
+            xfer_size = remaining;
         }
     }
 
-disk_success:
+    int ret = disk_read_sectors(volume, volume->cache, read_sector, xfer_size);
+    if (ret != DISK_SUCCESS) {
+        return false;
+    }
+
     volume->cache_status = CACHE_READY;
     volume->cached_block = block;
 
@@ -75,8 +77,9 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
     }
 
     if (volume->sect_count != (uint64_t)-1) {
+        // sect_count is always in 512-byte sectors for both whole disks and partitions
         uint64_t part_size;
-        if (__builtin_mul_overflow(volume->sect_count, volume->sector_size, &part_size)) {
+        if (__builtin_mul_overflow(volume->sect_count, (uint64_t)512, &part_size)) {
             return false;
         }
         if (loc >= part_size || count > part_size - loc) {

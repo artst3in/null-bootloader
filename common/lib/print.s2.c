@@ -15,21 +15,8 @@
 static void s2_print(const char *s, size_t len) {
     for (size_t i = 0; i < len; i++) {
         struct rm_regs r = {0};
-        char c = s[i];
-
-        switch (c) {
-            case '\n':
-                r.eax = 0x0e00 | '\r';
-                rm_int(0x10, &r, &r);
-                r = (struct rm_regs){0};
-                r.eax = 0x0e00 | '\n';
-                rm_int(0x10, &r, &r);
-                break;
-            default:
-                r.eax = 0x0e00 | s[i];
-                rm_int(0x10, &r, &r);
-                break;
-        }
+        r.eax = 0x0e00 | s[i];
+        rm_int(0x10, &r, &r);
     }
 }
 #endif
@@ -38,31 +25,11 @@ static const char *base_digits = "0123456789abcdef";
 
 #define PRINT_BUF_MAX 4096
 
-static void prn_str(char *print_buf, size_t *print_buf_i, const char *string) {
-    size_t i;
-
-    for (i = 0; string[i]; i++) {
-        if (*print_buf_i == (PRINT_BUF_MAX - 1))
-            break;
-        print_buf[(*print_buf_i)++] = string[i];
-    }
-
-    print_buf[*print_buf_i] = 0;
-}
-
-static void prn_nstr(char *print_buf, size_t *print_buf_i, const char *string, size_t len) {
-    size_t i;
-
-    for (i = 0; i < len; i++) {
-        if (*print_buf_i == (PRINT_BUF_MAX - 1))
-            break;
-        print_buf[(*print_buf_i)++] = string[i];
-    }
-
-    print_buf[*print_buf_i] = 0;
-}
-
 static void prn_char(char *print_buf, size_t *print_buf_i, char c) {
+    if (c == '\n') {
+        prn_char(print_buf, print_buf_i, '\r');
+    }
+
     if (*print_buf_i < (PRINT_BUF_MAX - 1)) {
         print_buf[(*print_buf_i)++] = c;
     }
@@ -70,9 +37,25 @@ static void prn_char(char *print_buf, size_t *print_buf_i, char c) {
     print_buf[*print_buf_i] = 0;
 }
 
+static void prn_str(char *print_buf, size_t *print_buf_i, const char *string) {
+    size_t i;
+
+    for (i = 0; string[i]; i++) {
+        prn_char(print_buf, print_buf_i, string[i]);
+    }
+}
+
+static void prn_nstr(char *print_buf, size_t *print_buf_i, const char *string, size_t len) {
+    size_t i;
+
+    for (i = 0; i < len; i++) {
+        prn_char(print_buf, print_buf_i, string[i]);
+    }
+}
+
 static void prn_i(char *print_buf, size_t *print_buf_i, int64_t x) {
     int i;
-    char buf[20] = {0};
+    char buf[21] = {0};
 
     if (!x) {
         prn_char(print_buf, print_buf_i, '0');
@@ -80,11 +63,11 @@ static void prn_i(char *print_buf, size_t *print_buf_i, int64_t x) {
     }
 
     int sign = x < 0;
-    if (sign) x = -x;
+    uint64_t ux = sign ? (uint64_t)0 - (uint64_t)x : (uint64_t)x;
 
-    for (i = 18; x; i--) {
-        buf[i] = (x % 10) + 0x30;
-        x = x / 10;
+    for (i = 19; ux; i--) {
+        buf[i] = (ux % 10) + 0x30;
+        ux = ux / 10;
     }
     if (sign)
         buf[i] = '-';
@@ -145,8 +128,9 @@ void vprint(const char *fmt, va_list args) {
     size_t print_buf_i = 0;
 
     for (;;) {
-        while (*fmt && *fmt != '%')
+        while (*fmt && *fmt != '%') {
             prn_char(print_buf, &print_buf_i, *fmt++);
+        }
 
         if (!*fmt++)
             goto out;
@@ -238,17 +222,11 @@ out:
 #endif
 #if defined (BIOS)
         if (stage3_loaded && ((!quiet && serial) || COM_OUTPUT)) {
-            switch (print_buf[i]) {
-                case '\n':
-                    serial_out('\r');
-                    serial_out('\n');
-                    continue;
-                case '\e':
-                    serial_out('\e');
-                    continue;
-            }
             if (!isprint(print_buf[i])) {
-                continue;
+                switch (print_buf[i]) {
+                    case '\r': case '\n': case '\e': break;
+                    default: continue;
+                }
             }
             serial_out(print_buf[i]);
         }

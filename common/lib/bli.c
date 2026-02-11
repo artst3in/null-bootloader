@@ -48,10 +48,13 @@ void bli_set_loader_time(wchar_t *variable, uint64_t time) {
     wchar_t time_wstr[21];
     uint64_to_decwstr(time, time_wstr);
 
+    size_t len = 0;
+    while (time_wstr[len] != L'\0') len++;
+
     gRT->SetVariable(variable,
             &bli_vendor_guid,
             EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
-            sizeof(time_wstr),
+            (len + 1) * sizeof(wchar_t),
             time_wstr);
 }
 

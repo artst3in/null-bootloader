@@ -306,5 +306,6 @@ fail:
     pmm_free(terms[0], sizeof(struct flanterm_context));
     pmm_free(terms, sizeof(void *));
     terms_i = 0;
+    terms = NULL;
 #endif
 }

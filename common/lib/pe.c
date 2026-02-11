@@ -179,6 +179,10 @@ static void pe64_validate(uint8_t *image, size_t file_size) {
         panic(true, "pe: Not a valid PE file");
     }
 
+    if (nt_hdrs->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
+        panic(true, "pe: Not a valid PE32+ file");
+    }
+
 #if defined(__x86_64__) || defined(__i386__)
     if (nt_hdrs->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) {
         panic(true, "pe: Not an x86-64 PE file");
@@ -267,6 +271,10 @@ bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t
     uint64_t image_size = nt_hdrs->OptionalHeader.SizeOfImage;
     uint64_t alignment = nt_hdrs->OptionalHeader.SectionAlignment;
 
+    if (alignment > 1 && (alignment & (alignment - 1)) != 0) {
+        panic(true, "pe: SectionAlignment is not a power of 2");
+    }
+
     bool lower_to_higher = false;
 
     if (image_base < FIXED_HIGHER_HALF_OFFSET_64) {
@@ -288,9 +296,10 @@ bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t
     *physical_base = (uintptr_t)ext_mem_alloc_type_aligned(image_size, alloc_type, alignment);
     *virtual_base = image_base;
 
-    // Validate SizeOfHeaders doesn't exceed file size
-    if (nt_hdrs->OptionalHeader.SizeOfHeaders > file_size) {
-        panic(true, "pe: SizeOfHeaders exceeds file size");
+    // Validate SizeOfHeaders doesn't exceed file size or image size
+    if (nt_hdrs->OptionalHeader.SizeOfHeaders > file_size
+     || nt_hdrs->OptionalHeader.SizeOfHeaders > image_size) {
+        panic(true, "pe: SizeOfHeaders exceeds file or image size");
     }
 
     memcpy((void *)(uintptr_t)*physical_base, image, nt_hdrs->OptionalHeader.SizeOfHeaders);
@@ -317,18 +326,31 @@ again:
         uintptr_t section_base = *physical_base + section->VirtualAddress;
         uint32_t section_raw_size = section->VirtualSize < section->SizeOfRawData ? section->VirtualSize : section->SizeOfRawData;
 
+        // Validate section doesn't write past the image buffer
+        if ((uint64_t)section->VirtualAddress + section_raw_size > image_size) {
+            panic(true, "pe: Section %U exceeds image bounds", (uint64_t)i);
+        }
+
         // Validate section data doesn't exceed file bounds
         if ((uint64_t)section->PointerToRawData + section_raw_size > file_size) {
-            panic(true, "pe: Section %zu data extends beyond file bounds", i);
+            panic(true, "pe: Section %U data extends beyond file bounds", (uint64_t)i);
         }
 
         memcpy((void *)section_base, image + section->PointerToRawData, section_raw_size);
+    }
+
+    if (nt_hdrs->OptionalHeader.NumberOfRvaAndSizes < IMAGE_DIRECTORY_ENTRY_BASERELOC + 1) {
+        panic(true, "pe: NumberOfRvaAndSizes too small for import/reloc directories");
     }
 
     IMAGE_DATA_DIRECTORY *import_dir = &nt_hdrs->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
     IMAGE_DATA_DIRECTORY *reloc_dir = &nt_hdrs->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
 
     if (import_dir->Size != 0) {
+        if (import_dir->VirtualAddress >= image_size ||
+            sizeof(IMAGE_IMPORT_DESCRIPTOR) > image_size - import_dir->VirtualAddress) {
+            panic(true, "pe: Import directory VirtualAddress out of bounds");
+        }
         IMAGE_IMPORT_DESCRIPTOR *import_desc = (IMAGE_IMPORT_DESCRIPTOR *)((uintptr_t)*physical_base + import_dir->VirtualAddress);
 
         if (import_desc->Name != 0) {
@@ -337,6 +359,10 @@ again:
     }
 
     if (reloc_dir->VirtualAddress != 0) {
+        if (reloc_dir->VirtualAddress >= image_size ||
+            reloc_dir->Size > image_size - reloc_dir->VirtualAddress) {
+            panic(true, "pe: Relocation directory VirtualAddress out of bounds");
+        }
         size_t reloc_block_offset = 0;
 
         while (reloc_dir->Size - reloc_block_offset >= sizeof(IMAGE_BASE_RELOCATION_BLOCK)) {
@@ -345,6 +371,14 @@ again:
             // Validate SizeOfBlock to prevent infinite loop (if 0) and underflow (if too small)
             if (block->SizeOfBlock < sizeof(IMAGE_BASE_RELOCATION_BLOCK)) {
                 panic(true, "pe: Invalid relocation block size");
+            }
+
+            if (block->SizeOfBlock > reloc_dir->Size - reloc_block_offset) {
+                panic(true, "pe: Relocation block size exceeds directory");
+            }
+
+            if (block->VirtualAddress >= image_size) {
+                panic(true, "pe: Relocation block VirtualAddress out of bounds");
             }
 
             uintptr_t block_base = *physical_base + block->VirtualAddress;
@@ -359,6 +393,24 @@ again:
                     continue;
                 }
 
+                size_t write_size;
+                switch (type) {
+                    case IMAGE_REL_BASED_HIGHLOW:
+                        if (lower_to_higher) {
+                            panic(true, "pe: 32-bit relocations are incompatible with higher-half loading");
+                        }
+                        write_size = 4;
+                        break;
+                    case IMAGE_REL_BASED_DIR64: write_size = 8; break;
+                    default:
+                        panic(true, "pe: Unsupported relocation type %u", type);
+                        __builtin_unreachable();
+                }
+
+                if ((uint64_t)block->VirtualAddress + offset + write_size > image_size) {
+                    panic(true, "pe: Relocation offset out of bounds");
+                }
+
                 switch (type) {
                     case IMAGE_REL_BASED_HIGHLOW:
                         *(uint32_t *)(block_base + offset) += slide;
@@ -366,8 +418,6 @@ again:
                     case IMAGE_REL_BASED_DIR64:
                         *(uint64_t *)(block_base + offset) += slide;
                         break;
-                    default:
-                        panic(true, "pe: Unsupported relocation type %u", type);
                 }
             }
 

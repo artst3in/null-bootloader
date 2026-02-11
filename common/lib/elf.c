@@ -45,6 +45,7 @@
 #define ARCH_RISCV   0xf3
 #define ARCH_LOONGARCH 0x102
 #define BITS_LE      0x01
+#define ELFCLASS32   0x01
 #define ELFCLASS64   0x02
 #define SHT_RELA     0x00000004
 #define SHN_UNDEF    0x00000000
@@ -193,7 +194,9 @@ int elf_bits(uint8_t *elf) {
             return 64;
         case ARCH_RISCV:
         case ARCH_LOONGARCH:
-            return (hdr->ident[EI_CLASS] == ELFCLASS64) ? 64 : 32;
+            if (hdr->ident[EI_CLASS] == ELFCLASS64) return 64;
+            if (hdr->ident[EI_CLASS] == ELFCLASS32) return 32;
+            return -1;
         case ARCH_X86_32:
             return 32;
         default:
@@ -343,30 +346,41 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
 end_of_pt_segment:
 
     if (rela_offset != 0) {
+        bool rela_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= rela_offset && _phdr->p_vaddr + _phdr->p_filesz > rela_offset) {
                 rela_offset -= _phdr->p_vaddr;
                 rela_offset += _phdr->p_offset;
+                rela_translated = true;
                 break;
             }
+        }
+        if (!rela_translated) {
+            panic(true, "elf: RELA vaddr not in any PT_LOAD segment");
         }
     }
 
     if (relr_offset != 0) {
+        bool relr_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= relr_offset && _phdr->p_vaddr + _phdr->p_filesz > relr_offset) {
                 relr_offset -= _phdr->p_vaddr;
                 relr_offset += _phdr->p_offset;
+                relr_translated = true;
                 break;
             }
+        }
+        if (!relr_translated) {
+            panic(true, "elf: RELR vaddr not in any PT_LOAD segment");
         }
     }
 
     if (symtab_offset != 0) {
+        bool symtab_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
@@ -375,12 +389,17 @@ end_of_pt_segment:
                 symtab_size = _phdr->p_filesz - (symtab_offset - _phdr->p_vaddr);
                 symtab_offset -= _phdr->p_vaddr;
                 symtab_offset += _phdr->p_offset;
+                symtab_translated = true;
                 break;
             }
+        }
+        if (!symtab_translated) {
+            panic(true, "elf: SYMTAB vaddr not in any PT_LOAD segment");
         }
     }
 
     if (strtab_offset != 0) {
+        bool strtab_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
@@ -389,20 +408,29 @@ end_of_pt_segment:
                 strtab_size = _phdr->p_filesz - (strtab_offset - _phdr->p_vaddr);
                 strtab_offset -= _phdr->p_vaddr;
                 strtab_offset += _phdr->p_offset;
+                strtab_translated = true;
                 break;
             }
+        }
+        if (!strtab_translated) {
+            panic(true, "elf: STRTAB vaddr not in any PT_LOAD segment");
         }
     }
 
     if (dt_jmprel != 0) {
+        bool jmprel_translated = false;
         for (uint16_t i = 0; i < hdr->ph_num; i++) {
             struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
 
             if (_phdr->p_vaddr <= dt_jmprel && _phdr->p_vaddr + _phdr->p_filesz > dt_jmprel) {
                 dt_jmprel -= _phdr->p_vaddr;
                 dt_jmprel += _phdr->p_offset;
+                jmprel_translated = true;
                 break;
             }
+        }
+        if (!jmprel_translated) {
+            panic(true, "elf: JMPREL vaddr not in any PT_LOAD segment");
         }
     }
 
@@ -487,7 +515,7 @@ end_of_pt_segment:
             continue;
 
         // Relocation is after buffer
-        if (vaddr + size < relocation->r_addr + 8)
+        if (size < 8 || relocation->r_addr > vaddr + size - 8)
             continue;
 
         // It's inside it, calculate where it is
@@ -539,9 +567,12 @@ end_of_pt_segment:
                 if (symtab_offset == 0 || symtab_ent == 0) {
                     panic(true, "elf: Relocation requires symbol table but none present");
                 }
+                if (symtab_size == 0) {
+                    panic(true, "elf: Symtab vaddr translation failed");
+                }
                 // Validate symbol index is within bounds
                 uint64_t sym_offset = symtab_ent * (uint64_t)relocation->r_symbol;
-                if (symtab_size != 0 && sym_offset + sizeof(struct elf64_sym) > symtab_size) {
+                if (sym_offset + sizeof(struct elf64_sym) > symtab_size) {
                     panic(true, "elf: Symbol index %u out of bounds", relocation->r_symbol);
                 }
                 struct elf64_sym *s = (void *)elf + symtab_offset + sym_offset;
@@ -550,8 +581,11 @@ end_of_pt_segment:
                         *ptr = 0;
                         break;
                     }
+                    if (strtab_size == 0) {
+                        panic(true, "elf: Strtab vaddr translation failed");
+                    }
                     // Validate string table access
-                    if (strtab_size != 0 && s->st_name >= strtab_size) {
+                    if (s->st_name >= strtab_size) {
                         panic(true, "elf: Symbol name offset out of bounds");
                     }
                     panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
@@ -576,9 +610,12 @@ end_of_pt_segment:
                 if (symtab_offset == 0 || symtab_ent == 0) {
                     panic(true, "elf: Relocation requires symbol table but none present");
                 }
+                if (symtab_size == 0) {
+                    panic(true, "elf: Symtab vaddr translation failed");
+                }
                 // Validate symbol index is within bounds
                 uint64_t sym_offset = symtab_ent * (uint64_t)relocation->r_symbol;
-                if (symtab_size != 0 && sym_offset + sizeof(struct elf64_sym) > symtab_size) {
+                if (sym_offset + sizeof(struct elf64_sym) > symtab_size) {
                     panic(true, "elf: Symbol index %u out of bounds", relocation->r_symbol);
                 }
                 struct elf64_sym *s = (void *)elf + symtab_offset + sym_offset;
@@ -587,8 +624,11 @@ end_of_pt_segment:
                         *ptr = 0;
                         break;
                     }
+                    if (strtab_size == 0) {
+                        panic(true, "elf: Strtab vaddr translation failed");
+                    }
                     // Validate string table access
-                    if (strtab_size != 0 && s->st_name >= strtab_size) {
+                    if (s->st_name >= strtab_size) {
                         panic(true, "elf: Symbol name offset out of bounds");
                     }
                     panic(true, "elf: Unresolved symbol \"%s\"", elf + strtab_offset + s->st_name);
@@ -610,7 +650,7 @@ end_of_pt_segment:
     return true;
 }
 
-bool elf64_load_section(uint8_t *elf, void *buffer, const char *name, size_t limit, uint64_t slide) {
+bool elf64_load_section(uint8_t *elf, size_t file_size, void *buffer, const char *name, size_t limit, uint64_t slide) {
     struct elf64_hdr *hdr = (void *)elf;
 
     elf64_validate(hdr);
@@ -627,14 +667,40 @@ bool elf64_load_section(uint8_t *elf, void *buffer, const char *name, size_t lim
         return false;
     }
 
+    // Validate section header table is within file bounds
+    uint64_t shdr_table_end = (uint64_t)hdr->shoff + (uint64_t)hdr->sh_num * hdr->shdr_size;
+    if (shdr_table_end > file_size) {
+        return false;
+    }
+
     struct elf64_shdr *shstrtab = (void *)elf + (hdr->shoff + hdr->shstrndx * hdr->shdr_size);
+
+    // Validate shstrtab offset and size are within file bounds
+    if (shstrtab->sh_offset >= file_size || shstrtab->sh_size > file_size - shstrtab->sh_offset) {
+        return false;
+    }
 
     char *names = (void *)elf + shstrtab->sh_offset;
 
     for (uint16_t i = 0; i < hdr->sh_num; i++) {
         struct elf64_shdr *section = (void *)elf + (hdr->shoff + i * hdr->shdr_size);
 
+        // Validate sh_name is within the string table
+        if (section->sh_name >= shstrtab->sh_size) {
+            continue;
+        }
+
+        // Ensure the string is NUL-terminated within the string table
+        if (!memchr(&names[section->sh_name], '\0', shstrtab->sh_size - section->sh_name)) {
+            continue;
+        }
+
         if (strcmp(&names[section->sh_name], name) == 0) {
+            // Validate section data is within file bounds
+            if (section->sh_offset >= file_size || section->sh_size > file_size - section->sh_offset) {
+                return false;
+            }
+
             if (limit == 0) {
                 *(void **)buffer = ext_mem_alloc(section->sh_size);
                 buffer = *(void **)buffer;
@@ -665,6 +731,10 @@ static uint64_t elf64_max_align(uint8_t *elf) {
 
         if (phdr->p_type != PT_LOAD || phdr->p_memsz == 0) {
             continue;
+        }
+
+        if (phdr->p_align > 1 && (phdr->p_align & (phdr->p_align - 1)) != 0) {
+            panic(true, "elf: p_align is not a power of 2");
         }
 
         if (phdr->p_align > ret) {
@@ -729,8 +799,9 @@ static void elf64_get_ranges(uint8_t *elf, uint64_t slide, struct mem_range **_r
         uint64_t load_addr = phdr->p_vaddr + slide;
         uint64_t this_top = load_addr + phdr->p_memsz;
 
-        ranges[r].base = load_addr & ~(phdr->p_align - 1);
-        ranges[r].length = ALIGN_UP(this_top - ranges[r].base, phdr->p_align);
+        uint64_t align = phdr->p_align <= 1 ? 1 : phdr->p_align;
+        ranges[r].base = load_addr & ~(align - 1);
+        ranges[r].length = ALIGN_UP(this_top - ranges[r].base, align);
 
         if (phdr->p_flags & ELF_PF_X) {
             ranges[r].permissions |= MEM_RANGE_X;
@@ -751,13 +822,33 @@ static void elf64_get_ranges(uint8_t *elf, uint64_t slide, struct mem_range **_r
     *_ranges = ranges;
 }
 
-bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t alloc_type, bool kaslr, struct mem_range **ranges, uint64_t *ranges_count, uint64_t *physical_base, uint64_t *virtual_base, uint64_t *_image_size, uint64_t *_image_size_before_bss, bool *is_reloc) {
+bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t *_slide, uint32_t alloc_type, bool kaslr, struct mem_range **ranges, uint64_t *ranges_count, uint64_t *physical_base, uint64_t *virtual_base, uint64_t *_image_size, uint64_t *_image_size_before_bss, bool *is_reloc) {
     struct elf64_hdr *hdr = (void *)elf;
 
     elf64_validate(hdr);
 
     if (hdr->type != ET_EXEC && hdr->type != ET_DYN) {
         panic(true, "elf: ELF file not of type ET_EXEC nor ET_DYN");
+    }
+
+    if (hdr->phdr_size < sizeof(struct elf64_phdr)) {
+        panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
+    }
+
+    // Validate program header count is reasonable (max 256 segments)
+    if (hdr->ph_num > 256) {
+        panic(true, "elf: Too many program headers (%u)", hdr->ph_num);
+    }
+
+    // Validate program header offset and size don't overflow
+    uint64_t phdr_table_end;
+    if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
+        __builtin_add_overflow(phdr_table_end, hdr->phoff, &phdr_table_end)) {
+        panic(true, "elf: Program header table size overflow");
+    }
+
+    if (phdr_table_end > file_size) {
+        panic(true, "elf: Program header table extends beyond file bounds");
     }
 
     if (is_reloc) {
@@ -778,22 +869,6 @@ bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t 
     uint64_t max_align = elf64_max_align(elf);
 
     uint64_t image_size = 0;
-
-    if (hdr->phdr_size < sizeof(struct elf64_phdr)) {
-        panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
-    }
-
-    // Validate program header count is reasonable (max 256 segments)
-    if (hdr->ph_num > 256) {
-        panic(true, "elf: Too many program headers (%u)", hdr->ph_num);
-    }
-
-    // Validate program header offset and size don't overflow
-    uint64_t phdr_table_end;
-    if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
-        __builtin_add_overflow(phdr_table_end, hdr->phoff, &phdr_table_end)) {
-        panic(true, "elf: Program header table size overflow");
-    }
 
     bool lower_to_higher = false;
 
@@ -817,6 +892,11 @@ bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t 
             }
         }
 
+        uint64_t phdr_end;
+        if (__builtin_add_overflow(phdr->p_vaddr, phdr->p_memsz, &phdr_end)) {
+            panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", i);
+        }
+
         // check for overlapping phdrs
         for (uint16_t j = 0; j < hdr->ph_num; j++) {
             struct elf64_phdr *phdr_in = (void *)elf + (hdr->phoff + j * hdr->phdr_size);
@@ -835,19 +915,24 @@ bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t 
                 continue;
             }
 
+            uint64_t phdr_in_end;
+            if (__builtin_add_overflow(phdr_in->p_vaddr, phdr_in->p_memsz, &phdr_in_end)) {
+                panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", j);
+            }
+
             if ((phdr_in->p_vaddr >= phdr->p_vaddr
-              && phdr_in->p_vaddr < phdr->p_vaddr + phdr->p_memsz)
+              && phdr_in->p_vaddr < phdr_end)
                 ||
-                (phdr_in->p_vaddr + phdr_in->p_memsz > phdr->p_vaddr
-              && phdr_in->p_vaddr + phdr_in->p_memsz <= phdr->p_vaddr + phdr->p_memsz)) {
+                (phdr_in_end > phdr->p_vaddr
+              && phdr_in_end <= phdr_end)) {
                 panic(true, "elf: Attempted to load ELF file with overlapping PHDRs (%u and %u overlap)", i, j);
             }
 
             if (ranges != NULL) {
                 uint64_t page_rounded_base = ALIGN_DOWN(phdr->p_vaddr, 4096);
-                uint64_t page_rounded_top = ALIGN_UP(phdr->p_vaddr + phdr->p_memsz, 4096);
+                uint64_t page_rounded_top = ALIGN_UP(phdr_end, 4096);
                 uint64_t page_rounded_base_in = ALIGN_DOWN(phdr_in->p_vaddr, 4096);
-                uint64_t page_rounded_top_in = ALIGN_UP(phdr_in->p_vaddr + phdr_in->p_memsz, 4096);
+                uint64_t page_rounded_top_in = ALIGN_UP(phdr_in_end, 4096);
 
                 if ((page_rounded_base >= page_rounded_base_in
                   && page_rounded_base < page_rounded_top_in)
@@ -865,8 +950,8 @@ bool elf64_load(uint8_t *elf, uint64_t *entry_point, uint64_t *_slide, uint32_t 
             min_vaddr = phdr->p_vaddr;
         }
 
-        if (phdr->p_vaddr + phdr->p_memsz > max_vaddr) {
-            max_vaddr = phdr->p_vaddr + phdr->p_memsz;
+        if (phdr_end > max_vaddr) {
+            max_vaddr = phdr_end;
         }
     }
 
@@ -913,10 +998,13 @@ again:
             panic(true, "elf: p_filesz > p_memsz");
         }
 
-        // Validate p_offset + p_filesz doesn't overflow
+        // Validate p_offset + p_filesz doesn't overflow or exceed file size
         uint64_t offset_end;
         if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)) {
             panic(true, "elf: p_offset + p_filesz overflow");
+        }
+        if (offset_end > file_size) {
+            panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
         uint64_t load_addr = *physical_base + (phdr->p_vaddr - *virtual_base);
@@ -926,7 +1014,8 @@ again:
 
         uint64_t mem_base, mem_size;
 
-        mem_base = load_addr & ~(phdr->p_align - 1);
+        uint64_t align = phdr->p_align <= 1 ? 1 : phdr->p_align;
+        mem_base = load_addr & ~(align - 1);
         mem_size = this_top - mem_base;
 #endif
 
@@ -963,7 +1052,7 @@ again:
     return true;
 }
 
-bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
+bool elf32_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
                           struct elsewhere_range **ranges) {
     struct elf32_hdr *hdr = (void *)elf;
 
@@ -980,6 +1069,11 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
         panic(true, "elf: phdr_size < sizeof(struct elf32_phdr)");
     }
 
+    uint64_t phdr_table_size32 = (uint64_t)hdr->ph_num * hdr->phdr_size;
+    if (hdr->phoff > file_size || phdr_table_size32 > file_size - hdr->phoff) {
+        panic(true, "elf: Program header table extends beyond file bounds");
+    }
+
     size_t image_size = 0;
     uint64_t min_paddr = (uint64_t)-1;
     uint64_t max_paddr = 0;
@@ -993,8 +1087,9 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
             min_paddr = phdr->p_paddr;
         }
 
-        if (phdr->p_paddr + phdr->p_memsz > max_paddr) {
-            max_paddr = phdr->p_paddr + phdr->p_memsz;
+        uint64_t top = (uint64_t)phdr->p_paddr + phdr->p_memsz;
+        if (top > max_paddr) {
+            max_paddr = top;
         }
     }
     image_size = max_paddr - min_paddr;
@@ -1016,6 +1111,9 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
         // Sanity checks
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
+        }
+        if ((uint64_t)phdr->p_offset + phdr->p_filesz > file_size) {
+            panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
         memcpy(elsewhere + (phdr->p_paddr - min_paddr), elf + phdr->p_offset, phdr->p_filesz);
@@ -1032,7 +1130,7 @@ bool elf32_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
     return true;
 }
 
-bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
+bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
                           struct elsewhere_range **ranges) {
     struct elf64_hdr *hdr = (void *)elf;
 
@@ -1049,6 +1147,11 @@ bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
         panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
     }
 
+    uint64_t phdr_table_size64 = (uint64_t)hdr->ph_num * hdr->phdr_size;
+    if (hdr->phoff > file_size || phdr_table_size64 > file_size - hdr->phoff) {
+        panic(true, "elf: Program header table extends beyond file bounds");
+    }
+
     size_t image_size = 0;
     uint64_t min_paddr = (uint64_t)-1;
     uint64_t max_paddr = 0;
@@ -1062,8 +1165,12 @@ bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
             min_paddr = phdr->p_paddr;
         }
 
-        if (phdr->p_paddr + phdr->p_memsz > max_paddr) {
-            max_paddr = phdr->p_paddr + phdr->p_memsz;
+        uint64_t top;
+        if (__builtin_add_overflow(phdr->p_paddr, phdr->p_memsz, &top)) {
+            panic(true, "elf: p_paddr + p_memsz overflow");
+        }
+        if (top > max_paddr) {
+            max_paddr = top;
         }
     }
     image_size = max_paddr - min_paddr;
@@ -1085,6 +1192,11 @@ bool elf64_load_elsewhere(uint8_t *elf, uint64_t *entry_point,
         // Sanity checks
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
+        }
+        uint64_t offset_end;
+        if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)
+            || offset_end > file_size) {
+            panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
         memcpy(elsewhere + (phdr->p_paddr - min_paddr), elf + phdr->p_offset, phdr->p_filesz);

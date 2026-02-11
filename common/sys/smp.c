@@ -71,7 +71,7 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     passed_info->smp_tpl_hhdm = hhdm;
     passed_info->smp_tpl_bsp_apic_addr_msr = rdmsr(0x1b);
     passed_info->smp_tpl_mtrr_restore = (uint64_t)(uintptr_t)mtrr_restore;
-    passed_info->smp_tpl_temp_stack = (uint64_t)(uintptr_t)temp_stack;
+    passed_info->smp_tpl_temp_stack = (uint64_t)(uintptr_t)temp_stack + 8192;
 
     asm volatile ("" ::: "memory");
 
@@ -84,13 +84,16 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     }
     delay(10000000);
 
-    // Send the Startup IPI
-    if (x2apic) {
-        x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) |
-                                     ((size_t)trampoline / 4096) | 0x4600);
-    } else {
-        lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
-        lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
+    // Send two Startup IPIs per Intel SDM recommendation (Vol 3, 8.4.4.1)
+    for (int j = 0; j < 2; j++) {
+        if (x2apic) {
+            x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) |
+                                         ((size_t)trampoline / 4096) | 0x4600);
+        } else {
+            lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
+            lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
+        }
+        delay(200000); // ~200 us
     }
 
     for (int i = 0; i < 100; i++) {
@@ -329,8 +332,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
     // Prepare the trampoline
     static void *trampoline = NULL;
     if (trampoline == NULL) {
-        // AArch64 trampoline expects 0x1000 byte buffer with passed_info at the end
-        trampoline = ext_mem_alloc(0x1000);
+        trampoline = ext_mem_alloc(smp_trampoline_size);
 
         memcpy(trampoline, smp_trampoline_start, smp_trampoline_size);
     }
@@ -355,8 +357,8 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
     // Additionally, the newly-booted AP may have caches disabled which implies
     // it possibly does not see our cache contents either.
 
-    clean_dcache_poc((uintptr_t)trampoline, (uintptr_t)trampoline + 0x1000);
-    inval_icache_pou((uintptr_t)trampoline, (uintptr_t)trampoline + 0x1000);
+    clean_dcache_poc((uintptr_t)trampoline, (uintptr_t)trampoline + smp_trampoline_size);
+    inval_icache_pou((uintptr_t)trampoline, (uintptr_t)trampoline + smp_trampoline_size);
 
     asm volatile ("" ::: "memory");
 
@@ -550,6 +552,11 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
         }
     }
 
+    if (*cpu_count == 0) {
+        pmm_free(ret, max_cpus * sizeof(struct limine_mp_info));
+        return NULL;
+    }
+
     return ret;
 }
 
@@ -598,7 +605,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
     }
 
     int address_cells = fdt_address_cells(dtb, cpus);
-    if (address_cells < 0) {
+    if (address_cells < 1) {
         printv("smp: fdt_address_cells failed: %s\n", fdt_strerror(address_cells));
         return NULL;
     }
@@ -693,6 +700,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
                 boot_method = BOOT_WITH_PSCI_HVC;
             } else {
                 printv("smp: illegal PSCI method: '%s'\n", psci_method);
+                continue;
             }
 
         } else if (!strcmp(prop, "spin-table")) {
@@ -828,7 +836,7 @@ struct limine_mp_info *init_smp(size_t *cpu_count, pagemap_t pagemap, uint64_t h
             continue;
         }
 
-        printv("smp: Found candidate AP for bring-up. Hart ID: %u\n", hart->hartid);
+        printv("smp: Found candidate AP for bring-up. Hart ID: %U\n", (uint64_t)hart->hartid);
 
         // Try to start the AP.
         size_t satp = make_satp(pagemap.paging_mode, pagemap.top_level);

@@ -143,6 +143,13 @@ void pmm_sanitise_entries(struct memmap_entry *m, size_t *_count, bool align_ent
             uint64_t res_length = m[j].length;
             uint64_t res_top    = res_base + res_length;
 
+            // Non-usable entry fully contains usable entry
+            if (res_base <= base && res_top >= top) {
+                m[i].base   = top;
+                m[i].length = 0;
+                break;
+            }
+
             if ( (res_base >= base && res_base < top)
               && (res_top  >= base && res_top  < top) ) {
                 // TODO actually handle splitting off usable chunks
@@ -539,7 +546,7 @@ void pmm_release_uefi_mem(void) {
         status = gBS->FreePages(untouched_memmap[i].base, untouched_memmap[i].length / 4096);
 
         if (status) {
-            panic(false, "pmm: FreePages failure (%x)", status);
+            panic(false, "pmm: FreePages failure (%X)", (uint64_t)status);
         }
     }
 
@@ -684,25 +691,35 @@ void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alig
 struct meminfo mmap_get_info(size_t mmap_count, struct memmap_entry *mmap) {
     struct meminfo info = {0};
 
-    for (size_t i = 0; i < mmap_count; i++) {
-        if (mmap[i].type == MEMMAP_USABLE) {
-            // NOTE: Upper memory starts at address 1MiB and the
-            // value of uppermem is the address of the first upper memory
-            // hole minus 1MiB.
-            if (mmap[i].base < 0x100000) {
-                if (mmap[i].base + mmap[i].length > 0x100000) {
-                    size_t low_len = 0x100000 - mmap[i].base;
+    // Find contiguous usable memory from address 0 (lower) and 1 MiB (upper)
+    // by iteratively extending a frontier. Handles unsorted entries.
+    uint64_t lower_end = 0;
+    uint64_t upper_end = 0x100000;
+    bool progress;
 
-                    info.lowermem += low_len;
-                    info.uppermem += mmap[i].length - low_len;
-                } else {
-                    info.lowermem += mmap[i].length;
-                }
-            } else {
-                info.uppermem += mmap[i].length;
+    do {
+        progress = false;
+        for (size_t i = 0; i < mmap_count; i++) {
+            if (mmap[i].type != MEMMAP_USABLE)
+                continue;
+            uint64_t base = mmap[i].base;
+            uint64_t top = base + mmap[i].length;
+            if (base <= lower_end && top > lower_end) {
+                lower_end = top;
+                progress = true;
+            }
+            if (base <= upper_end && top > upper_end) {
+                upper_end = top;
+                progress = true;
             }
         }
-    }
+    } while (progress);
+
+    if (lower_end > 0x100000)
+        lower_end = 0x100000;
+
+    info.lowermem = lower_end;
+    info.uppermem = upper_end - 0x100000;
 
     return info;
 }

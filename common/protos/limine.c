@@ -293,12 +293,12 @@ extern symbol limine_spinup_32;
 
 #define LIMINE_TCR(tsz, pa) ( ((uint64_t)(pa) << 32)         /* Intermediate address size */  \
                             | ((uint64_t)2 << 30)            /* TTBR1 4K granule */           \
-                            | ((uint64_t)2 << 28)            /* TTBR1 Inner shareable */      \
+                            | ((uint64_t)2 << 28)            /* TTBR1 Outer shareable */      \
                             | ((uint64_t)1 << 26)            /* TTBR1 Outer WB RW-Allocate */ \
                             | ((uint64_t)1 << 24)            /* TTBR1 Inner WB RW-Allocate */ \
                             | ((uint64_t)(tsz) << 16)        /* Address bits in TTBR1 */      \
                                                              /* TTBR0 4K granule */           \
-                            | ((uint64_t)2 << 12)            /* TTBR0 Inner shareable */      \
+                            | ((uint64_t)2 << 12)            /* TTBR0 Outer shareable */      \
                             | ((uint64_t)1 << 10)            /* TTBR0 Outer WB RW-Allocate */ \
                             | ((uint64_t)1 << 8)             /* TTBR0 Inner WB RW-Allocate */ \
                             | ((uint64_t)(tsz) << 0))        /* Address bits in TTBR0 */
@@ -486,7 +486,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     enum executable_format kernel_format = detect_kernel_format(kernel, kernel_file->size);
     switch (kernel_format) {
         case EXECUTABLE_FORMAT_ELF:
-            if (!elf64_load(kernel, &entry_point, &slide,
+            if (!elf64_load(kernel, kernel_file->size, &entry_point, &slide,
                             MEMMAP_KERNEL_AND_MODULES, kaslr,
                             &ranges, &ranges_count,
                             &physical_base, &virtual_base, NULL,
@@ -515,6 +515,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     // Determine base revision
     uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(0);
     int base_revision = 0;
+    bool base_revision_found = false;
     uint64_t *base_rev_p1_ptr = NULL;
     uint64_t *base_rev_p2_ptr = NULL;
     for (size_t i = 0; i < ALIGN_DOWN(image_size_before_bss, 8); i += 8) {
@@ -524,6 +525,7 @@ noreturn void limine_load(char *config, char *cmdline) {
         if (p[0] == limine_requests_start_marker[0] && p[1] == limine_requests_start_marker[1]
          && p[2] == limine_requests_start_marker[2] && p[3] == limine_requests_start_marker[3]) {
             base_revision = 0;
+            base_revision_found = false;
             base_rev_p1_ptr = NULL;
             base_rev_p2_ptr = NULL;
             continue;
@@ -535,9 +537,10 @@ noreturn void limine_load(char *config, char *cmdline) {
         }
 
         if (p[0] == limine_base_revision[0] && p[1] == limine_base_revision[1]) {
-            if (base_revision != 0) {
+            if (base_revision_found) {
                 panic(true, "limine: Duplicated base revision tag");
             }
+            base_revision_found = true;
             base_revision = p[2];
             if (p[2] <= SUPPORTED_BASE_REVISION) {
                 // Set to 0 to mean "supported"
@@ -559,7 +562,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint64_t *limine_reqs = NULL;
     requests = ext_mem_alloc(MAX_REQUESTS * sizeof(void *));
     requests_count = 0;
-    if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, &limine_reqs, ".limine_reqs", 0, slide)) {
+    if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, kernel_file->size, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
             if (i >= MAX_REQUESTS) {
                 panic(true, "limine: Maximum requests exceeded");
@@ -637,7 +640,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     printv("limine: Slide:           %X\n", slide);
     printv("limine: ELF entry point: %X\n", entry_point);
     printv("limine: Base revision:   %u\n", base_revision);
-    printv("limine: Requests count:  %u\n", requests_count);
+    printv("limine: Requests count:  %U\n", (uint64_t)requests_count);
     printv("limine: Top of HHDM:     %X\n", hhdm_span_top);
 
     // Paging Mode

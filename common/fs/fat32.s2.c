@@ -36,7 +36,7 @@ struct fat32_file_handle {
     struct fat32_context context;
     uint32_t first_cluster;
     uint32_t size_bytes;
-    uint32_t size_clusters;
+
     uint32_t *cluster_chain;
     size_t chain_len;
 };
@@ -155,6 +155,11 @@ bytes_per_sector_valid:;
         return 1;
     }
 
+    // The boot sector itself occupies at least sector 0
+    if (bpb.reserved_sectors == 0) {
+        return 1;
+    }
+
     // The following mess to identify the FAT type is from the FAT spec
     // at paragraph 3.5
     size_t root_dir_sects = ((bpb.root_entries_count * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector;
@@ -192,6 +197,11 @@ bytes_per_sector_valid:;
     context->root_directory_cluster = bpb.root_directory_cluster;
     context->fat_start_lba = bpb.reserved_sectors;
     context->root_entries = bpb.root_entries_count;
+
+    // FAT12/16 require a non-zero root directory entry count
+    if (context->type != 32 && context->root_entries == 0) {
+        return 1;
+    }
 
     // Calculate root_start with overflow check
     uint64_t root_start_64 = (uint64_t)context->reserved_sectors + (uint64_t)context->number_of_fats * context->sectors_per_fat;
@@ -669,6 +679,9 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
         }
 
         if (expect_directory) {
+            if (!(current_file.attribute & FAT32_ATTRIBUTE_SUBDIRECTORY)) {
+                return NULL;
+            }
             _current_directory = current_file;
             current_directory = &_current_directory;
         } else {
@@ -679,7 +692,7 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
             ret->first_cluster = current_file.cluster_num_low;
             if (context.type == 32)
                 ret->first_cluster |= (uint64_t)current_file.cluster_num_high << 16;
-            ret->size_clusters = DIV_ROUNDUP((uint64_t)current_file.file_size_bytes, context.bytes_per_sector);
+
             ret->size_bytes = current_file.file_size_bytes;
             // Initialize chain_len before calling cache_cluster_chain
             // (cache_cluster_chain may return NULL without setting it for empty files)

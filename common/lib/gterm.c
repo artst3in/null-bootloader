@@ -291,7 +291,7 @@ static uint32_t *bg_canvas;
 #define R(rgb) (uint8_t)(rgb >> 16)
 #define G(rgb) (uint8_t)(rgb >> 8)
 #define B(rgb) (uint8_t)(rgb)
-#define ARGB(a, r, g, b) (a << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF)
+#define ARGB(a, r, g, b) (((a) << 24) | (((r) & 0xFF) << 16) | (((g) & 0xFF) << 8) | ((b) & 0xFF))
 
 static inline uint32_t colour_blend(uint32_t fg, uint32_t bg) {
     unsigned alpha = 255 - A(fg);
@@ -367,30 +367,30 @@ __attribute__((always_inline)) static inline void genloop(struct fb_info *fb, si
                 uint32_t img_pixel = *(uint32_t*)(img + image_x * colsize + off);
                 uint32_t i = blend(fb, x, y, img_pixel);
                 bg_canvas[canvas_off + x] = i;
-                if (image_x++ == img_width) image_x = 0; // image_x = x % img_width, but modulo is too expensive
+                if (++image_x == img_width) image_x = 0; // image_x = x % img_width, but modulo is too expensive
             }
         }
         break;
 
     case IMAGE_CENTERED:
         for (size_t y = ystart; y < yend; y++) {
-            size_t image_y = y - background->y_displacement;
-            const size_t off = img_pitch * image_y;
+            int64_t image_y = (int64_t)y - background->y_displacement;
             size_t canvas_off = fb->framebuffer_width * y;
-            if (image_y >= background->y_size) { /* external part */
+            if (image_y < 0 || (uint64_t)image_y >= background->y_size) { /* external part */
                 for (size_t x = xstart; x < xend; x++) {
                     uint32_t i = blend(fb, x, y, background->back_colour);
                     bg_canvas[canvas_off + x] = i;
                 }
             }
             else { /* internal part */
+                const size_t off = img_pitch * (size_t)image_y;
                 for (size_t x = xstart; x < xend; x++) {
                     uint32_t pixel;
-                    if (x < background->x_displacement || x - background->x_displacement >= background->x_size) {
+                    int64_t image_x = (int64_t)x - background->x_displacement;
+                    if (image_x < 0 || (uint64_t)image_x >= background->x_size) {
                         pixel = background->back_colour;
                     } else {
-                        size_t image_x = x - background->x_displacement;
-                        pixel = *(uint32_t*)(img + image_x * colsize + off);
+                        pixel = *(uint32_t*)(img + (size_t)image_x * colsize + off);
                     }
                     uint32_t i = blend(fb, x, y, pixel);
                     bg_canvas[canvas_off + x] = i;
@@ -437,7 +437,15 @@ static void generate_canvas(struct fb_info *fb) {
         bg_canvas_size = fb->framebuffer_width * fb->framebuffer_height * sizeof(uint32_t);
         bg_canvas = ext_mem_alloc(bg_canvas_size);
 
-        int64_t margin_no_gradient = (int64_t)margin - margin_gradient;
+        // Clamp margin to half the framebuffer dimensions to prevent underflow
+        size_t max_margin = fb->framebuffer_width / 2;
+        if (fb->framebuffer_height / 2 < max_margin) {
+            max_margin = fb->framebuffer_height / 2;
+        }
+        size_t effective_margin = margin > max_margin ? max_margin : margin;
+        size_t effective_margin_gradient = margin_gradient > effective_margin ? effective_margin : margin_gradient;
+
+        int64_t margin_no_gradient = (int64_t)effective_margin - effective_margin_gradient;
 
         if (margin_no_gradient < 0) {
             margin_no_gradient = 0;
@@ -451,17 +459,17 @@ static void generate_canvas(struct fb_info *fb) {
         loop_external(fb, 0, margin_no_gradient, margin_no_gradient, scan_stop_y);
         loop_external(fb, scan_stop_x, fb->framebuffer_width, margin_no_gradient, scan_stop_y);
 
-        size_t gradient_stop_x = fb->framebuffer_width - margin;
-        size_t gradient_stop_y = fb->framebuffer_height - margin;
+        size_t gradient_stop_x = fb->framebuffer_width - effective_margin;
+        size_t gradient_stop_y = fb->framebuffer_height - effective_margin;
 
-        if (margin_gradient) {
-            loop_margin(fb, margin_no_gradient, scan_stop_x, margin_no_gradient, margin);
+        if (effective_margin_gradient) {
+            loop_margin(fb, margin_no_gradient, scan_stop_x, margin_no_gradient, effective_margin);
             loop_margin(fb, margin_no_gradient, scan_stop_x, gradient_stop_y, scan_stop_y);
-            loop_margin(fb, margin_no_gradient, margin, margin, gradient_stop_y);
-            loop_margin(fb, gradient_stop_x, scan_stop_x, margin, gradient_stop_y);
+            loop_margin(fb, margin_no_gradient, effective_margin, effective_margin, gradient_stop_y);
+            loop_margin(fb, gradient_stop_x, scan_stop_x, effective_margin, gradient_stop_y);
         }
 
-        loop_internal(fb, margin, gradient_stop_x, margin, gradient_stop_y);
+        loop_internal(fb, effective_margin, gradient_stop_x, effective_margin, gradient_stop_y);
     } else {
         bg_canvas = NULL;
     }
@@ -476,6 +484,25 @@ static void riscv_flush_callback(volatile void *base, size_t length) {
     for (uintptr_t ptr = start; ptr < end; ptr += cbom_block_size) {
         asm volatile("cbo.flush (%0)" :: "r"(ptr) : "memory");
     }
+}
+static void riscv_flush_callback_nozicbom(volatile void *base, size_t length) {
+    (void)base;
+    (void)length;
+
+    // Without Zicbom, there is no portable instruction to flush dirty cache lines.
+    // Read through a dedicated eviction buffer to create cache pressure and displace
+    // dirty framebuffer lines. 128 KB covers typical RISC-V L1 D-caches (32-64 KB).
+    static volatile uint8_t *eviction_buf = NULL;
+    #define EVICTION_BUF_SIZE (128 * 1024)
+    if (eviction_buf == NULL) {
+        eviction_buf = ext_mem_alloc(EVICTION_BUF_SIZE);
+    }
+
+    volatile uint64_t *p = (volatile uint64_t *)eviction_buf;
+    for (size_t i = 0; i < EVICTION_BUF_SIZE / sizeof(uint64_t); i += (64 / sizeof(uint64_t))) {
+        (void)p[i];
+    }
+    asm volatile ("fence rw, rw" ::: "memory");
 }
 #elif defined (__aarch64__)
 static void aarch64_flush_callback(volatile void *base, size_t length) {
@@ -659,6 +686,10 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         margin_gradient = strtoui(theme_margin_gradient, NULL, 10);
     }
 
+    if (margin_gradient > margin) {
+        margin_gradient = margin;
+    }
+
     size_t font_width = 8;
     size_t font_height = 16;
     size_t font_size = (font_width * font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
@@ -679,7 +710,7 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
 
         if (tmp_font_size > FONT_MAX) {
-            print("Font would be too large (%u bytes, %u bytes allowed). Not loading.\n", tmp_font_size, FONT_MAX);
+            print("Font would be too large (%U bytes, %u bytes allowed). Not loading.\n", (uint64_t)tmp_font_size, FONT_MAX);
             goto no_load_font;
         }
 
@@ -799,6 +830,7 @@ no_load_font:;
 
         if (bg_canvas != NULL) {
             pmm_free(bg_canvas, bg_canvas_size);
+            bg_canvas = NULL;
         }
     }
 
@@ -810,6 +842,7 @@ no_load_font:;
     }
 
     if (terms_i == 0) {
+        pmm_free(terms, fbs_count * sizeof(void *));
         return false;
     }
 
@@ -847,6 +880,8 @@ no_load_font:;
 #if defined (__riscv)
         if (riscv_check_isa_extension("zicbom", NULL, NULL)) {
             flanterm_fb_set_flush_callback(term, riscv_flush_callback);
+        } else {
+            flanterm_fb_set_flush_callback(term, riscv_flush_callback_nozicbom);
         }
 #elif defined (__aarch64__)
         flanterm_fb_set_flush_callback(term, aarch64_flush_callback);

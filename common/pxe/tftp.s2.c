@@ -25,7 +25,9 @@ static uint32_t get_boot_server_info(void) {
     }
     struct bootph *ph = (struct bootph*)(void *) (((((uint32_t)cachedinfo.buffer) >> 16) << 4) + (((uint32_t)cachedinfo.buffer) & 0xFFFF));
     if (!cached_dhcp_ack_valid) {
-        memcpy(cached_dhcp_packet, ph, DHCP_ACK_PACKET_LEN);
+        size_t copy_len = cachedinfo.buffer_size < DHCP_ACK_PACKET_LEN
+                        ? cachedinfo.buffer_size : DHCP_ACK_PACKET_LEN;
+        memcpy(cached_dhcp_packet, ph, copy_len);
         cached_dhcp_ack_valid = true;
     }
     return ph->sip;
@@ -104,7 +106,7 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     struct pxenv_open open = {
         .status = 0,
         .sip = server_ip,
-        .port = (server_port) << 8,
+        .port = (server_port >> 8) | (server_port << 8),
         .packet_size = mtu
     };
     memcpy(open.name, name, name_len + 1);
@@ -120,7 +122,8 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
     // Validate server's negotiated packet size doesn't exceed our buffer
     if (open.packet_size > mtu) {
         print("tftp: Server requested packet size %u exceeds our MTU %u\n", open.packet_size, mtu);
-        pxe_call(TFTP_CLOSE, ((uint16_t)rm_seg(&(uint16_t){0})), (uint16_t)rm_off(&(uint16_t){0}));
+        uint16_t close = 0;
+        pxe_call(TFTP_CLOSE, ((uint16_t)rm_seg(&close)), (uint16_t)rm_off(&close));
         pmm_free(handle->path, handle->path_len);
         pmm_free(handle, sizeof(struct file_handle));
         return NULL;
@@ -229,7 +232,7 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
 
     // Validate file size from TFTP server (max 1GB)
     if (file_size == 0 || file_size > (1024 * 1024 * 1024)) {
-        print("tftp: Invalid file size from server: %llu\n", (unsigned long long)file_size);
+        print("tftp: Invalid file size from server: %U\n", file_size);
         return NULL;
     }
 

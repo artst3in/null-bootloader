@@ -160,6 +160,7 @@ void *freadall_mode(struct file_handle *fd, uint32_t type, bool allow_high_alloc
                 memcpy_to_64(high_ret + i, pool, count);
             }
             pmm_free(pool, 0x100000);
+            fd->close(fd);
             return &high_ret;
         }
 low_ret:

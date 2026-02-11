@@ -63,7 +63,11 @@ static bool init_efi_app_path(size_t *len_out) {
             goto found;
         }
 
-        path = (void *)path + *((uint16_t *)&path->Length[0]);
+        uint16_t node_length = *((uint16_t *)&path->Length[0]);
+        if (node_length < 4) {
+            return false;
+        }
+        path = (void *)path + node_length;
     }
 
     return false;
@@ -229,7 +233,10 @@ bool init_config_smbios(void) {
 
             size_t prefix_len = sizeof("limine:config:") - 1;
             if (string_area_size > prefix_len && !strncmp(string_data, "limine:config:", prefix_len)) {
-                size_t config_size = strnlen(string_data, string_area_size) - prefix_len + 1;
+                size_t total_len = strnlen(string_data, string_area_size);
+                if (total_len <= prefix_len)
+                    continue;
+                size_t config_size = total_len - prefix_len + 2;
                 config_addr = ext_mem_alloc(config_size);
                 memcpy(config_addr, &string_data[prefix_len], config_size - 1);
                 config_addr[config_size - 1] = '\0';
@@ -372,6 +379,8 @@ int init_config(size_t config_size) {
     // add trailing newline if not present
     config_addr[config_size - 2] = '\n';
 
+    size_t config_alloc_size = config_size;
+
     // remove windows carriage returns and spaces at the start and end of lines, if any
     for (size_t i = 0; i < config_size; i++) {
         size_t skip = 0;
@@ -444,7 +453,7 @@ skip_loop:
             for (j = 0; config_addr[i] != '}' && config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
                 if (j >= sizeof(macro->name) - 1) {
                     bad_config = true;
-                    panic(true, "config: Macro name too long (max %u)", sizeof(macro->name) - 1);
+                    panic(true, "config: Macro name too long (max %U)", (uint64_t)(sizeof(macro->name) - 1));
                 }
                 macro->name[j] = config_addr[i];
             }
@@ -460,7 +469,7 @@ skip_loop:
             for (j = 0; config_addr[i] != '\n' && config_addr[i] != 0; j++, i++) {
                 if (j >= sizeof(macro->value) - 1) {
                     bad_config = true;
-                    panic(true, "config: Macro value too long (max %u)", sizeof(macro->value) - 1);
+                    panic(true, "config: Macro value too long (max %U)", (uint64_t)(sizeof(macro->value) - 1));
                 }
                 macro->value[j] = config_addr[i];
             }
@@ -491,12 +500,14 @@ skip_loop:
              || (config_size - i >= 2 && i == 0 && memcmp(config_addr, "${", 2) == 0)) {
                 size_t orig_i = i;
                 i += i ? 3 : 2;
-                while (config_addr[i++] != '}') {
-                    if (i >= config_size) {
-                        bad_config = true;
-                        panic(true, "config: Malformed macro usage");
-                    }
+                while (i < config_size && config_addr[i] != '}') {
+                    i++;
                 }
+                if (i >= config_size) {
+                    bad_config = true;
+                    panic(true, "config: Malformed macro usage");
+                }
+                i++; // skip '}'
                 if (i >= config_size || config_addr[i++] != '=') {
                     i = orig_i;
                     goto next;
@@ -555,7 +566,7 @@ overflow:
             new_config[in++] = config_addr[i++];
         }
 
-        pmm_free(config_addr, config_size);
+        pmm_free(config_addr, config_alloc_size);
 
         config_addr = new_config;
         config_size = in;
@@ -570,6 +581,7 @@ overflow:
             pmm_free(macro, sizeof(struct macro));
             macro = next;
         }
+        macros = NULL;
     }
 
     config_ready = true;

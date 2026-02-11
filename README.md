@@ -1,334 +1,102 @@
-<div align="center">
+# Limine [![Matrix Server](https://img.shields.io/matrix/limine:matrix.org?color=000000&label=Matrix&logo=matrix)](https://matrix.to/#/#limine:matrix.org) [![Discord Server](https://img.shields.io/discord/706151776247873636?color=5865F2&label=Discord&logo=discord&logoColor=white)](https://discord.gg/Z93u2ZUNZs)
 
-# 🌙 Null
-### **The Minimal Bootloader**
+<p align="center">
+    <img src="https://codeberg.org/Limine/Limine/raw/branch/trunk/logo.png" alt="Limine's logo"/>
+</p>
 
-*A Stripped-Down Limine Fork for LunaOS*
+### What is Limine?
 
-[![Version](https://img.shields.io/badge/version-2026.01-blue.svg)]()
-[![License](https://img.shields.io/badge/license-BSD%202--Clause-green.svg)](COPYING)
-[![Platform](https://img.shields.io/badge/platform-x64%20%7C%20UEFI%20%7C%20BIOS-orange.svg)]()
-[![Lines Removed](https://img.shields.io/badge/lines_removed-4%2C300-red.svg)]()
+Limine (pronounced as demonstrated [here](https://www.merriam-webster.com/dictionary/in%20limine))
+is a modern, advanced, portable, multiprotocol bootloader and boot manager, also used
+as the reference implementation for the [Limine boot protocol](https://codeberg.org/Limine/limine-protocol/src/branch/trunk/PROTOCOL.md).
 
-**🚀 Minimal** • **🛡️ Proven** • **⚡ Fast** • **🌙 LunaOS-Native**
+### Community, Support, and Donations
 
-[Features](#-features) •
-[What We Changed](#-what-we-changed) •
-[What We Kept](#-what-we-kept) •
-[Philosophy](#-philosophy)
+#### Donate
+If you want to support the work I ([@mintsuki](https://codeberg.org/Mintsuki)) do on Limine, feel free to donate to me on Liberapay:
+<p><a href="https://liberapay.com/mintsuki/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></p>
 
-</div>
+Donations welcome, but absolutely not mandatory!
 
----
+#### Community
+We have a Matrix room at [`#limine:matrix.org`](https://matrix.to/#/#limine:matrix.org)
+and a [Discord server](https://discord.gg/Z93u2ZUNZs) if you need support, info, or you just want to hang out with us.
 
-## 🎯 What is Null?
+### Limine's boot menu
 
-**Null** is a **minimal bootloader** for LunaOS - a stripped-down fork of [Limine](https://github.com/limine-bootloader/limine) with ~4,300 lines of dead code removed. It does exactly one thing: boot LunaOS kernels via the Limine protocol.
+![Reference screenshot](screenshot.png?raw=true "Reference screenshot")
 
-**The numbers:**
+[Photo by Pixabay](https://www.pexels.com/photo/brown-leafed-tree-on-open-field-under-white-clouds-and-blue-sky-35857/)
 
-- 🗑️ **~4,300 lines removed** - Multiboot, Linux boot, Chainload, ISO9660
-- 📦 **19 files deleted** - unused protocol handlers and filesystems
-- ✅ **1 protocol supported** - Limine (the only one LunaOS uses)
-- 🔒 **0 regressions** - boot process untouched
+### Supported architectures
+* IA-32 (32-bit x86)
+* x86-64
+* aarch64 (arm64)
+* riscv64
+* loongarch64 (experimental support!)
 
-> 💡 **Philosophy:** Use proven code. Remove unused code. Touch nothing else.
+### Supported boot protocols
+* Linux
+* [Limine](https://codeberg.org/Limine/limine-protocol/src/branch/trunk/PROTOCOL.md)
+* Multiboot 1
+* Multiboot 2
+* Chainloading
 
----
+### Supported partitioning schemes
+* MBR
+* GPT
+* Unpartitioned media
 
-## ✨ Features
+### Supported filesystems
+* FAT12/16/32
+* ISO9660 (CDs/DVDs)
 
-### 🚀 What Null Does
+If your filesystem isn't listed here, please read [the FAQ](FAQ.md) first, especially before
+opening issues or pull requests related to this.
 
-<table>
-<tr>
-<td width="50%">
+### Minimum system requirements
+For 32-bit x86 systems, support is only ensured starting with those with
+Pentium Pro (i686) class CPUs.
 
-**🖥️ Boot LunaOS**
-- 🔧 Limine protocol (full support)
-- 📋 Boot menu (recovery/older kernels)
-- 💾 UEFI & BIOS boot
-- 🔀 SMP initialization
+All x86-64, aarch64, riscv64 and loongarch64 (UEFI) systems are supported.
 
-</td>
-<td width="50%">
+## Packaging status
 
-**🌐 Network & Storage**
-- 📁 FAT32 filesystem
-- 🌍 PXE/TFTP network boot
-- 💿 EFI partition support
-- 🔐 Classical crypto (Ed25519/X25519)
+All Limine releases since 7.x use [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for their naming.
 
-</td>
-</tr>
-</table>
+[![Packaging status](https://repology.org/badge/vertical-allrepos/limine.svg?columns=3)](https://repology.org/project/limine/versions)
 
-### 🚫 What Null Doesn't Do
+## Binary releases
 
-<table>
-<tr>
-<td width="33%">
+For convenience, for point releases, binaries are distributed. These binaries
+are shipped in the `-binary` branches and tags of this repository
+(see [branches](https://codeberg.org/Limine/Limine/branches) and
+[tags](https://codeberg.org/Limine/Limine/tags)).
 
-**❌ Removed Protocols**
-- ~~Multiboot 1/2~~
-- ~~Linux boot~~
-- ~~Chainload~~
-
-</td>
-<td width="33%">
-
-**❌ Removed Filesystems**
-- ~~ISO9660~~
-- ~~CD/DVD boot~~
-
-</td>
-<td width="33%">
-
-**💡 Why?**
-- 🎯 LunaOS uses Limine only
-- 🛡️ Dead code = attack surface
-- ⚡ Smaller = faster boot
-
-</td>
-</tr>
-</table>
-
----
-
-## 🔧 What We Changed
-
-| Component | Lines Removed | Status |
-|-----------|---------------|--------|
-| 📄 `multiboot1.c/h` | ~560 | 🗑️ Deleted |
-| 📄 `multiboot2.c/h` | ~1,360 | 🗑️ Deleted |
-| 📄 `linux_x86.c` | ~630 | 🗑️ Deleted |
-| 📄 `linux_risc.c` | ~450 | 🗑️ Deleted |
-| 📄 `chainload.c/h` | ~370 | 🗑️ Deleted |
-| 📄 `iso9660.s2.c/h` | ~580 | 🗑️ Deleted |
-| 🔩 Assembly files | ~220 | 🗑️ Deleted |
-| 📋 `menu.c` dispatch | ~30 | ✂️ Simplified |
-| **📊 Total** | **~4,300** | **✅ Gone** |
-
----
-
-## 🛡️ What We Kept
-
-| Component | Purpose | Status |
-|-----------|---------|--------|
-| 🔧 **Limine protocol** | Boot LunaOS kernels | ✅ Essential |
-| 📋 **Boot menu** | Recovery mode, kernel selection | ✅ Essential |
-| 📁 **FAT32** | Read kernel from EFI partition | ✅ Essential |
-| 🌐 **PXE/TFTP** | Network boot (sister resurrection) | 💡 Useful |
-| 🔐 **Crypto** | Ed25519 signatures & X25519 encryption | ✅ Essential |
-| 🗺️ **Memory map** | DO NOT TOUCH | 🔒 Sacred |
-| 🔀 **SMP boot** | DO NOT TOUCH | 🔒 Sacred |
-| 📄 **Paging** | DO NOT TOUCH | 🔒 Sacred |
-
----
-
-## 🧠 Philosophy
-
-### 🤔 Why Fork Limine?
-
-We tried everything else:
-
-| Attempt | Duration | Result |
-|---------|----------|--------|
-| 🔨 Custom bootloader from scratch | 1 week | 😭 Crying, almost quit |
-| 🔧 "Reorganizing" Limine memory | 1 day | 💀 SMP disappeared |
-| 🦀 Translating to Rust | 2 days | 💥 Failed miserably |
-
-**🎯 Conclusion:** Use proven bootloader, strip bloat, move on.
-
-### 📜 The Rules
-
-1. 🚫 **Never touch memory map** - It works. Don't ask how.
-2. 🚫 **Never touch SMP boot** - It works. Don't ask why.
-3. 🚫 **Never touch paging** - It works. Just be grateful.
-4. ✂️ **Remove unused code** - Less code = fewer bugs.
-5. 📋 **Keep the boot menu** - Recovery mode saves lives.
-
----
-
-## 🔐 Classical Cryptography
-
-Null includes a classical cryptographic stack for secure boot. Post-quantum cryptography
-(Dilithium/Kyber) has been removed based on MLE (Multiversal Law of Existence) theoretical
-analysis demonstrating that quantum computing as theorized cannot exist.
-
-### Crypto Primitives
-
-| Component | Algorithm | Security Level | Key Sizes |
-|-----------|-----------|----------------|-----------|
-| 🔏 **Signatures** | Ed25519 | 128-bit | PK: 32B, SK: 64B, Sig: 64B |
-| 🔑 **Key Exchange** | X25519 | 128-bit | PK: 32B, SK: 32B |
-| 🔒 **Symmetric AEAD** | ChaCha20-Poly1305 | 256-bit | Key: 32B, Nonce: 12B, Tag: 16B |
-
-### Performance Benefits (vs removed PQC)
-
-| Metric | PQC (Removed) | Classical | Improvement |
-|--------|---------------|-----------|-------------|
-| Boot overhead | ~15-25ms | ~1-2ms | **10-20x faster** |
-| Signature size | 3,309 bytes | 64 bytes | **52x smaller** |
-| Public key | 1,952 bytes | 32 bytes | **61x smaller** |
-| Code size | ~15KB | ~3KB | **5x smaller** |
-
-### How It Works
-
-**Signing** protects against kernel replacement (integrity):
-```
-Developer                           User's Machine
-    │                                    │
-    │  kernel.elf + secret key           │
-    │      │                             │
-    │  [luna_sign] ──────────────►  kernel.signed
-    │                                    │
-    │  BOOTX64.EFI ─────────────►   Bootloader verifies
-    │  (has public key)                  signature before
-    │                                    executing kernel
-```
-
-**Encryption** protects against kernel reading (confidentiality):
-```
-Developer                           User's Machine
-    │                                    │
-    │  kernel.signed + encryption key    │
-    │      │                             │
-    │  [luna_crypt] ─────────────►  kernel.enc
-    │                                    │
-    │  BOOTX64.EFI ─────────────►   Bootloader decrypts
-    │  (has decryption key)              then verifies
-```
-
-### File Formats
-
-**Signed kernel**: `[kernel data][Ed25519 signature (64 bytes)]`
-
-**Encrypted kernel** (LUNAENC2 format):
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Magic: "LUNAENC2" (8 bytes)                                     │
-├─────────────────────────────────────────────────────────────────┤
-│ Ephemeral X25519 Public Key (32 bytes)                          │
-├─────────────────────────────────────────────────────────────────┤
-│ ChaCha20 Nonce (12 bytes)                                       │
-├─────────────────────────────────────────────────────────────────┤
-│ Poly1305 Authentication Tag (16 bytes)                          │
-├─────────────────────────────────────────────────────────────────┤
-│ Encrypted Data (variable length)                                │
-└─────────────────────────────────────────────────────────────────┘
-Header overhead: 68 bytes (vs 1604 bytes with PQC)
-```
-
-### ⚠️ Important Security Notes
-
-1. **Keys are per-developer** - Each developer generates their own keypair
-2. **Bootloader + kernel are paired** - A bootloader only verifies kernels signed with its embedded public key
-3. **Back up your secret keys** - Store `keys/*.sec` files securely; if lost, you cannot sign new kernels
-4. **Never commit secret keys** - `.sec` files are gitignored by default
-5. **Pre-built binaries are useless** - A downloaded bootloader has someone else's keys embedded
-
-### Setup Script Options
-
+For example, to clone the latest binary release of the `10.x` branch, one can do:
 ```bash
-./setup-crypto.sh                 # Full setup (recommended)
-./setup-crypto.sh --tools-only    # Only build tools
-./setup-crypto.sh --keys-only     # Only generate keys
-./setup-crypto.sh --build-only    # Only rebuild bootloader
-./setup-crypto.sh --clean         # Clean and start fresh
-./setup-crypto.sh --no-encryption # Signing only (no encryption)
-./setup-crypto.sh --help          # Show all options
+git clone https://codeberg.org/Limine/Limine.git --branch=v10.x-binary --depth=1
 ```
-
----
-
-## 🏗️ Building
-
-### With Cryptography (Recommended)
-
+or, to clone a specific binary point release (for example `10.7.0`):
 ```bash
-./setup-crypto.sh
+git clone https://codeberg.org/Limine/Limine.git --branch=v10.7.0-binary --depth=1
 ```
 
-### Manual Build (No Crypto)
+In order to rebuild host utilities like `limine`, simply run `make` in the binary
+release directory.
 
-```bash
-./bootstrap
-./configure --enable-uefi-x86-64
-make
-```
+Host utility binaries are provided for Windows.
 
-See [INSTALL.md](INSTALL.md) for full build instructions.
+## Build and Install Instructions
 
----
+*The following steps are not necessary if cloning a binary release.*
 
-## 🏷️ Versioning
+See [INSTALL.md](INSTALL.md).
 
-Null follows the LunaOS unified versioning scheme:
+## Usage
 
-- **Version**: `2025.12.100` (YYYY.MM.BBB)
-- **Increment**: Bump BBB (100 → 101 → 102) per release
-- **Reset**: Back to 100 each month
+See [USAGE.md](USAGE.md).
 
-See [VERSIONING.md](VERSIONING.md) for details.
+## 3rd Party Software Acknowledgments
 
----
-
-## 📜 License
-
-Licensed under the **BSD 2-Clause License**
-
-Based on [Limine](https://github.com/limine-bootloader/limine) by mintsuki and contributors.
-
-See [COPYING](COPYING) for full details.
-
----
-
-## 🙏 Acknowledgments
-
-Null is a minimal fork of the legendary **[Limine](https://github.com/limine-bootloader/limine)** bootloader. We're deeply grateful to mintsuki and the Limine community for creating such a robust foundation.
-
-**What we took:**
-- 🔧 Proven boot process (memory, SMP, paging)
-- 📦 Limine protocol implementation
-- 📋 Boot menu system
-- 📁 FAT32 and PXE support
-
-**What we gave back:**
-- 📚 A lesson in humility (don't rewrite bootloaders)
-
----
-
-## 🌙 Part of LunaOS
-
-Null is a core component of **[LunaOS](https://github.com/artst3in/LunaOS)** - the first operating system built on the **Coherence Paradigm**.
-
-### The Coherence Paradigm
-
-Null embodies the **First Law of Computational Physics** (LCP):
-
-- 🎯 **Minimum viable code** - Only what's needed to boot LunaOS
-- 🛡️ **Proven foundations** - Use Limine's battle-tested boot process
-- 📉 **Zero entropy increase** - Remove code, don't add it
-
-> *"The best bootloader is the one that gets out of the way."*
-
----
-
-<div align="center">
-
-### 🚀 Ready to boot?
-
-```bash
-./configure --enable-uefi-x86-64 && make
-```
-
-**[📖 Build Instructions](INSTALL.md)** • **[⚙️ Configuration](CONFIG.md)** • **[🐛 Issues](https://github.com/artst3in/null-bootloader/issues)**
-
----
-
-**Made with 💜 by the LunaOS team**
-
-**dε/dt ≤ 0**
-
-</div>
+See [3RDPARTY.md](3RDPARTY.md).

@@ -167,7 +167,7 @@ static inline uint64_t tsc_freq_arch(void) {
         return 0;
     if (eax == 0 || ebx == 0 || ecx == 0)
         return 0;
-    return ecx * ebx / eax;
+    return (uint64_t)ecx * ebx / eax;
 }
 
 #define rdrand(type) ({ \
@@ -250,14 +250,14 @@ static inline size_t icache_line_size(void) {
     uint64_t ctr;
     asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
 
-    return (ctr & 0b1111) << 4;
+    return 4 << (ctr & 0b1111);
 }
 
 static inline size_t dcache_line_size(void) {
     uint64_t ctr;
     asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
 
-    return ((ctr >> 16) & 0b1111) << 4;
+    return 4 << ((ctr >> 16) & 0b1111);
 }
 
 static inline bool is_icache_pipt(void) {
@@ -312,12 +312,14 @@ static inline int current_el(void) {
 
 static inline uint64_t rdtsc(void) {
     uint64_t v;
-    asm volatile ("rdcycle %0" : "=r"(v));
+    asm volatile ("rdtime %0" : "=r"(v));
     return v;
 }
 
+uint64_t riscv_time_base_frequency(void);
+
 static inline uint64_t tsc_freq_arch(void) {
-    return 0; // FIXME
+    return riscv_time_base_frequency();
 }
 
 #define csr_read(csr) ({\
@@ -360,6 +362,7 @@ struct riscv_hart {
 #define RISCV_HART_HAS_MMU ((uint8_t)1 << 1)  // `mmu_type` field is valid
 
 extern struct riscv_hart *hart_list;
+extern struct riscv_hart *bsp_hart;
 
 bool riscv_check_isa_extension_for(size_t hartid, const char *ext, size_t *maj, size_t *min);
 
@@ -371,16 +374,27 @@ void init_riscv(const char *config);
 
 #elif defined (__loongarch64)
 
-#define LOONGARCH_CSR_TVAL 0x42
-
 static inline uint64_t rdtsc(void) {
     uint64_t v;
-    asm volatile ("csrrd %0, %1" : "=r" (v) : "i" (LOONGARCH_CSR_TVAL));
+    asm volatile ("rdtime.d %0, $zero" : "=r" (v));
+    return v;
+}
+
+static inline uint32_t loongarch_cpucfg(uint32_t reg) {
+    uint32_t v;
+    asm volatile ("cpucfg %0, %1" : "=r" (v) : "r" (reg));
     return v;
 }
 
 static inline uint64_t tsc_freq_arch(void) {
-    return 0; // FIXME
+    uint32_t cc_freq = loongarch_cpucfg(4);
+    uint32_t cc_cfg = loongarch_cpucfg(5);
+    uint32_t cc_mul = cc_cfg & 0xFFFF;
+    uint32_t cc_div = (cc_cfg >> 16) & 0xFFFF;
+    if (cc_freq == 0 || cc_mul == 0 || cc_div == 0) {
+        return 0;
+    }
+    return (uint64_t)cc_freq * cc_mul / cc_div;
 }
 
 #else

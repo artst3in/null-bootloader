@@ -62,8 +62,14 @@ void *riscv_fdt = NULL;
 
 size_t bsp_hartid;
 struct riscv_hart *hart_list = NULL;
-static struct riscv_hart *bsp_hart;
+struct riscv_hart *bsp_hart;
 static const char *current_config = NULL;
+
+static uint64_t cached_time_base_freq = 0;
+
+uint64_t riscv_time_base_frequency(void) {
+    return cached_time_base_freq;
+}
 
 static struct riscv_hart *riscv_get_hart(size_t hartid) {
     for (struct riscv_hart *hart = hart_list; hart != NULL; hart = hart->next) {
@@ -71,7 +77,7 @@ static struct riscv_hart *riscv_get_hart(size_t hartid) {
             return hart;
         }
     }
-    panic(false, "no `struct riscv_hart` for hartid %u", hartid);
+    panic(false, "no `struct riscv_hart` for hartid %U", (uint64_t)hartid);
 }
 
 static inline struct rhct_hart_info *rhct_get_hart_info(struct rhct *rhct, uint32_t acpi_uid) {
@@ -99,6 +105,8 @@ static void init_riscv_acpi(void) {
         panic(false, "riscv: requires `APIC` and `RHCT` ACPI tables");
     }
 
+    cached_time_base_freq = rhct->time_base_frequency;
+
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
          (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length; madt_ptr += *(madt_ptr + 1)) {
         if (*(madt_ptr + 1) == 0) {
@@ -120,7 +128,7 @@ static void init_riscv_acpi(void) {
 
         struct rhct_hart_info *hart_info = rhct_get_hart_info(rhct, acpi_uid);
         if (hart_info == NULL) {
-            panic(false, "riscv: missing rhct node for hartid %u", hartid);
+            panic(false, "riscv: missing rhct node for hartid %U", (uint64_t)hartid);
         }
 
         const char *isa_string = NULL;
@@ -162,12 +170,12 @@ static void init_riscv_acpi(void) {
         }
 
         if (isa_string == NULL) {
-            print("riscv: missing isa string for hartid %u, skipping.\n", hartid);
+            print("riscv: missing isa string for hartid %U, skipping.\n", (uint64_t)hartid);
             continue;
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            print("riscv: skipping hartid %U with invalid isa string: %s\n", (uint64_t)hartid, isa_string);
             continue;
         }
 
@@ -201,6 +209,16 @@ static void init_riscv_fdt(const void *fdt) {
         panic(false, "riscv: missing `/cpus` node");
     }
 
+    int len;
+    const void *tbf = fdt_getprop(fdt, cpus, "timebase-frequency", &len);
+    if (tbf != NULL) {
+        if (len == 8) {
+            cached_time_base_freq = fdt64_ld(tbf);
+        } else if (len == 4) {
+            cached_time_base_freq = fdt32_ld(tbf);
+        }
+    }
+
     int node;
     fdt_for_each_subnode(node, fdt, cpus) {
         const void *prop;
@@ -231,12 +249,12 @@ static void init_riscv_fdt(const void *fdt) {
 
         const char *isa_string = fdt_getprop(fdt, node, "riscv,isa", NULL);
         if (isa_string == NULL) {
-            print("riscv: missing isa string for hartid %u, skipping.\n", hartid);
+            print("riscv: missing isa string for hartid %U, skipping.\n", (uint64_t)hartid);
             continue;
         }
 
         if (strncmp("rv64", isa_string, 4) && strncmp("rv32", isa_string, 4)) {
-            print("riscv: skipping hartid %u with invalid isa string: %s\n", hartid, isa_string);
+            print("riscv: skipping hartid %U with invalid isa string: %s\n", (uint64_t)hartid, isa_string);
             continue;
         }
 
@@ -261,11 +279,16 @@ static void init_riscv_fdt(const void *fdt) {
 }
 
 void init_riscv(const char *config) {
-    while (hart_list != NULL && current_config != config) {
+    if (current_config == config && hart_list != NULL) {
+        return;
+    }
+
+    while (hart_list != NULL) {
         void *cur_hart = hart_list;
         hart_list = hart_list->next;
         pmm_free(cur_hart, sizeof(struct riscv_hart));
     }
+    bsp_hart = NULL;
 
     if (riscv_fdt != NULL) {
         pmm_free(riscv_fdt, fdt_totalsize(riscv_fdt));

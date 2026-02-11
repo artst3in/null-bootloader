@@ -160,7 +160,7 @@ void acpi_get_smbios(void **smbios32, void **smbios64) {
         if (acpi_checksum((void *)ptr, ptr->length) != 0)
             continue;
 
-        printv("acpi: Found SMBIOS 32-bit entry point at %X\n", ptr);
+        printv("acpi: Found SMBIOS 32-bit entry point at %p\n", ptr);
 
         *smbios32 = (void *)ptr;
 
@@ -179,7 +179,7 @@ void acpi_get_smbios(void **smbios32, void **smbios64) {
         if (acpi_checksum((void *)ptr, ptr->length) != 0)
             continue;
 
-        printv("acpi: Found SMBIOS 64-bit entry point at %X\n", ptr);
+        printv("acpi: Found SMBIOS 64-bit entry point at %p\n", ptr);
 
         *smbios64 = (void *)ptr;
 
@@ -209,7 +209,8 @@ void *acpi_get_table(const char *signature, int index) {
         return NULL;
 
     bool use_xsdt = false;
-    if (rsdp->rev >= 2 && rsdp->xsdt_addr)
+    if (rsdp->rev >= 2 && rsdp->xsdt_addr
+     && (sizeof(uintptr_t) >= 8 || rsdp->xsdt_addr <= UINT32_MAX))
         use_xsdt = true;
 
     struct rsdt *rsdt;
@@ -245,7 +246,7 @@ void *acpi_get_table(const char *signature, int index) {
         if (!memcmp(ptr->signature, signature, 4)
          && !acpi_checksum(ptr, ptr->length)
          && cnt++ == index) {
-            printv("acpi: Found \"%s\" at %x\n", signature, ptr);
+            printv("acpi: Found \"%s\" at %p\n", signature, ptr);
             return ptr;
         }
     }
@@ -299,7 +300,10 @@ void acpi_map_tables(void) {
     map_single_table((uintptr_t)xsdt, (uint32_t)-1);
 
     for (size_t i = 0; i < xsdt_entry_count; i++) {
-        struct sdt *sdt = (void *)(uintptr_t)((uint64_t *)xsdt->ptrs_start)[i];
+        uint64_t entry = ((uint64_t *)xsdt->ptrs_start)[i];
+        if (entry == 0)
+            continue;
+        struct sdt *sdt = (void *)(uintptr_t)entry;
 
         map_single_table((uintptr_t)sdt, (uint32_t)-1);
     }
@@ -318,7 +322,10 @@ no_xsdt:;
     map_single_table((uintptr_t)rsdt, (uint32_t)-1);
 
     for (size_t i = 0; i < rsdt_entry_count; i++) {
-        struct sdt *sdt = (void *)(uintptr_t)((uint32_t *)rsdt->ptrs_start)[i];
+        uint32_t entry = ((uint32_t *)rsdt->ptrs_start)[i];
+        if (entry == 0)
+            continue;
+        struct sdt *sdt = (void *)(uintptr_t)entry;
 
         map_single_table((uintptr_t)sdt, (uint32_t)-1);
     }
@@ -328,29 +335,34 @@ no_rsdt:;
     if (fadt == NULL) {
         return;
     }
-    uint32_t fadt_length = *(uint32_t *)(fadt + 4);
+    uint32_t fadt_length;
+    memcpy(&fadt_length, fadt + 4, sizeof(fadt_length));
 
     // Read the single fields from the FADT without defining a struct for the whole table
     if (fadt_length >= 132 + 8) {
-        uint64_t x_facs = *(uint64_t *)(fadt + 132);
+        uint64_t x_facs;
+        memcpy(&x_facs, fadt + 132, sizeof(x_facs));
         if (x_facs != 0) {
             map_single_table(x_facs, (uint32_t)-1);
         }
     }
     if (fadt_length >= 140 + 8) {
-        uint64_t x_dsdt = *(uint64_t *)(fadt + 140);
+        uint64_t x_dsdt;
+        memcpy(&x_dsdt, fadt + 140, sizeof(x_dsdt));
         if (x_dsdt != 0) {
             map_single_table(x_dsdt, (uint32_t)-1);
         }
     }
     if (fadt_length >= 36 + 4) {
-        uint32_t facs = *(uint32_t *)(fadt + 36);
+        uint32_t facs;
+        memcpy(&facs, fadt + 36, sizeof(facs));
         if (facs != 0) {
             map_single_table(facs, (uint32_t)-1);
         }
     }
     if (fadt_length >= 40 + 4) {
-        uint32_t dsdt = *(uint32_t *)(fadt + 40);
+        uint32_t dsdt;
+        memcpy(&dsdt, fadt + 40, sizeof(dsdt));
         if (dsdt != 0) {
             map_single_table(dsdt, (uint32_t)-1);
         }
