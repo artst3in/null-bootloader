@@ -5,7 +5,7 @@
 
 *A Stripped-Down Limine Fork for LunaOS*
 
-[![Version](https://img.shields.io/badge/version-2026.01-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2026.02-blue.svg)]()
 [![License](https://img.shields.io/badge/license-BSD%202--Clause-green.svg)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-x64%20%7C%20UEFI%20%7C%20BIOS-orange.svg)]()
 [![Lines Removed](https://img.shields.io/badge/lines_removed-4%2C300-red.svg)]()
@@ -266,7 +266,7 @@ See [INSTALL.md](INSTALL.md) for full build instructions.
 
 Null follows the LunaOS unified versioning scheme:
 
-- **Version**: `2025.12.100` (YYYY.MM.BBB)
+- **Version**: `2026.02.100` (YYYY.MM.BBB)
 - **Increment**: Bump BBB (100 → 101 → 102) per release
 - **Reset**: Back to 100 each month
 
