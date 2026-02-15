@@ -793,6 +793,8 @@ no_load_font:;
         generate_canvas(fb);
 
         if (font_scale_is_default) {
+            font_scale_x = 1;
+            font_scale_y = 1;
             if (fb->framebuffer_width >= (1920 + 1920 / 3) && fb->framebuffer_height >= (1080 + 1080 / 3)) {
                 font_scale_x = 2;
                 font_scale_y = 2;
