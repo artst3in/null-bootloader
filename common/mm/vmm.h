@@ -123,11 +123,20 @@ void map_page(pagemap_t pagemap, uint64_t virt_addr, uint64_t phys_addr, uint64_
 
 #elif defined (__loongarch64)
 
-#define paging_mode_va_bits(mode) 48
+static inline uint32_t read_cpucfg(uint32_t reg) {
+    uint32_t val = 0;
+    asm volatile("cpucfg %0, %1\n\t"
+        :"=r"(val)
+        :"r"(reg)
+    );
+    return val;
+}
+
+#define paging_mode_va_bits(mode) (((read_cpucfg(0x1) >> 12) & 0xFF) + 1)
 
 static inline uint64_t paging_mode_higher_half(int paging_mode) {
     (void)paging_mode;
-    return 0xffff800000000000;
+    return 0UL - (1UL << (paging_mode_va_bits(paging_mode) - 1));
 }
 
 // We use fake flags here because these don't properly map onto the
