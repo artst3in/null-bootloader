@@ -83,12 +83,6 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
         return NULL;
     }
 
-    // Validate file size from TFTP server (max 1GB)
-    if (fsize.file_size == 0 || fsize.file_size > (1024 * 1024 * 1024)) {
-        print("tftp: Invalid file size from server: %u\n", fsize.file_size);
-        return NULL;
-    }
-
     struct file_handle *handle = ext_mem_alloc(sizeof(struct file_handle));
 
     handle->size = fsize.file_size;
@@ -227,12 +221,6 @@ struct file_handle *tftp_open(struct volume *part, const char *server_addr, cons
             false);
 
     if (status) {
-        return NULL;
-    }
-
-    // Validate file size from TFTP server (max 1GB)
-    if (file_size == 0 || file_size > (1024 * 1024 * 1024)) {
-        print("tftp: Invalid file size from server: %U\n", file_size);
         return NULL;
     }
 
