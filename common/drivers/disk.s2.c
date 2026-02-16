@@ -197,34 +197,10 @@ static bool detect_sector_size(struct volume *volume) {
         }
     }
 
-    size_t detected_size = sector_size_a > sector_size_b ? sector_size_a : sector_size_b;
+    volume->sector_size = sector_size_a > sector_size_b ? sector_size_a : sector_size_b;
 
-    if (detected_size == 0) {
+    if (volume->sector_size == 0) {
         return false;
-    }
-
-    // Validate detected sector size is a power of 2 and within reasonable bounds
-    // Valid sector sizes are typically 512, 1024, 2048, or 4096 bytes
-    static const size_t valid_sector_sizes[] = { 512, 1024, 2048, 4096 };
-    bool valid = false;
-    for (size_t i = 0; i < SIZEOF_ARRAY(valid_sector_sizes); i++) {
-        if (detected_size == valid_sector_sizes[i]) {
-            valid = true;
-            break;
-        }
-    }
-
-    if (!valid) {
-        // Round down to nearest valid sector size
-        volume->sector_size = 512;  // Default fallback
-        for (size_t i = SIZEOF_ARRAY(valid_sector_sizes); i > 0; i--) {
-            if (detected_size >= valid_sector_sizes[i - 1]) {
-                volume->sector_size = valid_sector_sizes[i - 1];
-                break;
-            }
-        }
-    } else {
-        volume->sector_size = detected_size;
     }
 
     return true;
