@@ -384,7 +384,7 @@ void init_memmap(void) {
         uint64_t base = entry->PhysicalStart;
         uint64_t length;
         if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
-            panic(false, "pmm: EFI memory descriptor size overflow");
+            continue;
         }
 
         memmap[memmap_entries].base = base;
