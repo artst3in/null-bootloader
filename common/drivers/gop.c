@@ -38,6 +38,19 @@ static void linear_mask_to_mask_shift(
     }
 }
 
+static bool validate_pitch(struct fb_info *ret, size_t mode) {
+    uint64_t bytes_per_pixel = ret->framebuffer_bpp / 8;
+    if (bytes_per_pixel == 0
+     || ret->framebuffer_pitch % bytes_per_pixel != 0
+     || ret->framebuffer_pitch < ret->framebuffer_width * bytes_per_pixel) {
+        printv("gop: Mode %u has invalid pitch %u (width=%u, bpp=%u), skipping.\n",
+               (uint32_t)mode, (uint32_t)ret->framebuffer_pitch,
+               (uint32_t)ret->framebuffer_width, (uint32_t)ret->framebuffer_bpp);
+        return false;
+    }
+    return true;
+}
+
 // Most of this code taken from https://wiki.osdev.org/GOP
 
 static bool mode_to_fb_info(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, size_t mode) {
@@ -102,13 +115,7 @@ static bool mode_to_fb_info(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *g
     ret->framebuffer_width = mode_info->HorizontalResolution;
     ret->framebuffer_height = mode_info->VerticalResolution;
 
-    uint64_t bytes_per_pixel = ret->framebuffer_bpp / 8;
-    if (bytes_per_pixel == 0
-     || ret->framebuffer_pitch % bytes_per_pixel != 0
-     || ret->framebuffer_pitch < ret->framebuffer_width * bytes_per_pixel) {
-        printv("gop: Mode %u has invalid pitch %u (width=%u, bpp=%u), skipping.\n",
-               (uint32_t)mode, (uint32_t)ret->framebuffer_pitch,
-               (uint32_t)ret->framebuffer_width, (uint32_t)ret->framebuffer_bpp);
+    if (!validate_pitch(ret, mode)) {
         return false;
     }
 
@@ -159,6 +166,14 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
             printv("gop: Failed to set video mode %X, moving on...\n", (uint64_t)mode);
             return false;
         }
+    }
+
+    // Recalculate pitch from gop->Mode->Info, as some firmware (e.g. Apple
+    // Macs) report incorrect PixelsPerScanLine via QueryMode.
+    ret->framebuffer_pitch = gop->Mode->Info->PixelsPerScanLine * (ret->framebuffer_bpp / 8);
+
+    if (!validate_pitch(ret, mode)) {
+        return false;
     }
 
     ret->framebuffer_addr = gop->Mode->FrameBufferBase;
