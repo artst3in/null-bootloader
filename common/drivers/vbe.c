@@ -269,9 +269,7 @@ bool init_vbe(struct fb_info *ret,
                 edid_width  += ((int)edid_info->det_timing_desc1[4] & 0xf0) << 4;
             int edid_height  = (int)edid_info->det_timing_desc1[5];
                 edid_height += ((int)edid_info->det_timing_desc1[7] & 0xf0) << 4;
-            // Sanity check EDID values
-            if (edid_width > 0 && edid_width <= 16384 &&
-                edid_height > 0 && edid_height <= 16384) {
+            if (edid_width && edid_height) {
                 target_width  = edid_width;
                 target_height = edid_height;
                 target_bpp    = 32;
