@@ -835,11 +835,6 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
         panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
     }
 
-    // Validate program header count is reasonable (max 256 segments)
-    if (hdr->ph_num > 256) {
-        panic(true, "elf: Too many program headers (%u)", hdr->ph_num);
-    }
-
     // Validate program header offset and size don't overflow
     uint64_t phdr_table_end;
     if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
