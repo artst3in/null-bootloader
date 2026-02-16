@@ -37,6 +37,7 @@ noreturn void uefi_entry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) 
     gRT = SystemTable->RuntimeServices;
     efi_image_handle = ImageHandle;
 
+    calibrate_tsc();
     usec_at_bootloader_entry = rdtsc_usec();
 
     EFI_STATUS status;

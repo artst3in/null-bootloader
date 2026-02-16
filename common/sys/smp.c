@@ -82,7 +82,7 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
         lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
         lapic_write(LAPIC_REG_ICR0, 0x4500);
     }
-    delay(10000000);
+    stall(10000);
 
     // Send two Startup IPIs per Intel SDM recommendation (Vol 3, 8.4.4.1)
     for (int j = 0; j < 2; j++) {
@@ -93,14 +93,14 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
             lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
             lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
         }
-        delay(200000); // ~200 us
+        stall(200);
     }
 
     for (int i = 0; i < 100; i++) {
         if (locked_read(&passed_info->smp_tpl_booted_flag) == 1) {
             return true;
         }
-        delay(10000000);
+        stall(10000);
     }
 
     return false;
@@ -423,7 +423,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
         if (locked_read(&passed_info->smp_tpl_booted_flag) == 1) {
             return true;
         }
-        delay(100000);
+        stall(100);
     }
 
     return false;
@@ -804,7 +804,7 @@ static bool smp_start_ap(size_t hartid, size_t satp, struct limine_mp_info *info
         if (locked_read(&passed_info.smp_tpl_booted_flag) == 1)
             return true;
 
-        delay(100000);
+        stall(100);
     }
 
     return false;

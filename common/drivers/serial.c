@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <lib/misc.h>
 #include <drivers/serial.h>
 #include <sys/cpu.h>
 

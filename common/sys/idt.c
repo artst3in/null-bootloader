@@ -61,7 +61,7 @@ void flush_irqs(void) {
     asm volatile ("sti" ::: "memory");
 
     // Delay a while to make sure we catch ALL pending IRQs
-    delay(10000000);
+    stall(10000);
 
     asm volatile ("cli" ::: "memory");
 
