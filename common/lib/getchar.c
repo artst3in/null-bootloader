@@ -176,7 +176,7 @@ again:
                 case '\r':
                     return '\n';
                 case 0x1b:
-                    delay(10000);
+                    stall(10);
                     ret = serial_in();
                     if (ret == -1) {
                         return GETCHAR_ESCAPE;
