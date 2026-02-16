@@ -126,7 +126,8 @@ bool gop_force_16 = false;
 
 static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
                      size_t mode, uint64_t width, uint64_t height, int bpp,
-                     struct fb_info *fbs, size_t fbs_count) {
+                     struct fb_info *fbs, size_t fbs_count,
+                     bool *setmode_called) {
     EFI_STATUS status;
 
     if (!mode_to_fb_info(ret, gop, mode)) {
@@ -157,7 +158,7 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 
     printv("gop: Found matching mode %X, attempting to set...\n", (uint64_t)mode);
 
-    if (mode == gop->Mode->Mode) {
+    if (mode == gop->Mode->Mode && *setmode_called) {
         printv("gop: Mode was already set, perfect!\n");
     } else {
         status = gop->SetMode(gop, mode);
@@ -166,6 +167,8 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
             printv("gop: Failed to set video mode %X, moving on...\n", (uint64_t)mode);
             return false;
         }
+
+        *setmode_called = true;
     }
 
     // Recalculate pitch from gop->Mode->Info, as some firmware (e.g. Apple
@@ -207,6 +210,7 @@ static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL
 
 #define MAX_PRESET_MODES 128
 no_unwind static int preset_modes[MAX_PRESET_MODES];
+no_unwind static bool setmode_called[MAX_PRESET_MODES];
 no_unwind static bool preset_modes_initialised = false;
 
 void init_gop(struct fb_info **ret, size_t *_fbs_count,
@@ -214,6 +218,7 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
     if (preset_modes_initialised == false) {
         for (size_t i = 0; i < MAX_PRESET_MODES; i++) {
             preset_modes[i] = -1;
+            setmode_called[i] = false;
         }
         preset_modes_initialised = true;
     }
@@ -286,6 +291,7 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
             if (status) {
                 continue;
             }
+            setmode_called[i] = true;
             status = gop->QueryMode(gop, gop->Mode == NULL ? 0 : gop->Mode->Mode,
                                     &mode_info_size, &mode_info);
         }
@@ -313,7 +319,7 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
 
 retry:
         for (size_t j = 0; j < modes_count; j++) {
-            if (try_mode(fb, gop, j, _target_width, _target_height, _target_bpp, *ret, fbs_count)) {
+            if (try_mode(fb, gop, j, _target_width, _target_height, _target_bpp, *ret, fbs_count, &setmode_called[i])) {
                 goto success;
             }
         }
@@ -340,7 +346,7 @@ fallback:
         if (current_fallback == 1) {
             current_fallback++;
 
-            if (try_mode(fb, gop, preset_modes[i], 0, 0, 0, *ret, fbs_count)) {
+            if (try_mode(fb, gop, preset_modes[i], 0, 0, 0, *ret, fbs_count, &setmode_called[i])) {
                 goto success;
             }
         }
