@@ -635,6 +635,16 @@ void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alig
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
 
+#if defined(__x86_64__) || defined(__i386__)
+    // Try below 4GiB first to avoid relying on firmware identity-mapping
+    // memory above 4GiB (some buggy UEFI implementations don't).
+    uint64_t limit = 0x100000000;
+
+again:
+#else
+    uint64_t limit = UINT64_MAX;
+#endif
+
     for (int i = memmap_entries - 1; i >= 0; i--) {
         if (memmap[i].type != 1)
             continue;
@@ -642,14 +652,11 @@ void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alig
         int64_t entry_base = (int64_t)(memmap[i].base);
         int64_t entry_top  = (int64_t)(memmap[i].base + memmap[i].length);
 
-#if defined(__x86_64__) || defined(__i386__)
-        // Let's make sure the entry is not > 4GiB
-        if (entry_top >= 0x100000000 && !allow_high_allocs) {
-            entry_top = 0x100000000;
+        if ((uint64_t)entry_top > limit) {
+            entry_top = (int64_t)limit;
             if (entry_base >= entry_top)
                 continue;
         }
-#endif
 
         int64_t alloc_base = ALIGN_DOWN(entry_top - (int64_t)count, alignment);
 
@@ -682,6 +689,13 @@ void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alig
 
         return ret;
     }
+
+#if defined(__x86_64__) || defined(__i386__)
+    if (allow_high_allocs && limit < UINT64_MAX) {
+        limit = UINT64_MAX;
+        goto again;
+    }
+#endif
 
     panic(false, "High memory allocator: Out of memory");
 }
