@@ -255,6 +255,29 @@ void *acpi_get_table(const char *signature, int index) {
     return NULL;
 }
 
+static bool acpi_padding_is_safe(uint64_t base, uint64_t length) {
+    if (length == 0) {
+        return true;
+    }
+
+    uint64_t top = base + length;
+
+    for (size_t i = 0; i < memmap_entries; i++) {
+        uint64_t entry_base = memmap[i].base;
+        uint64_t entry_top  = entry_base + memmap[i].length;
+
+        if (entry_base >= top || entry_top <= base) {
+            continue;
+        }
+
+        if (memmap[i].type != MEMMAP_USABLE && memmap[i].type != MEMMAP_RESERVED) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static void map_single_table(uint64_t addr, uint32_t len) {
 #if defined (__i386__)
     if (addr >= 0x100000000) {
@@ -265,10 +288,20 @@ static void map_single_table(uint64_t addr, uint32_t len) {
 
     uint32_t length = len != (uint32_t)-1 ? len : *(uint32_t *)(uintptr_t)(addr + 4);
 
+    uint64_t aligned_base = ALIGN_DOWN(addr, 4096);
+    uint64_t aligned_top  = ALIGN_UP(addr + length, 4096);
+
+    if (!acpi_padding_is_safe(aligned_base, addr - aligned_base)) {
+        aligned_base = addr;
+    }
+    if (!acpi_padding_is_safe(addr + length, aligned_top - (addr + length))) {
+        aligned_top = addr + length;
+    }
+
     uint64_t memmap_type = pmm_check_type(addr);
 
     if (memmap_type != MEMMAP_ACPI_RECLAIMABLE && memmap_type != MEMMAP_ACPI_NVS) {
-        memmap_alloc_range(addr, length, MEMMAP_ACPI_TABLES, 0, true, false, true);
+        memmap_alloc_range(aligned_base, aligned_top - aligned_base, MEMMAP_ACPI_TABLES, 0, true, false, true);
     }
 }
 
