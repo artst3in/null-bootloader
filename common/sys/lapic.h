@@ -20,6 +20,7 @@ void lapic_write(uint32_t reg, uint32_t data);
 
 bool x2apic_check(void);
 bool x2apic_enable(void);
+bool x2apic_disable(void);
 uint64_t x2apic_read(uint32_t reg);
 void x2apic_write(uint32_t reg, uint64_t data);
 
