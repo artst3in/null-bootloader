@@ -53,13 +53,25 @@ smp_trampoline_start:
     mov ebx, esi
 
     mov ecx, 0x1b
+    rdmsr
+    test eax, (1 << 10)
+    jz .write_apic_msr
+
+    ; Check if target also has x2APIC
+    test dword [ebx + (passed_info.bsp_apic_addr_msr_lo - smp_trampoline_start)], (1 << 10)
+    jnz .write_apic_msr
+
+    ; AP is x2APIC but target is xAPIC: go through disabled state
+    btr eax, 11
+    btr eax, 10
+    wrmsr
+
+  .write_apic_msr:
     mov eax, [ebx + (passed_info.bsp_apic_addr_msr_lo - smp_trampoline_start)]
     mov edx, [ebx + (passed_info.bsp_apic_addr_msr_hi - smp_trampoline_start)]
     bts eax, 11
     btr eax, 8
     wrmsr
-
-  .nox2apic:
     mov esp, [ebx + (passed_info.temp_stack - smp_trampoline_start)]
 
     mov eax, cr4

@@ -279,6 +279,37 @@ bool x2apic_enable(void) {
     return true;
 }
 
+bool x2apic_disable(void) {
+    uint64_t msr = rdmsr(0x1b);
+    if (!(msr & (1 << 10)))
+        return true;
+
+    // Check for LEGACY_XAPIC_DISABLED (Intel Meteor Lake+).
+    // CPUID.07H.0:EDX[29] enumerates IA32_ARCH_CAPABILITIES MSR (0x10A).
+    // IA32_ARCH_CAPABILITIES bit 21 = XAPIC_DISABLE feature supported.
+    // IA32_XAPIC_DISABLE_STATUS MSR (0xBD) bit 0 = xAPIC permanently disabled.
+    uint32_t eax, ebx, ecx, edx;
+    if (cpuid(7, 0, &eax, &ebx, &ecx, &edx) && (edx & (1 << 29))) {
+        uint64_t arch_caps = rdmsr(0x10a);
+        if (arch_caps & (1 << 21)) {
+            if (rdmsr(0xbd) & 1) {
+                return false;
+            }
+        }
+    }
+
+    // Transition x2APIC -> disabled -> xAPIC.
+    // Direct x2APIC -> xAPIC is an invalid transition (#GP).
+    msr &= ~((1ULL << 11) | (1ULL << 10));
+    wrmsr(0x1b, msr);
+
+    msr |= (1ULL << 11);
+    wrmsr(0x1b, msr);
+
+    x2apic_mode = false;
+    return true;
+}
+
 void lapic_eoi(void) {
     if (!x2apic_mode) {
         lapic_write(0xb0, 0);
