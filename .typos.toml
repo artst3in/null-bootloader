@@ -19,5 +19,6 @@ pn = "pn"
 hd = "hd"
 htpt = "htpt"
 CMO = "CMO"
+extint = "extint"
 
 [default.extend-identifiers]
