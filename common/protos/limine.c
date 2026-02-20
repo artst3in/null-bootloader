@@ -904,6 +904,24 @@ FEAT_START
     entrypoint_request->response = reported_addr(entrypoint_response);
 FEAT_END
 
+    // x86-64 Keep IOMMU feature
+#if defined (__x86_64__) || defined (__i386__)
+    bool keep_iommu = false;
+FEAT_START
+    struct limine_x86_64_keep_iommu_request *keep_iommu_request =
+        get_request(LIMINE_X86_64_KEEP_IOMMU_REQUEST_ID);
+    if (keep_iommu_request == NULL) {
+        break;
+    }
+
+    struct limine_x86_64_keep_iommu_response *keep_iommu_response =
+        ext_mem_alloc(sizeof(struct limine_x86_64_keep_iommu_response));
+
+    keep_iommu_request->response = reported_addr(keep_iommu_response);
+    keep_iommu = true;
+FEAT_END
+#endif
+
     // Bootloader info feature
 FEAT_START
     struct limine_bootloader_info_request *bootloader_info_request = get_request(LIMINE_BOOTLOADER_INFO_REQUEST_ID);
@@ -1666,7 +1684,9 @@ FEAT_END
     rm_int(0x15, &r, &r);
 #endif
 
-    iommu_disable_all();
+    if (!keep_iommu) {
+        iommu_disable_all();
+    }
 
     pic_mask_all();
     io_apic_mask_all(base_revision >= 5);
