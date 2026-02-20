@@ -16,6 +16,7 @@
 #include <sys/idt.h>
 #include <lib/fb.h>
 #include <lib/acpi.h>
+#include <sys/iommu.h>
 #include <drivers/edid.h>
 #include <drivers/vga_textmode.h>
 #include <drivers/gop.h>
@@ -642,6 +643,8 @@ no_fb:;
     ///////////////////////////////////////
     // Spin up
     ///////////////////////////////////////
+
+    iommu_disable_all();
 
     irq_flush_type = IRQ_PIC_ONLY_FLUSH;
 

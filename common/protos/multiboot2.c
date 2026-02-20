@@ -18,6 +18,7 @@
 #include <sys/pic.h>
 #include <sys/cpu.h>
 #include <sys/idt.h>
+#include <sys/iommu.h>
 #include <fs/file.h>
 #include <mm/vmm.h>
 #include <lib/acpi.h>
@@ -1000,6 +1001,8 @@ skip_modeset:;
 
     mbi_start->size = info_idx;
     mbi_start->reserved = 0x00;
+
+    iommu_disable_all();
 
     irq_flush_type = IRQ_PIC_ONLY_FLUSH;
 
