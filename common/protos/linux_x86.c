@@ -644,7 +644,9 @@ no_fb:;
     // Spin up
     ///////////////////////////////////////
 
-    iommu_disable_all();
+    // Commented out because Linux shouldn't need it and we don't want to
+    // introduce potential breakages or security weakening.
+    //iommu_disable_all();
 
     irq_flush_type = IRQ_PIC_ONLY_FLUSH;
 
