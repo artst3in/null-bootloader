@@ -9,6 +9,210 @@
 #include <lib/acpi.h>
 #include <mm/pmm.h>
 
+#define LAPIC_REG_LVT_CMCI    0x2f0
+#define LAPIC_REG_LVT_TIMER   0x320
+#define LAPIC_REG_LVT_THERMAL 0x330
+#define LAPIC_REG_LVT_PMC     0x340
+#define LAPIC_REG_LVT_LINT0   0x350
+#define LAPIC_REG_LVT_LINT1   0x360
+#define LAPIC_REG_LVT_ERROR   0x370
+#define LAPIC_REG_SVR         0x0f0
+#define LAPIC_REG_TPR         0x080
+#define LAPIC_REG_VERSION     0x030
+
+static uint32_t pending_lint0 = 0x00010000; // masked
+static uint32_t pending_lint1 = 0x00010000; // masked
+
+static uint32_t lapic_madt_nmi_flags_to_lvt(uint16_t flags) {
+    uint32_t lvt = 0x10400; // masked + NMI delivery mode
+
+    // Polarity: bits 1:0 of flags
+    uint8_t polarity = flags & 0x3;
+    if (polarity == 0x3) {
+        lvt |= (1 << 13); // active low
+    }
+    // 0b00 (conforms) and 0b01 (active high) leave bit 13 clear
+
+    // Trigger mode: bits 3:2 of flags
+    uint8_t trigger = (flags >> 2) & 0x3;
+    if (trigger == 0x3) {
+        lvt |= (1 << 15); // level triggered
+    }
+    // 0b00 (conforms) and 0b01 (edge) leave bit 15 clear
+
+    return lvt;
+}
+
+void lapic_prep_lint(struct madt *madt, uint32_t acpi_uid, bool is_bsp, bool x2apic) {
+    // Set defaults
+    if (is_bsp) {
+        pending_lint0 = 0x00010700; // ExtINT delivery mode, masked
+    } else {
+        pending_lint0 = 0x00010000; // masked
+    }
+    pending_lint1 = 0x00010000; // masked
+
+    // Walk MADT entries looking for NMI entries
+    for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
+      madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
+        switch (*madt_ptr) {
+            case 4: {
+                // Local APIC NMI
+                if (*(madt_ptr + 1) < sizeof(struct madt_lapic_nmi)) {
+                    continue;
+                }
+
+                struct madt_lapic_nmi *nmi = (void *)madt_ptr;
+
+                // Match all processors (0xff) or specific UID
+                if (nmi->acpi_processor_uid != 0xff && nmi->acpi_processor_uid != (uint8_t)acpi_uid) {
+                    continue;
+                }
+
+                uint32_t lvt = lapic_madt_nmi_flags_to_lvt(nmi->flags);
+                if (nmi->lint == 0) {
+                    pending_lint0 = lvt;
+                } else if (nmi->lint == 1) {
+                    pending_lint1 = lvt;
+                }
+                continue;
+            }
+            case 0x0a: {
+                // Local x2APIC NMI
+                if (!x2apic) {
+                    continue;
+                }
+                if (*(madt_ptr + 1) < sizeof(struct madt_x2apic_nmi)) {
+                    continue;
+                }
+
+                struct madt_x2apic_nmi *nmi = (void *)madt_ptr;
+
+                // Match all processors (0xffffffff) or specific UID
+                if (nmi->acpi_processor_uid != 0xffffffff && nmi->acpi_processor_uid != acpi_uid) {
+                    continue;
+                }
+
+                uint32_t lvt = lapic_madt_nmi_flags_to_lvt(nmi->flags);
+                if (nmi->lint == 0) {
+                    pending_lint0 = lvt;
+                } else if (nmi->lint == 1) {
+                    pending_lint1 = lvt;
+                }
+                continue;
+            }
+        }
+    }
+}
+
+void lapic_configure_handoff_state(void) {
+    bool is_x2 = !!(rdmsr(0x1b) & (1 << 10));
+
+    uint32_t max_lvt;
+    if (is_x2) {
+        max_lvt = (x2apic_read(LAPIC_REG_VERSION) >> 16) & 0xff;
+    } else {
+        max_lvt = (lapic_read(LAPIC_REG_VERSION) >> 16) & 0xff;
+    }
+
+    if (is_x2) {
+        x2apic_write(LAPIC_REG_SVR, 0x1ff);
+        x2apic_write(LAPIC_REG_TPR, 0);
+        if (max_lvt >= 6) {
+            x2apic_write(LAPIC_REG_LVT_CMCI, 0x00010000);
+        }
+        x2apic_write(LAPIC_REG_LVT_TIMER, 0x00010000);
+        if (max_lvt >= 5) {
+            x2apic_write(LAPIC_REG_LVT_THERMAL, 0x00010000);
+        }
+        if (max_lvt >= 4) {
+            x2apic_write(LAPIC_REG_LVT_PMC, 0x00010000);
+        }
+        x2apic_write(LAPIC_REG_LVT_ERROR, 0x00010000);
+        x2apic_write(LAPIC_REG_LVT_LINT0, pending_lint0);
+        x2apic_write(LAPIC_REG_LVT_LINT1, pending_lint1);
+    } else {
+        lapic_write(LAPIC_REG_SVR, 0x1ff);
+        lapic_write(LAPIC_REG_TPR, 0);
+        if (max_lvt >= 6) {
+            lapic_write(LAPIC_REG_LVT_CMCI, 0x00010000);
+        }
+        lapic_write(LAPIC_REG_LVT_TIMER, 0x00010000);
+        if (max_lvt >= 5) {
+            lapic_write(LAPIC_REG_LVT_THERMAL, 0x00010000);
+        }
+        if (max_lvt >= 4) {
+            lapic_write(LAPIC_REG_LVT_PMC, 0x00010000);
+        }
+        lapic_write(LAPIC_REG_LVT_ERROR, 0x00010000);
+        lapic_write(LAPIC_REG_LVT_LINT0, pending_lint0);
+        lapic_write(LAPIC_REG_LVT_LINT1, pending_lint1);
+    }
+}
+
+void lapic_configure_bsp(void) {
+    struct madt *madt = acpi_get_table("APIC", 0);
+    if (madt == NULL) {
+        return;
+    }
+
+    // Detect x2APIC from MSR
+    bool is_x2 = !!(rdmsr(0x1b) & (1 << 10));
+
+    // Find the BSP entry by matching LAPIC ID
+    uint32_t bsp_lapic_id;
+    if (is_x2) {
+        bsp_lapic_id = x2apic_read(LAPIC_REG_ID);
+    } else {
+        bsp_lapic_id = lapic_read(LAPIC_REG_ID) >> 24;
+    }
+
+    uint32_t bsp_acpi_uid = 0;
+
+    for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
+      (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
+      madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0) {
+            break;
+        }
+        switch (*madt_ptr) {
+            case 0: {
+                if (*(madt_ptr + 1) < sizeof(struct madt_lapic)) {
+                    continue;
+                }
+                struct madt_lapic *lapic = (void *)madt_ptr;
+                if (lapic->lapic_id == bsp_lapic_id) {
+                    bsp_acpi_uid = lapic->acpi_processor_uid;
+                    goto found;
+                }
+                continue;
+            }
+            case 9: {
+                if (!is_x2) {
+                    continue;
+                }
+                if (*(madt_ptr + 1) < sizeof(struct madt_x2apic)) {
+                    continue;
+                }
+                struct madt_x2apic *x2lapic = (void *)madt_ptr;
+                if (x2lapic->x2apic_id == bsp_lapic_id) {
+                    bsp_acpi_uid = x2lapic->acpi_processor_uid;
+                    goto found;
+                }
+                continue;
+            }
+        }
+    }
+
+found:
+    lapic_prep_lint(madt, bsp_acpi_uid, true, is_x2);
+    lapic_configure_handoff_state();
+}
+
 struct dmar {
     struct sdt header;
     uint8_t host_address_width;
@@ -161,7 +365,7 @@ uint32_t io_apic_gsi_count(size_t io_apic) {
     return ((io_apic_read(io_apic, 1) & 0xff0000) >> 16) + 1;
 }
 
-void io_apic_mask_all(void) {
+void io_apic_mask_all(bool mask_nmi_and_extint) {
     for (size_t i = 0; i < max_io_apics; i++) {
         uint32_t gsi_count = io_apic_gsi_count(i);
         for (uint32_t j = 0; j < gsi_count; j++) {
@@ -169,6 +373,12 @@ void io_apic_mask_all(void) {
             switch ((io_apic_read(i, ioredtbl) >> 8) & 0b111) {
                 case 0b000: // Fixed
                 case 0b001: // Lowest Priority
+                    break;
+                case 0b100: // NMI
+                case 0b111: // ExtINT
+                    if (!mask_nmi_and_extint) {
+                        continue;
+                    }
                     break;
                 default:
                     continue;
