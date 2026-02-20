@@ -24,6 +24,7 @@
 #include <flanterm_backends/fb.h>
 #include <sys/pic.h>
 #include <sys/lapic.h>
+#include <sys/iommu.h>
 #include <sys/idt.h>
 #include <fs/file.h>
 #include <mm/pmm.h>
@@ -1657,6 +1658,8 @@ FEAT_END
     r.ebx = 0x02;   // Long mode only
     rm_int(0x15, &r, &r);
 #endif
+
+    iommu_disable_all();
 
     pic_mask_all();
     io_apic_mask_all();

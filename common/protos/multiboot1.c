@@ -18,6 +18,7 @@
 #include <sys/pic.h>
 #include <sys/cpu.h>
 #include <sys/idt.h>
+#include <sys/iommu.h>
 #include <fs/file.h>
 #include <mm/vmm.h>
 #include <mm/pmm.h>
@@ -483,6 +484,8 @@ skip_modeset:;
     multiboot1_info->mmap_length = mb_mmap_len;
     multiboot1_info->mmap_addr = (uint32_t)(size_t)mmap - mb1_info_slide;
     multiboot1_info->flags |= (1 << 0) | (1 << 6);
+
+    iommu_disable_all();
 
     irq_flush_type = IRQ_PIC_ONLY_FLUSH;
 
