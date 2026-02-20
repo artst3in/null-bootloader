@@ -36,7 +36,10 @@ struct trampoline_passed_info {
     uint64_t smp_tpl_bsp_apic_addr_msr;
     uint64_t smp_tpl_mtrr_restore;
     uint64_t smp_tpl_temp_stack;
+    uint64_t smp_tpl_lapic_setup;
 } __attribute__((packed));
+
+bool smp_configure_apic = false;
 
 static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
                          struct limine_mp_info *info_struct,
@@ -72,6 +75,8 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     passed_info->smp_tpl_bsp_apic_addr_msr = rdmsr(0x1b);
     passed_info->smp_tpl_mtrr_restore = (uint64_t)(uintptr_t)mtrr_restore;
     passed_info->smp_tpl_temp_stack = (uint64_t)(uintptr_t)temp_stack + 8192;
+    passed_info->smp_tpl_lapic_setup = smp_configure_apic
+        ? (uint64_t)(uintptr_t)lapic_configure_handoff_state : 0;
 
     asm volatile ("" ::: "memory");
 
@@ -234,6 +239,11 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 
                 printv("smp: [xAPIC] Found candidate AP for bring-up. LAPIC ID: %u\n", lapic->lapic_id);
 
+                // Set up per-AP LINT values before starting
+                if (smp_configure_apic) {
+                    lapic_prep_lint(madt, lapic->acpi_processor_uid, false, x2apic);
+                }
+
                 // Try to start the AP
                 if (!smp_start_ap(lapic->lapic_id, &gdtr, info_struct,
                                   paging_mode, (uintptr_t)pagemap.top_level,
@@ -273,6 +283,11 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
                 }
 
                 printv("smp: [x2APIC] Found candidate AP for bring-up. LAPIC ID: %u\n", x2lapic->x2apic_id);
+
+                // Set up per-AP LINT values before starting
+                if (smp_configure_apic) {
+                    lapic_prep_lint(madt, x2lapic->acpi_processor_uid, false, true);
+                }
 
                 // Try to start the AP
                 if (!smp_start_ap(x2lapic->x2apic_id, &gdtr, info_struct,

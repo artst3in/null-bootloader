@@ -89,6 +89,13 @@ smp_trampoline_start:
 %ifdef IA32_TARGET
     ; Synchronise MTRRs with BSP
     call [ebx + (passed_info.mtrr_restore - smp_trampoline_start)]
+
+    ; Configure local APIC handoff state (if pointer is set)
+    mov eax, dword [ebx + (passed_info.lapic_setup - smp_trampoline_start)]
+    test eax, eax
+    jz .skip_lapic_setup32
+    call eax
+  .skip_lapic_setup32:
 %endif
 
     lea eax, [ebx + (.mode64 - smp_trampoline_start)]
@@ -138,6 +145,13 @@ parking64:
 %ifdef X86_64_TARGET
     ; Synchronise MTRRs with BSP
     call [rbx + (passed_info.mtrr_restore - smp_trampoline_start)]
+
+    ; Configure local APIC handoff state (if pointer is set)
+    mov rax, [rbx + (passed_info.lapic_setup - smp_trampoline_start)]
+    test rax, rax
+    jz .skip_lapic_setup64
+    call rax
+  .skip_lapic_setup64:
 %endif
 
     mov edi, dword [rbx + (passed_info.smp_info_struct - smp_trampoline_start)]
@@ -221,6 +235,8 @@ passed_info:
     .mtrr_restore:
         dq 0
     .temp_stack:
+        dq 0
+    .lapic_setup:
         dq 0
 
 smp_trampoline_end:

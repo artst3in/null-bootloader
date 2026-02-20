@@ -138,6 +138,21 @@ struct madt_io_apic {
     uint32_t gsib;
 } __attribute__((packed));
 
+struct madt_lapic_nmi {
+    struct madt_header header;   // type=4, length=6
+    uint8_t  acpi_processor_uid; // 0xff = all processors
+    uint16_t flags;              // MPS INTI flags
+    uint8_t  lint;               // 0 or 1
+} __attribute__((packed));
+
+struct madt_x2apic_nmi {
+    struct madt_header header;   // type=0x0a, length=12
+    uint16_t flags;              // MPS INTI flags
+    uint32_t acpi_processor_uid; // 0xffffffff = all processors
+    uint8_t  lint;               // 0 or 1
+    uint8_t  reserved[3];
+} __attribute__((packed));
+
 struct madt_gicc {
     struct madt_header header;
     uint8_t  reserved1[2];
@@ -181,5 +196,10 @@ void   *acpi_get_table(const char *signature, int index);
 void    acpi_get_smbios(void **smbios32, void **smbios64);
 
 void acpi_map_tables(void);
+void smbios_map_tables(void);
+
+#if defined (UEFI)
+void efi_map_runtime_entries(void);
+#endif
 
 #endif

@@ -301,7 +301,7 @@ static void map_single_table(uint64_t addr, uint32_t len) {
     uint64_t memmap_type = pmm_check_type(addr);
 
     if (memmap_type != MEMMAP_ACPI_RECLAIMABLE && memmap_type != MEMMAP_ACPI_NVS) {
-        memmap_alloc_range(aligned_base, aligned_top - aligned_base, MEMMAP_ACPI_TABLES, 0, true, false, true);
+        memmap_alloc_range(aligned_base, aligned_top - aligned_base, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
     }
 }
 
@@ -401,3 +401,75 @@ no_rsdt:;
         }
     }
 }
+
+void smbios_map_tables(void) {
+    void *smbios32_ptr = NULL, *smbios64_ptr = NULL;
+    acpi_get_smbios(&smbios32_ptr, &smbios64_ptr);
+
+    if (smbios32_ptr != NULL) {
+        struct smbios_entry_point_32 *smbios32 = smbios32_ptr;
+        map_single_table((uintptr_t)smbios32, smbios32->length);
+        if (smbios32->table_address != 0) {
+            map_single_table(smbios32->table_address, smbios32->table_length);
+        }
+    }
+
+    if (smbios64_ptr != NULL) {
+        struct smbios_entry_point_64 *smbios64 = smbios64_ptr;
+        map_single_table((uintptr_t)smbios64, smbios64->length);
+        if (smbios64->table_address != 0) {
+            map_single_table(smbios64->table_address, smbios64->table_maximum_size);
+        }
+    }
+}
+
+#if defined (UEFI)
+void efi_map_runtime_entries(void) {
+    size_t entry_count = efi_mmap_size / efi_desc_size;
+
+    for (size_t i = 0; i < entry_count; i++) {
+        EFI_MEMORY_DESCRIPTOR *entry = (void *)efi_mmap + i * efi_desc_size;
+
+        if (entry->Type != EfiRuntimeServicesCode
+         && entry->Type != EfiRuntimeServicesData) {
+            continue;
+        }
+
+        uint64_t base = entry->PhysicalStart;
+        uint64_t length;
+        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
+            continue;
+        }
+
+        memmap_alloc_range(base, length, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
+    }
+
+    // Explicitly map the EFI system table and the data it references.
+    // The UEFI spec does not guarantee these reside in EfiRuntimeServicesData,
+    // so we map them separately to ensure they are always accessible via HHDM.
+    map_single_table((uintptr_t)gST, sizeof(*gST));
+
+    if (gST->RuntimeServices != NULL) {
+        map_single_table((uintptr_t)gST->RuntimeServices,
+                         sizeof(*gST->RuntimeServices));
+    }
+
+    if (gST->ConfigurationTable != NULL && gST->NumberOfTableEntries > 0) {
+        uint64_t ct_size;
+        if (!__builtin_mul_overflow(gST->NumberOfTableEntries,
+                (uint64_t)sizeof(EFI_CONFIGURATION_TABLE), &ct_size)
+         && ct_size <= UINT32_MAX) {
+            map_single_table((uintptr_t)gST->ConfigurationTable, (uint32_t)ct_size);
+        }
+    }
+
+    if (gST->FirmwareVendor != NULL) {
+        size_t len = 0;
+        while (gST->FirmwareVendor[len] != 0) {
+            len++;
+        }
+        map_single_table((uintptr_t)gST->FirmwareVendor,
+                         (len + 1) * sizeof(*gST->FirmwareVendor));
+    }
+}
+#endif

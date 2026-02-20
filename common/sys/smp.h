@@ -10,6 +10,8 @@
 
 #if defined (__x86_64__) || defined (__i386__)
 
+extern bool smp_configure_apic;
+
 struct limine_mp_info *init_smp(size_t   *cpu_count,
                                  uint32_t *_bsp_lapic_id,
                                  int       paging_mode,
