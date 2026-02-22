@@ -1590,6 +1590,20 @@ FEAT_START
     mp_request->response = reported_addr(mp_response);
 FEAT_END
 
+#if defined (__x86_64__) || defined (__i386__)
+    // If there was no MP request, the kernel has no way to tell us it supports
+    // x2APIC. Try to disable it as a courtesy, but do not panic if we cannot
+    // since the kernel may be able to deal with it itself.
+    if (get_request(LIMINE_MP_REQUEST_ID) == NULL
+     && (rdmsr(0x1b) & (1 << 10))) {
+        if (x2apic_disable()) {
+            printv("limine: Firmware had x2APIC enabled, reverted to xAPIC mode\n");
+        } else {
+            printv("limine: Firmware has x2APIC enabled and it could not be disabled\n");
+        }
+    }
+#endif
+
 #if defined(__riscv)
     // RISC-V BSP Hart ID
 FEAT_START
