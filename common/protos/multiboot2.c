@@ -19,6 +19,7 @@
 #include <sys/cpu.h>
 #include <sys/idt.h>
 #include <sys/iommu.h>
+#include <sys/lapic.h>
 #include <fs/file.h>
 #include <mm/vmm.h>
 #include <lib/acpi.h>
@@ -1001,6 +1002,14 @@ skip_modeset:;
 
     mbi_start->size = info_idx;
     mbi_start->reserved = 0x00;
+
+    if (rdmsr(0x1b) & (1 << 10)) {
+        if (x2apic_disable()) {
+            printv("multiboot2: Firmware had x2APIC enabled, reverted to xAPIC mode\n");
+        } else {
+            printv("multiboot2: Firmware has x2APIC enabled and it could not be disabled\n");
+        }
+    }
 
     iommu_disable_all();
 

@@ -19,6 +19,7 @@
 #include <sys/cpu.h>
 #include <sys/idt.h>
 #include <sys/iommu.h>
+#include <sys/lapic.h>
 #include <fs/file.h>
 #include <mm/vmm.h>
 #include <mm/pmm.h>
@@ -484,6 +485,14 @@ skip_modeset:;
     multiboot1_info->mmap_length = mb_mmap_len;
     multiboot1_info->mmap_addr = (uint32_t)(size_t)mmap - mb1_info_slide;
     multiboot1_info->flags |= (1 << 0) | (1 << 6);
+
+    if (rdmsr(0x1b) & (1 << 10)) {
+        if (x2apic_disable()) {
+            printv("multiboot1: Firmware had x2APIC enabled, reverted to xAPIC mode\n");
+        } else {
+            printv("multiboot1: Firmware has x2APIC enabled and it could not be disabled\n");
+        }
+    }
 
     iommu_disable_all();
 
