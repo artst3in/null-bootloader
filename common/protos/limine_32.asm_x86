@@ -80,12 +80,6 @@ bits 64
     mov eax, [rsp+28] ; local_gdt
     lgdt [rax]
 
-    ; Clear TSS busy bit and load TR
-    mov rax, [rax + 2]
-    mov byte [rax + 0x3d], 0x89
-    mov ax, 0x38
-    ltr ax
-
     ; Jump to higher half
     mov rax, qword [rsp+36]
     add rsp, rax
