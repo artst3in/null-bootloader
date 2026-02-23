@@ -32,22 +32,7 @@
 static void vtd_disable_unit(uintptr_t reg_base) {
     uint32_t sts = mmind(reg_base + VTD_GSTS_REG);
 
-    // Disable interrupt remapping first (IRE depends on QIE, so reverse
-    // the enable order: disable IRE before QIE)
-    if (sts & VTD_GSTS_IRES) {
-        uint32_t gcmd = (sts & VTD_GCMD_ONESHOT_MASK) & ~VTD_GSTS_IRES;
-        mmoutd(reg_base + VTD_GCMD_REG, gcmd);
-
-        for (int i = 0; i < VTD_TIMEOUT; i++) {
-            asm volatile ("pause");
-            sts = mmind(reg_base + VTD_GSTS_REG);
-            if (!(sts & VTD_GSTS_IRES)) {
-                break;
-            }
-        }
-    }
-
-    // Disable DMA translation
+    // Disable DMA translation first (most urgent: prevents stale lookups)
     if (sts & VTD_GSTS_TES) {
         uint32_t gcmd = (sts & VTD_GCMD_ONESHOT_MASK) & ~VTD_GSTS_TES;
         mmoutd(reg_base + VTD_GCMD_REG, gcmd);
@@ -56,6 +41,20 @@ static void vtd_disable_unit(uintptr_t reg_base) {
             asm volatile ("pause");
             sts = mmind(reg_base + VTD_GSTS_REG);
             if (!(sts & VTD_GSTS_TES)) {
+                break;
+            }
+        }
+    }
+
+    // Disable interrupt remapping (depends on QIE, so disable before QIE)
+    if (sts & VTD_GSTS_IRES) {
+        uint32_t gcmd = (sts & VTD_GCMD_ONESHOT_MASK) & ~VTD_GSTS_IRES;
+        mmoutd(reg_base + VTD_GCMD_REG, gcmd);
+
+        for (int i = 0; i < VTD_TIMEOUT; i++) {
+            asm volatile ("pause");
+            sts = mmind(reg_base + VTD_GSTS_REG);
+            if (!(sts & VTD_GSTS_IRES)) {
                 break;
             }
         }
