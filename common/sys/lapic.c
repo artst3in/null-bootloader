@@ -242,6 +242,15 @@ void lapic_write(uint32_t reg, uint32_t data) {
     mmoutd(lapic_mmio_base + reg, data);
 }
 
+void lapic_icr_wait(void) {
+    for (int i = 0; i < 1000000; i++) {
+        if (!(lapic_read(LAPIC_REG_ICR0) & (1 << 12))) {
+            return;
+        }
+        asm volatile ("pause");
+    }
+}
+
 bool x2apic_check(void) {
     uint32_t eax, ebx, ecx, edx;
     if (!cpuid(1, 0, &eax, &ebx, &ecx, &edx))

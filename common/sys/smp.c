@@ -84,6 +84,7 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     if (x2apic) {
         x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) | 0x4500);
     } else {
+        lapic_icr_wait();
         lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
         lapic_write(LAPIC_REG_ICR0, 0x4500);
     }
@@ -95,10 +96,17 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
             x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) |
                                          ((size_t)trampoline / 4096) | 0x4600);
         } else {
+            lapic_icr_wait();
             lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
             lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
         }
-        stall(200);
+        if (j == 0) {
+            stall(200);
+        }
+    }
+
+    if (!x2apic) {
+        lapic_icr_wait();
     }
 
     for (int i = 0; i < 100; i++) {
