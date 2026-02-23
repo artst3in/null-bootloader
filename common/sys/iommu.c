@@ -27,8 +27,6 @@
 // All other bits (TE, EAFL, QIE, IRE, CFI) are persistent toggles.
 #define VTD_GCMD_ONESHOT_MASK 0x96FFFFFF
 
-#define VTD_TIMEOUT 10000000
-
 static void vtd_disable_unit(uintptr_t reg_base) {
     uint32_t sts = mmind(reg_base + VTD_GSTS_REG);
 
@@ -37,12 +35,8 @@ static void vtd_disable_unit(uintptr_t reg_base) {
         uint32_t gcmd = (sts & VTD_GCMD_ONESHOT_MASK) & ~VTD_GSTS_TES;
         mmoutd(reg_base + VTD_GCMD_REG, gcmd);
 
-        for (int i = 0; i < VTD_TIMEOUT; i++) {
+        while ((sts = mmind(reg_base + VTD_GSTS_REG)) & VTD_GSTS_TES) {
             asm volatile ("pause");
-            sts = mmind(reg_base + VTD_GSTS_REG);
-            if (!(sts & VTD_GSTS_TES)) {
-                break;
-            }
         }
     }
 
@@ -51,12 +45,8 @@ static void vtd_disable_unit(uintptr_t reg_base) {
         uint32_t gcmd = (sts & VTD_GCMD_ONESHOT_MASK) & ~VTD_GSTS_IRES;
         mmoutd(reg_base + VTD_GCMD_REG, gcmd);
 
-        for (int i = 0; i < VTD_TIMEOUT; i++) {
+        while ((sts = mmind(reg_base + VTD_GSTS_REG)) & VTD_GSTS_IRES) {
             asm volatile ("pause");
-            sts = mmind(reg_base + VTD_GSTS_REG);
-            if (!(sts & VTD_GSTS_IRES)) {
-                break;
-            }
         }
     }
 
@@ -65,12 +55,8 @@ static void vtd_disable_unit(uintptr_t reg_base) {
         uint32_t gcmd = (sts & VTD_GCMD_ONESHOT_MASK) & ~VTD_GSTS_QIES;
         mmoutd(reg_base + VTD_GCMD_REG, gcmd);
 
-        for (int i = 0; i < VTD_TIMEOUT; i++) {
+        while ((sts = mmind(reg_base + VTD_GSTS_REG)) & VTD_GSTS_QIES) {
             asm volatile ("pause");
-            sts = mmind(reg_base + VTD_GSTS_REG);
-            if (!(sts & VTD_GSTS_QIES)) {
-                break;
-            }
         }
     }
 }
