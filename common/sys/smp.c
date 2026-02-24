@@ -252,7 +252,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 
                 // Set up per-AP LINT values before starting
                 if (smp_configure_apic) {
-                    lapic_prep_lint(madt, lapic->acpi_processor_uid, false, x2apic);
+                    lapic_prep_lint(madt, lapic->acpi_processor_uid, x2apic);
                 }
 
                 // Try to start the AP
@@ -297,7 +297,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 
                 // Set up per-AP LINT values before starting
                 if (smp_configure_apic) {
-                    lapic_prep_lint(madt, x2lapic->acpi_processor_uid, false, true);
+                    lapic_prep_lint(madt, x2lapic->acpi_processor_uid, true);
                 }
 
                 // Try to start the AP

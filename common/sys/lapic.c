@@ -20,8 +20,8 @@
 #define LAPIC_REG_TPR         0x080
 #define LAPIC_REG_VERSION     0x030
 
-static uint32_t pending_lint0 = 0x00010000; // masked
-static uint32_t pending_lint1 = 0x00010000; // masked
+static uint32_t pending_lint0 = UINT32_MAX; // no override
+static uint32_t pending_lint1 = UINT32_MAX; // no override
 
 static uint32_t lapic_madt_nmi_flags_to_lvt(uint16_t flags) {
     uint32_t lvt = 0x10400; // masked + NMI delivery mode
@@ -43,14 +43,9 @@ static uint32_t lapic_madt_nmi_flags_to_lvt(uint16_t flags) {
     return lvt;
 }
 
-void lapic_prep_lint(struct madt *madt, uint32_t acpi_uid, bool is_bsp, bool x2apic) {
-    // Set defaults
-    if (is_bsp) {
-        pending_lint0 = 0x00010700; // ExtINT delivery mode, masked
-    } else {
-        pending_lint0 = 0x00010000; // masked
-    }
-    pending_lint1 = 0x00010000; // masked
+void lapic_prep_lint(struct madt *madt, uint32_t acpi_uid, bool x2apic) {
+    pending_lint0 = UINT32_MAX; // no override
+    pending_lint1 = UINT32_MAX; // no override
 
     // Walk MADT entries looking for NMI entries
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
@@ -109,6 +104,18 @@ void lapic_prep_lint(struct madt *madt, uint32_t acpi_uid, bool is_bsp, bool x2a
     }
 }
 
+static bool lvt_should_mask(uint32_t lvt) {
+    switch ((lvt >> 8) & 7) {
+        case 0b000: // Fixed
+        case 0b001: // Lowest Priority
+        case 0b100: // NMI
+        case 0b111: // ExtINT
+            return true;
+        default:    // SMI, INIT, Reserved
+            return false;
+    }
+}
+
 void lapic_configure_handoff_state(void) {
     bool is_x2 = !!(rdmsr(0x1b) & (1 << 10));
 
@@ -119,38 +126,82 @@ void lapic_configure_handoff_state(void) {
         max_lvt = (lapic_read(LAPIC_REG_VERSION) >> 16) & 0xff;
     }
 
+    uint32_t lvt;
+
     if (is_x2) {
         x2apic_write(LAPIC_REG_SVR, 0x1ff);
         x2apic_write(LAPIC_REG_TPR, 0);
         if (max_lvt >= 6) {
-            x2apic_write(LAPIC_REG_LVT_CMCI, 0x00010000);
+            lvt = x2apic_read(LAPIC_REG_LVT_CMCI);
+            if (lvt_should_mask(lvt)) {
+                x2apic_write(LAPIC_REG_LVT_CMCI, lvt | (1 << 16));
+            }
         }
-        x2apic_write(LAPIC_REG_LVT_TIMER, 0x00010000);
+        lvt = x2apic_read(LAPIC_REG_LVT_TIMER);
+        if (lvt_should_mask(lvt)) {
+            x2apic_write(LAPIC_REG_LVT_TIMER, lvt | (1 << 16));
+        }
         if (max_lvt >= 5) {
-            x2apic_write(LAPIC_REG_LVT_THERMAL, 0x00010000);
+            lvt = x2apic_read(LAPIC_REG_LVT_THERMAL);
+            if (lvt_should_mask(lvt)) {
+                x2apic_write(LAPIC_REG_LVT_THERMAL, lvt | (1 << 16));
+            }
         }
         if (max_lvt >= 4) {
-            x2apic_write(LAPIC_REG_LVT_PMC, 0x00010000);
+            lvt = x2apic_read(LAPIC_REG_LVT_PMC);
+            if (lvt_should_mask(lvt)) {
+                x2apic_write(LAPIC_REG_LVT_PMC, lvt | (1 << 16));
+            }
         }
-        x2apic_write(LAPIC_REG_LVT_ERROR, 0x00010000);
-        x2apic_write(LAPIC_REG_LVT_LINT0, pending_lint0);
-        x2apic_write(LAPIC_REG_LVT_LINT1, pending_lint1);
+        lvt = x2apic_read(LAPIC_REG_LVT_ERROR);
+        if (lvt_should_mask(lvt)) {
+            x2apic_write(LAPIC_REG_LVT_ERROR, lvt | (1 << 16));
+        }
+        lvt = x2apic_read(LAPIC_REG_LVT_LINT0);
+        if (lvt_should_mask(lvt)) {
+            x2apic_write(LAPIC_REG_LVT_LINT0, pending_lint0 != UINT32_MAX ? pending_lint0 : lvt | (1 << 16));
+        }
+        lvt = x2apic_read(LAPIC_REG_LVT_LINT1);
+        if (lvt_should_mask(lvt)) {
+            x2apic_write(LAPIC_REG_LVT_LINT1, pending_lint1 != UINT32_MAX ? pending_lint1 : lvt | (1 << 16));
+        }
     } else {
         lapic_write(LAPIC_REG_SVR, 0x1ff);
         lapic_write(LAPIC_REG_TPR, 0);
         if (max_lvt >= 6) {
-            lapic_write(LAPIC_REG_LVT_CMCI, 0x00010000);
+            lvt = lapic_read(LAPIC_REG_LVT_CMCI);
+            if (lvt_should_mask(lvt)) {
+                lapic_write(LAPIC_REG_LVT_CMCI, lvt | (1 << 16));
+            }
         }
-        lapic_write(LAPIC_REG_LVT_TIMER, 0x00010000);
+        lvt = lapic_read(LAPIC_REG_LVT_TIMER);
+        if (lvt_should_mask(lvt)) {
+            lapic_write(LAPIC_REG_LVT_TIMER, lvt | (1 << 16));
+        }
         if (max_lvt >= 5) {
-            lapic_write(LAPIC_REG_LVT_THERMAL, 0x00010000);
+            lvt = lapic_read(LAPIC_REG_LVT_THERMAL);
+            if (lvt_should_mask(lvt)) {
+                lapic_write(LAPIC_REG_LVT_THERMAL, lvt | (1 << 16));
+            }
         }
         if (max_lvt >= 4) {
-            lapic_write(LAPIC_REG_LVT_PMC, 0x00010000);
+            lvt = lapic_read(LAPIC_REG_LVT_PMC);
+            if (lvt_should_mask(lvt)) {
+                lapic_write(LAPIC_REG_LVT_PMC, lvt | (1 << 16));
+            }
         }
-        lapic_write(LAPIC_REG_LVT_ERROR, 0x00010000);
-        lapic_write(LAPIC_REG_LVT_LINT0, pending_lint0);
-        lapic_write(LAPIC_REG_LVT_LINT1, pending_lint1);
+        lvt = lapic_read(LAPIC_REG_LVT_ERROR);
+        if (lvt_should_mask(lvt)) {
+            lapic_write(LAPIC_REG_LVT_ERROR, lvt | (1 << 16));
+        }
+        lvt = lapic_read(LAPIC_REG_LVT_LINT0);
+        if (lvt_should_mask(lvt)) {
+            lapic_write(LAPIC_REG_LVT_LINT0, pending_lint0 != UINT32_MAX ? pending_lint0 : lvt | (1 << 16));
+        }
+        lvt = lapic_read(LAPIC_REG_LVT_LINT1);
+        if (lvt_should_mask(lvt)) {
+            lapic_write(LAPIC_REG_LVT_LINT1, pending_lint1 != UINT32_MAX ? pending_lint1 : lvt | (1 << 16));
+        }
     }
 }
 
@@ -209,7 +260,7 @@ void lapic_configure_bsp(void) {
     }
 
 found:
-    lapic_prep_lint(madt, bsp_acpi_uid, true, is_x2);
+    lapic_prep_lint(madt, bsp_acpi_uid, is_x2);
     lapic_configure_handoff_state();
 }
 
