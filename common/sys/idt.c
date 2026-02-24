@@ -36,7 +36,7 @@ int irq_flush_type = IRQ_NO_FLUSH;
 void flush_irqs(void) {
     switch (irq_flush_type) {
         case IRQ_PIC_ONLY_FLUSH:
-            pic_flush();
+            pic_flush(0x08, 0x70);
             // FALLTHRU
         case IRQ_NO_FLUSH:
             return;
@@ -56,7 +56,7 @@ void flush_irqs(void) {
     asm volatile ("lidt %0" :: "m"(new_idt) : "memory");
 
     // Flush the legacy PIC so we know the remaining ints come from the LAPIC
-    pic_flush();
+    pic_flush(0x20, 0x28);
 
     asm volatile ("sti" ::: "memory");
 
