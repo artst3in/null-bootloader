@@ -475,8 +475,7 @@ void io_apic_mask_all(bool mask_nmi_and_extint) {
                     continue;
             }
 
-            io_apic_write(i, ioredtbl, (1 << 16)); // mask
-            io_apic_write(i, ioredtbl + 1, 0);
+            io_apic_write(i, ioredtbl, io_apic_read(i, ioredtbl) | (1 << 16));
         }
     }
 }
