@@ -424,7 +424,7 @@ static inline void stall(uint64_t us) {
         return;
     }
 #endif
-    uint64_t ticks = tsc_freq * us / 1000000;
+    uint64_t ticks = (tsc_freq * us + 999999) / 1000000;
     uint64_t next_stop = rdtsc() + ticks;
     while (rdtsc() < next_stop);
 }
