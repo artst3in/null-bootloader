@@ -407,7 +407,11 @@ void calibrate_tsc(void);
 
 static inline uint64_t rdtsc_usec(void) {
     uint64_t exec_ticks = rdtsc();
-    return tsc_freq != 0 ? 1000000ULL * exec_ticks / tsc_freq : 0;
+    if (tsc_freq == 0) {
+        return 0;
+    }
+    return exec_ticks / tsc_freq * 1000000
+         + exec_ticks % tsc_freq * 1000000 / tsc_freq;
 }
 
 static inline void stall(uint64_t us) {
