@@ -1,3 +1,16 @@
+2026-02-26  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.1 ***
+
+    Noteworthy changes compared to the previous release, 10.8.0:
+
+    Bug fixes:
+        - Fix VT-d disable order to TE, IRE, QIE.
+        - Fix VT-d polling loop read order and remove polling timeout.
+        - SMP: Add xAPIC ICR delivery status checks to INIT-SIPI-SIPI sequence.
+        - Amend certain APIC-related issues of Limine boot protocol and
+          implement the corrected behaviour.
+
 2026-02-22  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.8.0 ***
