@@ -1,3 +1,13 @@
+2026-02-26   Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.2 ***
+
+    Noteworthy changes compared to the previous release, 10.8.1:
+
+    Bug fixes:
+        - Revert broken/pointless legacy PIC reinitialisation logic on flush
+          that accidentally made it into 10.8.1.
+
 2026-02-26  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.8.1 ***
