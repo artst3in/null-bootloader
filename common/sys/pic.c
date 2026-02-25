@@ -15,26 +15,10 @@ void pic_eoi(int irq) {
     outb(0x20, 0x20);
 }
 
-// Flush all pending IRQs by reinitialising the PICs, preserving the IMR
-void pic_flush(uint8_t master_base, uint8_t slave_base) {
-    uint8_t master_imr = inb(0x21);
-    uint8_t slave_imr = inb(0xa1);
-
-    outb(0xa1, 0xff);
-    outb(0x21, 0xff);
-
-    outb(0x20, 0x11);
-    outb(0x21, master_base);
-    outb(0x21, 0x04);
-    outb(0x21, 0x01);
-
-    outb(0xa0, 0x11);
-    outb(0xa1, slave_base);
-    outb(0xa1, 0x02);
-    outb(0xa1, 0x01);
-
-    outb(0xa1, slave_imr);
-    outb(0x21, master_imr);
+// Flush all potentially pending IRQs
+void pic_flush(void) {
+    for (int i = 0; i < 16; i++)
+        pic_eoi(i);
 }
 
 void pic_set_mask(int line, bool status) {
