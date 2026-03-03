@@ -358,6 +358,18 @@ bool x2apic_disable(void) {
         }
     }
 
+    // Save LAPIC state; clearing EN resets all registers except APIC ID.
+    uint32_t max_lvt = (x2apic_read(LAPIC_REG_VERSION) >> 16) & 0xff;
+    uint32_t saved_svr = x2apic_read(LAPIC_REG_SVR);
+    uint32_t saved_tpr = x2apic_read(LAPIC_REG_TPR);
+    uint32_t saved_timer = x2apic_read(LAPIC_REG_LVT_TIMER);
+    uint32_t saved_lint0 = x2apic_read(LAPIC_REG_LVT_LINT0);
+    uint32_t saved_lint1 = x2apic_read(LAPIC_REG_LVT_LINT1);
+    uint32_t saved_error = x2apic_read(LAPIC_REG_LVT_ERROR);
+    uint32_t saved_pmc = max_lvt >= 4 ? x2apic_read(LAPIC_REG_LVT_PMC) : 0;
+    uint32_t saved_thermal = max_lvt >= 5 ? x2apic_read(LAPIC_REG_LVT_THERMAL) : 0;
+    uint32_t saved_cmci = max_lvt >= 6 ? x2apic_read(LAPIC_REG_LVT_CMCI) : 0;
+
     // Transition x2APIC -> disabled -> xAPIC.
     // Direct x2APIC -> xAPIC is an invalid transition (#GP).
     msr &= ~((1ULL << 11) | (1ULL << 10));
@@ -367,6 +379,18 @@ bool x2apic_disable(void) {
     wrmsr(0x1b, msr);
 
     x2apic_mode = false;
+
+    // Restore LAPIC state. SVR is restored last to re-enable the APIC.
+    lapic_write(LAPIC_REG_TPR, saved_tpr);
+    lapic_write(LAPIC_REG_LVT_TIMER, saved_timer);
+    lapic_write(LAPIC_REG_LVT_LINT0, saved_lint0);
+    lapic_write(LAPIC_REG_LVT_LINT1, saved_lint1);
+    lapic_write(LAPIC_REG_LVT_ERROR, saved_error);
+    if (max_lvt >= 4) lapic_write(LAPIC_REG_LVT_PMC, saved_pmc);
+    if (max_lvt >= 5) lapic_write(LAPIC_REG_LVT_THERMAL, saved_thermal);
+    if (max_lvt >= 6) lapic_write(LAPIC_REG_LVT_CMCI, saved_cmci);
+    lapic_write(LAPIC_REG_SVR, saved_svr);
+
     return true;
 }
 
