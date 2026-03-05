@@ -120,6 +120,8 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
 
         size_t load_size;
         if (header.load_end_addr) {
+            if (header.load_end_addr < header.load_addr)
+                panic(true, "multiboot1: Load end address less than load address");
             load_size = header.load_end_addr - header.load_addr;
         } else {
             if (load_src > kernel_file_size)
