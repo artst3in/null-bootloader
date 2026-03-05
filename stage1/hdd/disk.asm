@@ -52,10 +52,16 @@ read_sectors:
 
     pop si
 
-    ; EBP:EAX address to EAX LBA sector
+    ; EDX:EAX byte address to 64-bit LBA sector
+    push eax
+    mov eax, edx
+    xor edx, edx
+    div ebp
+    mov ebx, eax
+    pop eax
     div ebp
     mov dword [si+8],  eax
-    mov dword [si+12], 0
+    mov dword [si+12], ebx
 
     pop dx
 
@@ -67,10 +73,8 @@ read_sectors:
     jc .done
 
     add word  [si+4], bp
-    xor ebx, ebx
-    inc dword [si+8]
-    seto bl
-    add dword [si+12], ebx
+    add dword [si+8], 1
+    adc dword [si+12], 0
 
     loop .loop
 
