@@ -345,7 +345,9 @@ tab_part:
                     print(serial ? "<" : "←");
                 }
             }
-            window_size--;
+            if (window_size > 0) {
+                window_size--;
+            }
         }
 
         if (i == cursor_offset
