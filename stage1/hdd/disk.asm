@@ -18,8 +18,7 @@ read_sectors:
 
     mov si, .da_struct
 
-    mov word  [si],    16
-    mov word  [si+2],  1
+    mov dword [si],    0x00010010
     mov word  [si+4],  bx
     mov word  [si+6],  es
 
@@ -34,11 +33,11 @@ read_sectors:
     mov si, .drive_params
     mov word [si], 30       ; buf_size
     int 0x13
-    jc .done
+    jc .fail
     movzx ebp, word [si+24] ; bytes_per_sect
 
     ; ECX byte count to CX sector count
-    mov ax, cx
+    xchg ax, cx
     shr ecx, 16
     mov dx, cx
     xor cx, cx
@@ -54,10 +53,10 @@ read_sectors:
 
     ; EDX:EAX byte address to 64-bit LBA sector
     push eax
-    mov eax, edx
+    xchg eax, edx
     xor edx, edx
     div ebp
-    mov ebx, eax
+    xchg ebx, eax
     pop eax
     div ebp
     mov dword [si+8],  eax
@@ -78,6 +77,11 @@ read_sectors:
 
     loop .loop
 
+    jmp short .done
+
+  .fail:
+    add sp, 12
+    stc
   .done:
     popa
     ret
