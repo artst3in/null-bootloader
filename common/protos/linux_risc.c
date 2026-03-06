@@ -95,9 +95,7 @@ struct boot_param {
 #define LINUX_HEADER_MAGIC2             0x818223cd
 #endif
 
-static const char *verify_kernel(struct boot_param *p) {
-    struct linux_header *header = p->kernel_base;
-
+static const char *verify_kernel(struct linux_header *header) {
     if (header->magic2 != LINUX_HEADER_MAGIC2) {
         return "kernel header magic does not match";
     }
@@ -436,25 +434,30 @@ noreturn void linux_load(char *config, char *cmdline) {
     }
 
     p.kernel_size = kernel_file->size;
-    size_t kernel_alloc_size = p.kernel_size;
-    // Read image_size from kernel header for total memory including BSS
-    if (p.kernel_size >= sizeof(struct linux_header)) {
-        struct linux_header tmp_hdr;
-        fread(kernel_file, &tmp_hdr, 0, sizeof(tmp_hdr));
-        if (tmp_hdr.image_size > kernel_alloc_size) {
-            kernel_alloc_size = tmp_hdr.image_size;
-        }
+
+    if (p.kernel_size < sizeof(struct linux_header)) {
+        panic(true, "linux: kernel too small to contain a valid header");
     }
+
+    struct linux_header tmp_hdr;
+    fread(kernel_file, &tmp_hdr, 0, sizeof(tmp_hdr));
+
+    const char *reason = verify_kernel(&tmp_hdr);
+    if (reason)
+        panic(true, "linux: invalid kernel image: %s", reason);
+
+    // Use image_size from kernel header for total memory including BSS
+    size_t kernel_alloc_size = p.kernel_size;
+    if (tmp_hdr.image_size > kernel_alloc_size) {
+        kernel_alloc_size = tmp_hdr.image_size;
+    }
+
     p.kernel_base = ext_mem_alloc_type_aligned(
                 ALIGN_UP(kernel_alloc_size, 4096),
                 MEMMAP_KERNEL_AND_MODULES, 2 * 1024 * 1024);
     fread(kernel_file, p.kernel_base, 0, p.kernel_size);
     fclose(kernel_file);
     printv("linux: loaded kernel `%s` at %p, size %U\n", kernel_path, p.kernel_base, (uint64_t)p.kernel_size);
-
-    const char *reason = verify_kernel(&p);
-    if (reason)
-        panic(true, "linux: invalid kernel image: %s", reason);
 
     load_module(&p, config);
 
