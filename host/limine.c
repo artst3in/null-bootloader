@@ -46,12 +46,12 @@ static void remove_arg(int *argc, char *argv[], int index) {
     argv[*argc] = NULL;
 }
 
-static bool mul_u64_overflow(uint64_t a, uint64_t b, uint64_t *res) {
+static inline bool mul_u64_overflow(uint64_t a, uint64_t b, uint64_t *res) {
     *res = a * b;
     return a != 0 && b > UINT64_MAX / a;
 }
 
-static bool add_u64_overflow(uint64_t a, uint64_t b, uint64_t *res) {
+static inline bool add_u64_overflow(uint64_t a, uint64_t b, uint64_t *res) {
     *res = a + b;
     return a > UINT64_MAX - b;
 }
