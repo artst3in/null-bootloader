@@ -1112,13 +1112,30 @@ part_too_low:
             goto cleanup;
         }
 
-bios_boot_autodetected:
-        if (((ENDSWAP(gpt_entry.ending_lba) - ENDSWAP(gpt_entry.starting_lba)) + 1) * lb_size < 32768) {
+bios_boot_autodetected:;
+        uint64_t starting_lba = ENDSWAP(gpt_entry.starting_lba);
+        uint64_t ending_lba = ENDSWAP(gpt_entry.ending_lba);
+
+        if (ending_lba < starting_lba) {
+            fprintf(stderr, "error: Partition %" PRIu32 " has ending LBA less than starting LBA.\n", partition_num + 1);
+            goto cleanup;
+        }
+
+        uint64_t part_size;
+        if (mul_u64_overflow(ending_lba - starting_lba + 1, lb_size, &part_size)) {
+            fprintf(stderr, "error: Partition %" PRIu32 " size overflows.\n", partition_num + 1);
+            goto cleanup;
+        }
+
+        if (part_size < 32768) {
             fprintf(stderr, "error: Partition %" PRIu32 " is smaller than 32KiB.\n", partition_num + 1);
             goto cleanup;
         }
 
-        stage2_loc = ENDSWAP(gpt_entry.starting_lba) * lb_size;
+        if (mul_u64_overflow(starting_lba, lb_size, &stage2_loc)) {
+            fprintf(stderr, "error: Partition %" PRIu32 " starting LBA overflows.\n", partition_num + 1);
+            goto cleanup;
+        }
 
         bool err;
         bool valid = validate_or_force(stage2_loc, force, &err);
