@@ -294,6 +294,7 @@ again:
     gBS->WaitForEvent(2, events, &which);
 
     if (which == 1) {
+        gBS->CloseEvent(events[1]);
         return 0;
     }
 
@@ -313,6 +314,7 @@ again:
     }
 
     if (serial == true && kd.Key.ScanCode == 0x08) {
+        gBS->CloseEvent(events[1]);
         return '\b';
     }
 
@@ -357,6 +359,7 @@ again:
         goto again;
     }
 
+    gBS->CloseEvent(events[1]);
     return ret;
 }
 #endif
