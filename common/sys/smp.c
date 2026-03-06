@@ -138,8 +138,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 
     struct gdtr gdtr = gdt;
 
-    uint8_t bsp_lapic_id;
-    uint32_t bsp_x2apic_id;
+    uint32_t bsp_lapic_id;
 
     // If x2APIC already enabled by firmware, try to revert to xAPIC
     if (rdmsr(0x1b) & (1 << 10)) {
@@ -154,14 +153,12 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     x2apic = x2apic && x2apic_enable();
 
     if (x2apic) {
-        bsp_x2apic_id = x2apic_read(LAPIC_REG_ID);
-        bsp_lapic_id = bsp_x2apic_id;
+        bsp_lapic_id = x2apic_read(LAPIC_REG_ID);
     } else {
         bsp_lapic_id = lapic_read(LAPIC_REG_ID) >> 24;
-        bsp_x2apic_id = bsp_lapic_id;
     }
 
-    *_bsp_lapic_id = bsp_x2apic_id;
+    *_bsp_lapic_id = bsp_lapic_id;
 
     *cpu_count = 0;
 
@@ -288,7 +285,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
                 info_struct->lapic_id = x2lapic->x2apic_id;
 
                 // Do not try to restart the BSP
-                if (x2lapic->x2apic_id == bsp_x2apic_id) {
+                if (x2lapic->x2apic_id == bsp_lapic_id) {
                     (*cpu_count)++;
                     continue;
                 }
