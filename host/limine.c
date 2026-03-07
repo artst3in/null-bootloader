@@ -915,9 +915,9 @@ static int bios_install(int argc, char *argv[]) {
         // Write out the partition entries.
         for (size_t i = 0; i < part_to_conv_i; i++) {
             device_write(&part_to_conv[i].type, 0x1be + i * 16 + 0x04, 1);
-            uint32_t lba_start = ENDSWAP(part_to_conv[i].lba_start);
+            uint32_t lba_start = ENDSWAP((uint32_t)part_to_conv[i].lba_start);
             device_write(&lba_start, 0x1be + i * 16 + 0x08, 4);
-            uint32_t sect_count = ENDSWAP((part_to_conv[i].lba_end - part_to_conv[i].lba_start) + 1);
+            uint32_t sect_count = ENDSWAP((uint32_t)((part_to_conv[i].lba_end - part_to_conv[i].lba_start) + 1));
             device_write(&sect_count, 0x1be + i * 16 + 0x0c, 4);
 
             device_write(part_to_conv[i].chs_start, 0x1be + i * 16 + 1, 3);
