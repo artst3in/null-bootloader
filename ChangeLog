@@ -1,3 +1,25 @@
+2026-03-07  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.3 ***
+
+    Noteworthy changes compared to the previous release, 10.8.2:
+
+    Bug fixes:
+        - Preserve LAPIC register state across x2APIC-to-xAPIC transition.
+        - SMP: Widen bsp_lapic_id to uint32_t to avoid x2APIC ID truncation.
+        - Linux boot protocol: Validate RISC-V kernel header before trusting
+          image_size for allocation.
+        - Host tool: Replace GCC/Clang __builtin overflow checks with portable
+          C99 helpers.
+        - Host tool: Fix ENDSWAP width mismatch in GPT-to-MBR partition entry
+          conversion on big-endian hosts.
+        - BIOS HDD Stage 1: Fix 64-bit LBA calculation and carry propagation in
+          disk read loop.
+        - BIOS HDD Stage 1: Fix stack imbalance on int 13h/AH=48h failure.
+        - Add NULL terminator check in config_get_entry header line scan.
+        - Guard editor window_size decrement to prevent underflow on long line
+          wrapping.
+
 2026-02-26   Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.8.2 ***
