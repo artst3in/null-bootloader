@@ -85,7 +85,7 @@ if ! test -f version; then
     clone_repo_commit \
         https://codeberg.org/Limine/limine-protocol.git \
         limine-protocol \
-        c0d28498f63db5da26344ae898ce10e01ece8613
+        e80ce544605d407c628d57c5ffdf686eb9a7ac36
 
     clone_repo_commit \
         https://codeberg.org/PicoEFI/PicoEFI.git \
