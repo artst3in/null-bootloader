@@ -122,6 +122,7 @@ static const char *VALID_KEYS[] = {
     "GPT_UUID",
     "IMAGE_PATH",
 	"DTB_PATH",
+    "REBOOT_FOR_BITLOCKER",
     NULL
 };
 

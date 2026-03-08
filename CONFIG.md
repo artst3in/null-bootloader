@@ -276,6 +276,7 @@ Editor control options:
   * `resolution` - The resolution to be used. This setting takes the form of
     `<width>x<height>x<bpp>`. If the resolution is not available, Limine will
     pick another one automatically. Omitting `<bpp>` will default to 32.
+  * `reboot_for_bitlocker` - When set to true, Limine will set the `BootNext` UEFI Variable to the Windows Boot Manager boot entry and reboot.
 
 * BIOS Chainload protocol:
   * `drive` - The 1-based drive to chainload, if omitted, assume boot drive.
