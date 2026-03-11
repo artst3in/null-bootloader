@@ -1,3 +1,14 @@
+2026-03-12  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.5 ***
+
+    Noteworthy changes compared to the previous release, 10.8.4:
+
+    Bug fixes:
+        - Update the Flanterm library to 3.0.2 to fix a regression introduced
+          in Flanterm 3.0.1 that would also cause misrenderings of the boot
+          menu's text colour for selected entries.
+
 2026-03-11  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.8.4 ***
