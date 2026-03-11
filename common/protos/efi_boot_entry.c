@@ -113,6 +113,8 @@ noreturn void efi_boot_entry(char *config) {
 
   /* Now reboot */
   gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
+
+  panic(true, "efi_boot_entry: Failed to reboot");
 }
 
 #endif
