@@ -54,7 +54,7 @@ static bool find_boot_entry(CHAR16 *entry, uint16_t *out) {
         size_t buf_size = sizeof(buf);
 
         status = gRT->GetVariable(var_name, &global_variable, NULL, &buf_size, buf);
-        
+
         if (EFI_ERROR(status))
             continue;
 
@@ -81,9 +81,7 @@ noreturn void efi_boot_entry(char *config) {
     CHAR16 boot_entry_utf16[128];
     size_t i;
 
-    for (i = 0;
-        i < sizeof(boot_entry_utf16) / sizeof(CHAR16) - 1 && boot_entry[i];
-        i++) {
+    for (i = 0; i < sizeof(boot_entry_utf16) / sizeof(CHAR16) - 1 && boot_entry[i]; i++) {
         boot_entry_utf16[i] = (CHAR16)boot_entry[i];
     }
 

@@ -256,68 +256,6 @@ static EFI_DEVICE_PATH_PROTOCOL *build_relative_efi_file_path(struct file_handle
     return device_path;
 }
 
-static bool uefi_string_matches(CHAR16 *desc, CHAR16 *target) {
-    while (*target) {
-        CHAR16 a = *desc >= L'a' && *desc <= L'z' ? *desc - 32 : *desc;
-        CHAR16 b = *target >= L'a' && *target <= L'z' ? *target - 32 : *target;
-        if (a != b) return false;
-        desc++;
-        target++;
-    }
-    return *desc == L'\0';
-}
-
-static void format_boot_var(CHAR16 *out, UINT16 num) {
-    out[0] = L'B';
-    out[1] = L'o';
-    out[2] = L'o';
-    out[3] = L't';
-    out[4] = L"0123456789ABCDEF"[(num >> 12) & 0xF];
-    out[5] = L"0123456789ABCDEF"[(num >>  8) & 0xF];
-    out[6] = L"0123456789ABCDEF"[(num >>  4) & 0xF];
-    out[7] = L"0123456789ABCDEF"[(num >>  0) & 0xF];
-    out[8] = L'\0';
-}
-
-static uint16_t find_windows_boot_entry() {
-    EFI_STATUS status;
-    uint16_t boot_order[128];
-    size_t size = sizeof(boot_order);
-    EFI_GUID global_variable = EFI_GLOBAL_VARIABLE;
-
-    status = gRT->GetVariable(L"BootOrder", &global_variable,
-                             NULL, &size, boot_order);
-
-    if (EFI_ERROR(status)) {
-        panic(true, "reboot_for_bitlocker: Failed to get BootOrder variable (%X)", (uint64_t)status);
-    }
-
-    size_t count = size / sizeof(uint16_t);
-
-    for (size_t i = 0; i < count; i++) {
-        CHAR16 var_name[9];
-
-        format_boot_var(var_name, boot_order[i]);
-
-        uint8_t buf[512];
-        size_t buf_size = sizeof(buf);
-
-        status = gRT->GetVariable(var_name, &global_variable,
-                                 NULL, &buf_size, buf);
-        if (EFI_ERROR(status)) {
-            continue;
-        }
-
-        /* Get the description */
-        CHAR16 *desc = (CHAR16 *)(buf + sizeof(uint32_t) + sizeof(uint16_t));
-
-        if (uefi_string_matches(desc, L"Windows Boot Manager")) {
-            return boot_order[i];
-        }
-    }
-
-    panic(true, "reboot_for_bitlocker: no boot entry named 'Windows Boot Manager' was found");
-}
 
 noreturn void chainload(char *config, char *cmdline) {
     char *image_path = config_get_value(config, 0, "PATH");
@@ -326,27 +264,6 @@ noreturn void chainload(char *config, char *cmdline) {
     }
     if (image_path == NULL) {
         panic(true, "efi: Image path not specified");
-    }
-
-    char *reboot_for_bitlocker = config_get_value(config, 0, "REBOOT_FOR_BITLOCKER");
-
-    if (reboot_for_bitlocker != NULL && strcmp(reboot_for_bitlocker, "yes") == 0) {
-        /* Find the Windows Boot Manager boot entry */
-        uint16_t boot_next = find_windows_boot_entry();
-        EFI_GUID global_variable = EFI_GLOBAL_VARIABLE;
-
-        /* Set BootNext to it */
-        EFI_STATUS status = gRT->SetVariable(L"BootNext", 
-            &global_variable, 
-            EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
-            sizeof(boot_next), &boot_next);
-
-        if (status) {
-            panic(true, "efi: Failed to set BootNext variable (%X)", (uint64_t)status);
-        }
-
-        /* Now reboot */
-        gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
     }
 
     struct file_handle *image;
