@@ -20,6 +20,7 @@
 #include <protos/chainload.h>
 #include <protos/multiboot1.h>
 #include <protos/multiboot2.h>
+#include <protos/efi_boot_entry.h>
 #include <protos/limine.h>
 #include <sys/cpu.h>
 #include <lib/misc.h>
@@ -556,7 +557,8 @@ static inline bool should_skip_entry(struct menu_entry *entry) {
 #elif defined (BIOS)
         if (strcmp(cur_entry_protocol, "efi") == 0
          || strcmp(cur_entry_protocol, "uefi") == 0
-         || strcmp(cur_entry_protocol, "efi_chainload") == 0) {
+         || strcmp(cur_entry_protocol, "efi_chainload") == 0
+         || strcmp(cur_entry_protocol, "efi_boot_entry") == 0) {
 #endif
             return true;
         }
@@ -1395,6 +1397,11 @@ noreturn void boot(char *config) {
 #endif
         chainload(config, cmdline);
     }
+#if defined (UEFI)
+    else if (!strcmp(proto, "efi_boot_entry")) {
+        efi_boot_entry(config);
+    }
+#endif
 
     panic(true, "Unsupported protocol specified.");
 }
