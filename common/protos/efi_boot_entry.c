@@ -71,7 +71,7 @@ static bool find_boot_entry(CHAR16 *entry, uint16_t *out) {
 }
 
 noreturn void efi_boot_entry(char *config) {
-    char *boot_entry = config_get_value(config, 0, "entry");
+    char *boot_entry = config_get_value(config, 0, "ENTRY");
 
     if (boot_entry == NULL) {
         panic(true, "efi_boot_entry: No entry specified");

@@ -256,7 +256,6 @@ static EFI_DEVICE_PATH_PROTOCOL *build_relative_efi_file_path(struct file_handle
     return device_path;
 }
 
-
 noreturn void chainload(char *config, char *cmdline) {
     char *image_path = config_get_value(config, 0, "PATH");
     if (image_path == NULL) {
