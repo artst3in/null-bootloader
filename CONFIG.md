@@ -202,7 +202,7 @@ Editor control options:
   bootloader on the menu when an entry is selected.
 * `protocol` - The boot protocol that will be used to boot the
   kernel/executable. Valid protocols are: `linux`, `limine`, `multiboot`
-  (or `multiboot1`), `multiboot2`, `efi`, and `bios`.
+  (or `multiboot1`), `multiboot2`, `efi`, `efi_boot_entry` and `bios`.
 * `cmdline` - The command line string to be passed to the kernel/executable.
   Can be omitted.
 * `kernel_cmdline` - Alias of `cmdline`.
@@ -276,6 +276,9 @@ Editor control options:
   * `resolution` - The resolution to be used. This setting takes the form of
     `<width>x<height>x<bpp>`. If the resolution is not available, Limine will
     pick another one automatically. Omitting `<bpp>` will default to 32.
+
+* EFI Boot Entry protocol:
+  * `entry` - The name of the EFI boot entry to reboot into.
 
 * BIOS Chainload protocol:
   * `drive` - The 1-based drive to chainload, if omitted, assume boot drive.
