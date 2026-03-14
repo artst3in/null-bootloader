@@ -386,6 +386,21 @@ noreturn static void jump_to_kernel(struct boot_param *p) {
     inval_icache_pou((uintptr_t)p->kernel_base, (uintptr_t)p->kernel_base + p->kernel_size);
 
     asm ("msr daifset, 0xF");
+
+    // Disable MMU
+    if (current_el() == 2) {
+        uint64_t sctlr;
+        asm volatile ("mrs %0, sctlr_el2" : "=r"(sctlr));
+        sctlr &= ~1;
+        asm volatile ("msr sctlr_el2, %0" :: "r"(sctlr));
+    } else {
+        uint64_t sctlr;
+        asm volatile ("mrs %0, sctlr_el1" : "=r"(sctlr));
+        sctlr &= ~1;
+        asm volatile ("msr sctlr_el1, %0" :: "r"(sctlr));
+    }
+    asm volatile ("isb");
+
     kernel_entry((uint64_t)p->dtb, 0, 0, 0);
 #elif defined(__loongarch__)
 // LoongArch kernel used to store virtual address in header.kernel_entry
