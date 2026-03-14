@@ -371,7 +371,10 @@ noreturn static void jump_to_kernel(struct boot_param *p) {
 
     void (*kernel_entry)(uint64_t hartid, uint64_t dtb) = p->kernel_base;
     asm ("csrci   sstatus, 0x2\n\t"
-         "csrw    sie, zero\n\t");
+         "csrw    sie, zero\n\t"
+         "csrw    satp, zero\n\t"
+         "sfence.vma\n\t"
+         "fence.i\n\t");
     kernel_entry(bsp_hartid, (uint64_t)p->dtb);
 #elif defined(__aarch64__)
     printv("linux: device tree blob at %p\n", p->dtb);
