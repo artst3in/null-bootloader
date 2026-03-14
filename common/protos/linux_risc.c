@@ -380,6 +380,11 @@ noreturn static void jump_to_kernel(struct boot_param *p) {
     printv("linux: device tree blob at %p\n", p->dtb);
 
     void (*kernel_entry)(uint64_t dtb, uint64_t res0, uint64_t res1, uint64_t res2) = p->kernel_base;
+
+    // Clean caches for the loaded kernel image
+    clean_dcache_poc((uintptr_t)p->kernel_base, (uintptr_t)p->kernel_base + p->kernel_size);
+    inval_icache_pou((uintptr_t)p->kernel_base, (uintptr_t)p->kernel_base + p->kernel_size);
+
     asm ("msr daifset, 0xF");
     kernel_entry((uint64_t)p->dtb, 0, 0, 0);
 #elif defined(__loongarch__)
