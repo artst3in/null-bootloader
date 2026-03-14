@@ -452,9 +452,16 @@ noreturn void linux_load(char *config, char *cmdline) {
         kernel_alloc_size = tmp_hdr.image_size;
     }
 
+#if defined(__riscv) || defined(__aarch64__)
+    size_t text_offset = tmp_hdr.text_offset;
+#else
+    size_t text_offset = 0;
+#endif
+
     p.kernel_base = ext_mem_alloc_type_aligned(
-                ALIGN_UP(kernel_alloc_size, 4096),
+                ALIGN_UP(text_offset + kernel_alloc_size, 4096),
                 MEMMAP_KERNEL_AND_MODULES, 2 * 1024 * 1024);
+    p.kernel_base += text_offset;
     fread(kernel_file, p.kernel_base, 0, p.kernel_size);
     fclose(kernel_file);
     printv("linux: loaded kernel `%s` at %p, size %U\n", kernel_path, p.kernel_base, (uint64_t)p.kernel_size);
