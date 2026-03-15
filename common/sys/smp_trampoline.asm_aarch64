@@ -47,7 +47,6 @@ smp_trampoline_start:
     isb
     dsb sy
     isb
-    mov x2, #0x3c4       // Target: EL1t
     b 7f
 
 6:
@@ -64,7 +63,6 @@ smp_trampoline_start:
     isb
     dsb sy
     isb
-    mov x2, #0x3c4       // Target: EL1t
     b 7f
 
 8:
@@ -99,8 +97,6 @@ smp_trampoline_start:
 
     // No stage 2 translation
     msr vttbr_el2, xzr
-
-    mov x2, #0x3c8       // Target: EL2t
 
     // Jump directly to higher-half continuation (MMU just enabled from off)
     adrp x8, 3f
@@ -160,7 +156,6 @@ smp_trampoline_start:
     msr ttbr0_el1, x5
     msr ttbr1_el1, x6
     msr sctlr_el1, x2
-    mov x2, #0x3c4       // Target: EL1t (after x2 is done as sctlr)
     isb
     dsb sy
     isb
@@ -200,8 +195,13 @@ smp_trampoline_start:
     ldr x8, [x0, #16]
     mov sp, x8
 
-    // Enter kernel (x2 holds target SPSR: 0x3c4 for EL1t, 0x3c8 for EL2t)
-    msr spsr_el1, x2
+    // Enter kernel
+    mov x8, #0x3c4
+    ldr x9, [x1, tpl_enter_in_el2]
+    cbz x9, 9f
+    mov x8, #0x3c8
+9:
+    msr spsr_el1, x8
 
     ZERO_REGS_EXCEPT_X0
 
