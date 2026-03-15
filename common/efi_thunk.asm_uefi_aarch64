@@ -7,6 +7,23 @@ efi_main:
     mov x30, xzr
     mov x29, xzr
 
+    // If at EL2 and VHE is supported, enable it early so that
+    // VHE register redirection is active throughout the bootloader.
+    mrs x8, currentel
+    and x8, x8, #0b1100
+    cmp x8, #0b1000            // EL2?
+    b.ne 1f
+
+    mrs x8, id_aa64mmfr1_el1
+    ubfx x8, x8, #8, #4       // VH field, bits [11:8]
+    cbz x8, 1f
+
+    mrs x8, hcr_el2
+    orr x8, x8, #(1 << 34)    // E2H
+    msr hcr_el2, x8
+    isb
+
+1:
     b uefi_entry
 
 .section .note.GNU-stack,"",%progbits
