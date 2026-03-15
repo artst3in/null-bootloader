@@ -33,7 +33,11 @@ smp_trampoline_start:
 0:
     // Configure EL2-specific state for EL1
 
-    // Configure EL1 page tables
+    // Check HCR_EL2.E2H (set on Apple Silicon with VHE)
+    mrs x8, hcr_el2
+    tbnz x8, #34, 6f
+
+    // Configure EL1 page tables (normal silicon)
     msr mair_el1, x3
     msr tcr_el1, x4
     msr ttbr0_el1, x5
@@ -42,7 +46,22 @@ smp_trampoline_start:
     isb
     dsb sy
     isb
+    b 7f
 
+6:
+    // Configure EL1 page tables (Apple Silicon with VHE)
+    // With E2H=1, EL1 register names redirect to EL2, so use
+    // EL12 aliases to access the actual EL1 registers.
+    msr s3_5_c10_c2_0, x3 // MAIR_EL12
+    msr s3_5_c2_c0_2, x4  // TCR_EL12
+    msr s3_5_c2_c0_0, x5  // TTBR0_EL12
+    msr s3_5_c2_c0_1, x6  // TTBR1_EL12
+    msr s3_5_c1_c0_0, x2  // SCTLR_EL12
+    isb
+    dsb sy
+    isb
+
+7:
     // Don't trap counters to EL2
     mrs x8, cnthctl_el2
     orr x8, x8, #3
