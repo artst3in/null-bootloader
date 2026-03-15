@@ -324,6 +324,8 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 #elif defined (__aarch64__)
 
 struct trampoline_passed_info {
+    uint64_t smp_tpl_enter_in_el2;
+
     uint64_t smp_tpl_booted_flag;
 
     uint64_t smp_tpl_hhdm_offset;
@@ -351,7 +353,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
                          struct limine_mp_info *info_struct,
                          uint64_t ttbr0, uint64_t ttbr1, uint64_t mair,
                          uint64_t tcr, uint64_t sctlr,
-                         uint64_t hhdm_offset) {
+                         uint64_t hhdm_offset, bool enter_in_el2) {
     // Prepare the trampoline
     static void *trampoline = NULL;
     if (trampoline == NULL) {
@@ -374,6 +376,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
     passed_info->smp_tpl_tcr         = tcr;
     passed_info->smp_tpl_sctlr       = sctlr;
     passed_info->smp_tpl_hhdm_offset = hhdm_offset;
+    passed_info->smp_tpl_enter_in_el2 = enter_in_el2 ? 1 : 0;
 
     // Cache coherency between the I-Cache and D-Cache is not guaranteed by the
     // architecture and as such we must perform I-Cache invalidation.
@@ -458,7 +461,8 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
                                             uint64_t  mair,
                                             uint64_t  tcr,
                                             uint64_t  sctlr,
-                                            uint64_t  hhdm_offset) {
+                                            uint64_t  hhdm_offset,
+                                            bool      enter_in_el2) {
     int boot_method = BOOT_WITH_ACPI_PARK;
 
     // Search for FADT table
@@ -562,7 +566,8 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
                 if (!try_start_ap(boot_method, gicc->parking_addr, info_struct,
                                   (uint64_t)(uintptr_t)pagemap.top_level[0],
                                   (uint64_t)(uintptr_t)pagemap.top_level[1],
-                                  mair, tcr, sctlr, hhdm_offset)) {
+                                  mair, tcr, sctlr, hhdm_offset,
+                                  enter_in_el2)) {
                     print("smp: FAILED to bring-up AP\n");
                     continue;
                 }
@@ -590,7 +595,8 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
                                            uint64_t  mair,
                                            uint64_t  tcr,
                                            uint64_t  sctlr,
-                                           uint64_t  hhdm_offset) {
+                                           uint64_t  hhdm_offset,
+                                           bool      enter_in_el2) {
     uint64_t bsp_mpidr;
     asm volatile ("mrs %0, mpidr_el1" : "=r"(bsp_mpidr));
 
@@ -755,7 +761,8 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
         if (!try_start_ap(boot_method, method_ptr, info_struct,
                                         (uint64_t)(uintptr_t)pagemap.top_level[0],
                                         (uint64_t)(uintptr_t)pagemap.top_level[1],
-                                        mair, tcr, sctlr, hhdm_offset)) {
+                                        mair, tcr, sctlr, hhdm_offset,
+                                        enter_in_el2)) {
             print("smp: FAILED to bring-up AP\n");
             continue;
         }
@@ -776,12 +783,14 @@ struct limine_mp_info *init_smp(const char *config,
                                  uint64_t  mair,
                                  uint64_t  tcr,
                                  uint64_t  sctlr,
-                                 uint64_t  hhdm_offset) {
+                                 uint64_t  hhdm_offset,
+                                 bool      enter_in_el2) {
     struct limine_mp_info *info = NULL;
 
     if (acpi_get_rsdp() && (info = try_acpi_smp(
                                     cpu_count, bsp_mpidr, pagemap,
-                                    mair, tcr, sctlr, hhdm_offset)))
+                                    mair, tcr, sctlr, hhdm_offset,
+                                    enter_in_el2)))
         return info;
 
     // No RSDP means no ACPI, try device trees in that case.
@@ -789,7 +798,8 @@ struct limine_mp_info *init_smp(const char *config,
     if (dtb) {
         info = try_dtb_smp(dtb,
                            cpu_count, bsp_mpidr, pagemap,
-                           mair, tcr, sctlr, hhdm_offset);
+                           mair, tcr, sctlr, hhdm_offset,
+                           enter_in_el2);
         pmm_free(dtb, fdt_totalsize(dtb));
         return info;
     }

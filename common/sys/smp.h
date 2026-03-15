@@ -30,7 +30,8 @@ struct limine_mp_info *init_smp(const char *config,
                                  uint64_t  mair,
                                  uint64_t  tcr,
                                  uint64_t  sctlr,
-                                 uint64_t  hhdm_offset);
+                                 uint64_t  hhdm_offset,
+                                 bool      enter_in_el2);
 
 #elif defined (__riscv)
 

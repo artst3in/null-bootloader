@@ -1,5 +1,6 @@
 #include <lib/macros.aarch64_asm.h>
 
+.set tpl_enter_in_el2, -72
 .set tpl_booted_flag, -64
 .set tpl_hhdm_offset, -56
 .set tpl_ttbr0, -48
@@ -31,13 +32,13 @@ smp_trampoline_start:
 
     PICK_EL x8, 1f, 0f
 0:
-    // Configure EL2-specific state for EL1
+    // EL2 path
 
-    // Check HCR_EL2.E2H (set on Apple Silicon with VHE)
+    // Check HCR_EL2.E2H
     mrs x8, hcr_el2
     tbnz x8, #34, 6f
 
-    // Configure EL1 page tables (normal silicon)
+    // Non-VHE: configure real EL1 page tables directly
     msr mair_el1, x3
     msr tcr_el1, x4
     msr ttbr0_el1, x5
@@ -46,12 +47,15 @@ smp_trampoline_start:
     isb
     dsb sy
     isb
+    mov x2, #0x3c4       // Target: EL1t
     b 7f
 
 6:
-    // Configure EL1 page tables (Apple Silicon with VHE)
-    // With E2H=1, EL1 register names redirect to EL2, so use
-    // EL12 aliases to access the actual EL1 registers.
+    // VHE (E2H=1): check if we should stay at EL2
+    ldr x8, [x1, tpl_enter_in_el2]
+    cbnz x8, 8f
+
+    // VHE drop to EL1: use EL12 aliases for real EL1 registers
     msr s3_5_c10_c2_0, x3 // MAIR_EL12
     msr s3_5_c2_c0_2, x4  // TCR_EL12
     msr s3_5_c2_c0_0, x5  // TTBR0_EL12
@@ -60,8 +64,49 @@ smp_trampoline_start:
     isb
     dsb sy
     isb
+    mov x2, #0x3c4       // Target: EL1t
+    b 7f
+
+8:
+    // VHE stay at EL2: use plain EL1 names (VHE redirects to EL2 registers)
+    msr mair_el1, x3
+    msr tcr_el1, x4
+    msr ttbr0_el1, x5
+    msr ttbr1_el1, x6
+    msr sctlr_el1, x2
+    isb
+    dsb sy
+    isb
+
+    // Configure EL2 state for VHE
+    mrs x8, cnthctl_el2
+    orr x8, x8, #3
+    msr cnthctl_el2, x8
+    msr cntvoff_el2, xzr
+
+    // HCR: E2H + TGE + RW + SWIO
+    ldr x8, =0x488000002
+    msr hcr_el2, x8
+
+    // Don't trap FP/SIMD/SVE (VHE CPTR_EL2 layout)
+    mov x8, #0x330000
+    msr cptr_el2, x8
+    msr hstr_el2, xzr
+
+    // No stage 2 translation
+    msr vttbr_el2, xzr
+
+    mov x2, #0x3c8       // Target: EL2t
+
+    // Jump directly to higher-half continuation (MMU just enabled from off)
+    adrp x8, 3f
+    add x8, x8, :lo12:3f
+    add x8, x8, x7
+    br x8
 
 7:
+    // Common EL2-to-EL1 drop path
+
     // Don't trap counters to EL2
     mrs x8, cnthctl_el2
     orr x8, x8, #3
@@ -90,6 +135,7 @@ smp_trampoline_start:
     eret
 
 1:
+    // EL1 path
     msr spsel, #0
 
     // Switch to the new page tables
@@ -110,6 +156,7 @@ smp_trampoline_start:
     msr ttbr0_el1, x5
     msr ttbr1_el1, x6
     msr sctlr_el1, x2
+    mov x2, #0x3c4       // Target: EL1t (after x2 is done as sctlr)
     isb
     dsb sy
     isb
@@ -149,9 +196,8 @@ smp_trampoline_start:
     ldr x8, [x0, #16]
     mov sp, x8
 
-    // Enter kernel
-    mov x8, #0x3c4
-    msr spsr_el1, x8
+    // Enter kernel (x2 holds target SPSR: 0x3c4 for EL1t, 0x3c8 for EL2t)
+    msr spsr_el1, x2
 
     ZERO_REGS_EXCEPT_X0
 

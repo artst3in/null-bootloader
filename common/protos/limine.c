@@ -1506,6 +1506,32 @@ FEAT_END
     pagemap = build_pagemap(base_revision, nx_available, ranges, ranges_count,
                             physical_base, virtual_base, direct_map_offset);
 
+#if defined (__aarch64__)
+    // aarch64 EL2
+    bool want_el2 = false;
+FEAT_START
+    struct limine_aarch64_el2_request *el2_request =
+        get_request(LIMINE_AARCH64_EL2_REQUEST_ID);
+    if (el2_request == NULL) {
+        break;
+    }
+
+    // Grant EL2 if we are at EL2 and VHE is active (E2H enabled early)
+    if (current_el() == 2) {
+        uint64_t hcr;
+        asm volatile ("mrs %0, hcr_el2" : "=r"(hcr));
+        if (hcr & (1ULL << 34)) {
+            want_el2 = true;
+
+            struct limine_aarch64_el2_response *el2_response =
+                ext_mem_alloc(sizeof(struct limine_aarch64_el2_response));
+
+            el2_request->response = reported_addr(el2_response);
+        }
+    }
+FEAT_END
+#endif
+
     // MP
 FEAT_START
     struct limine_mp_request *mp_request = get_request(LIMINE_MP_REQUEST_ID);
@@ -1527,7 +1553,7 @@ FEAT_START
 
     mp_info = init_smp(config, &cpu_count, &bsp_mpidr,
                         pagemap, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa), LIMINE_SCTLR,
-                        direct_map_offset);
+                        direct_map_offset, want_el2);
 #elif defined (__riscv)
     mp_info = init_smp(&cpu_count, pagemap, direct_map_offset);
 #elif defined (__loongarch64)
@@ -1726,10 +1752,17 @@ FEAT_END
 
     uint64_t reported_stack = reported_addr(stack);
 
-    enter_in_el1(entry_point, reported_stack, LIMINE_SCTLR, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa),
-                 (uint64_t)pagemap.top_level[0],
-                 (uint64_t)pagemap.top_level[1],
-                 direct_map_offset);
+    if (want_el2) {
+        enter_in_el2(entry_point, reported_stack, LIMINE_SCTLR, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa),
+                     (uint64_t)pagemap.top_level[0],
+                     (uint64_t)pagemap.top_level[1],
+                     direct_map_offset);
+    } else {
+        enter_in_el1(entry_point, reported_stack, LIMINE_SCTLR, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa),
+                     (uint64_t)pagemap.top_level[0],
+                     (uint64_t)pagemap.top_level[1],
+                     direct_map_offset);
+    }
 #elif defined (__riscv)
     uint64_t reported_stack = reported_addr(stack);
     uint64_t satp = make_satp(pagemap.paging_mode, pagemap.top_level);

@@ -110,4 +110,76 @@ enter_in_el1:
 
     eret
 
+// noreturn void enter_in_el2(uint64_t entry, uint64_t sp, uint64_t sctlr,
+//                            uint64_t mair, uint64_t tcr, uint64_t ttbr0,
+//                            uint64_t ttbr1, uint64_t direct_map_offset)
+// Enter kernel at EL2 with VHE. Must be called at EL2 with E2H already enabled.
+
+.global enter_in_el2
+enter_in_el2:
+    msr spsel, #0
+    mov sp, x1
+
+    // Switch page tables using VHE-redirected register names.
+    // Under VHE, *_el1 writes go to the EL2 register bank.
+
+    // Point the exception handler to the continuation so that if we page fault
+    // during the switch, execution continues at the kernel entry.
+    adrp x8, 5f
+    add x8, x8, #:lo12:5f
+    add x8, x8, x7
+    msr vbar_el1, x8
+    isb
+    dsb sy
+    isb
+
+    // Switch the page table registers (VHE redirects to EL2)
+    msr mair_el1, x3
+    msr tcr_el1, x4
+    msr ttbr0_el1, x5
+    msr ttbr1_el1, x6
+    msr sctlr_el1, x2
+    isb
+    dsb sy
+    isb
+
+    // Jump to the higher half mapping in case we didn't immediately crash
+    br x8
+
+// Alignment required by VBAR register
+.align 11
+5:
+    // Zero out VBAR to avoid confusion
+    msr vbar_el1, xzr
+
+    // Configure EL2 state for VHE
+
+    // Don't trap counters
+    mrs x8, cnthctl_el2
+    orr x8, x8, #3
+    msr cnthctl_el2, x8
+    msr cntvoff_el2, xzr
+
+    // HCR: E2H + TGE + RW + SWIO
+    ldr x8, =0x488000002
+    msr hcr_el2, x8
+
+    // Don't trap FP/SIMD/SVE (VHE CPTR_EL2 layout)
+    mov x8, #0x330000
+    msr cptr_el2, x8
+    msr hstr_el2, xzr
+
+    // No stage 2 translation
+    msr vttbr_el2, xzr
+
+    // Enter kernel in EL2
+    mov x8, #0x3c8
+    msr spsr_el1, x8
+    msr elr_el1, x0
+
+    mov x0, xzr
+    ZERO_REGS_EXCEPT_X0
+
+    eret
+
 .section .note.GNU-stack,"",%progbits
