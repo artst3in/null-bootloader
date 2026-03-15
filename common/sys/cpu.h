@@ -241,7 +241,7 @@ static inline uint64_t tsc_freq_arch(void) {
     asm volatile ( \
         "ldar %0, %1" \
         : "=r" (locked_read__ret) \
-        : "m" (*(var)) \
+        : "Q" (*(var)) \
         : "memory" \
     ); \
     locked_read__ret; \
