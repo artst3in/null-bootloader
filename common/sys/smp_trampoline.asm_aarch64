@@ -85,7 +85,11 @@ smp_trampoline_start:
     msr cntvoff_el2, xzr
 
     // HCR: E2H + TGE + RW + SWIO
-    ldr x8, =0x488000002
+    mov x8, xzr
+    orr x8, x8, #(1 << 34)
+    orr x8, x8, #(1 << 31)
+    orr x8, x8, #(1 << 27)
+    orr x8, x8, #(1 << 1)
     msr hcr_el2, x8
 
     // Don't trap FP/SIMD/SVE (VHE CPTR_EL2 layout)
