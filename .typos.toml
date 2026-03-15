@@ -20,5 +20,6 @@ hd = "hd"
 htpt = "htpt"
 CMO = "CMO"
 extint = "extint"
+TGE = "TGE"
 
 [default.extend-identifiers]
