@@ -67,6 +67,8 @@ smp_trampoline_start:
         mv      tp, zero
         mv      ra, zero
 
+        li      t0, (2 << 32)
+        csrw    sstatus, t0
         csrw    sie, zero
         csrw    stvec, zero
 
