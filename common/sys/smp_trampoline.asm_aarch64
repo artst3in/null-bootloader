@@ -48,6 +48,7 @@ smp_trampoline_start:
     msr ttbr0_el1, x5
     msr ttbr1_el1, x6
     msr sctlr_el1, x2
+    msr cpacr_el1, xzr
     isb
     dsb sy
     isb
@@ -72,6 +73,7 @@ smp_trampoline_start:
     msr s3_5_c2_c0_0, x5  // TTBR0_EL12
     msr s3_5_c2_c0_1, x6  // TTBR1_EL12
     msr s3_5_c1_c0_0, x2  // SCTLR_EL12
+    msr s3_5_c1_c0_2, xzr // CPACR_EL12
     isb
     dsb sy
     isb
@@ -81,8 +83,7 @@ smp_trampoline_start:
     // VHE stay at EL2: configure EL2 state before enabling MMU
     msr spsel, #0
 
-    mrs x8, cnthctl_el2
-    orr x8, x8, #3
+    mov x8, #3
     msr cnthctl_el2, x8
     msr cntvoff_el2, xzr
 
@@ -94,13 +95,9 @@ smp_trampoline_start:
     orr x8, x8, #(1 << 1)
     msr hcr_el2, x8
 
-    // Don't trap FP/SIMD/SVE (VHE CPTR_EL2 layout)
-    mov x8, #0x330000
-    msr cptr_el2, x8
+    // Disable FP/SIMD/SVE (VHE CPTR_EL2 layout, CPACR-like)
+    msr cptr_el2, xzr
     msr hstr_el2, xzr
-
-    // No stage 2 translation
-    msr vttbr_el2, xzr
 
     // Set up VBAR for page table switch (VHE redirects VBAR_EL1 to VBAR_EL2)
     adrp x8, 2f
@@ -128,8 +125,7 @@ smp_trampoline_start:
     // Common EL2-to-EL1 drop path
 
     // Don't trap counters to EL2
-    mrs x8, cnthctl_el2
-    orr x8, x8, #3
+    mov x8, #3
     msr cnthctl_el2, x8
     msr cntvoff_el2, xzr
 
@@ -188,6 +184,9 @@ smp_trampoline_start:
 2:
     // Zero out VBAR to avoid confusion
     msr vbar_el1, xzr
+
+    // Disable FP/SIMD/SVE
+    msr cpacr_el1, xzr
 
 3:
     // Add HHDM offset to data pointer
