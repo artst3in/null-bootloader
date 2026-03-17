@@ -85,6 +85,7 @@ loongarch_spinup:
         move    $t6, $zero
         move    $t7, $zero
         move    $t8, $zero
+        move    $r21, $zero
         move    $fp, $zero
         move    $s0, $zero
         move    $s1, $zero
