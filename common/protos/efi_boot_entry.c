@@ -1,6 +1,8 @@
 #include <protos/efi_boot_entry.h>
 
 #if defined(UEFI)
+
+#include <mm/pmm.h>
 #include <efi.h>
 #include <lib/config.h>
 #include <lib/misc.h>
@@ -50,21 +52,24 @@ static bool find_boot_entry(CHAR16 *entry, uint16_t *out) {
 
         format_boot_var(var_name, boot_order[i]);
 
-        uint8_t buf[128];
-        size_t buf_size = sizeof(buf);
-
+        size_t buf_size = 0;
+        /* Query for buf size */
+        gRT->GetVariable(var_name, &global_variable, NULL, &buf_size, NULL);
+        uint8_t *buf = ext_mem_alloc(buf_size);
         status = gRT->GetVariable(var_name, &global_variable, NULL, &buf_size, buf);
 
-        if (EFI_ERROR(status))
-            continue;
-
+        if (EFI_ERROR(status)) {
+            pmm_free(buf, buf_size);
+            continue; 
+        }
         /* Get the description */
         CHAR16 *desc = (CHAR16 *)(buf + sizeof(uint32_t) + sizeof(uint16_t));
-
         if (uefi_string_matches(desc, entry)) {
             *out = boot_order[i];
+            pmm_free(buf, buf_size);
             return true;
         }
+        pmm_free(buf, buf_size);
     }
 
     return false;
