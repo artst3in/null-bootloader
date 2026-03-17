@@ -56,8 +56,13 @@ loongarch_spinup:
         la      $t0, loongarch_handle_refill
         csrwr   $t0, CSR_TLBRENTRY
 
+#define CSR_EUEN        0x02
+#define CSR_ECFG        0x04
+
         csrwr   $zero, CSR_EENTRY
         csrwr   $zero, CSR_MERRENTRY
+        csrwr   $zero, CSR_EUEN
+        csrwr   $zero, CSR_ECFG
 
         move    $t0, $a0
         move    $sp, $a1
