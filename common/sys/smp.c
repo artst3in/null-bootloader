@@ -978,7 +978,7 @@ static bool smp_start_ap(uint32_t phys_id, struct limine_mp_info *info_struct,
     for (int i = 0; i < 1000000; i++) {
         if (locked_read(&loongarch_smp_passed_info.smp_tpl_booted_flag) == 1)
             return true;
-        delay(100000);
+        stall(100);
     }
 
     return false;
