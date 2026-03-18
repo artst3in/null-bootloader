@@ -40,6 +40,10 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
                                  uint64_t  hhdm_offset);
 
 #elif defined (__loongarch64)
+
+struct limine_mp_info *init_smp(size_t *cpu_count, uint32_t *bsp_phys_id,
+                                pagemap_t pagemap, uint64_t hhdm_offset);
+
 #else
 #error Unknown architecture
 #endif

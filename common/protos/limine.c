@@ -1557,8 +1557,8 @@ FEAT_START
 #elif defined (__riscv)
     mp_info = init_smp(&cpu_count, pagemap, direct_map_offset);
 #elif defined (__loongarch64)
-    cpu_count = 0;
-    mp_info = NULL; // TODO: LoongArch MP
+    uint32_t bsp_phys_id;
+    mp_info = init_smp(&cpu_count, &bsp_phys_id, pagemap, direct_map_offset);
 #else
 #error Unknown architecture
 #endif
@@ -1581,6 +1581,9 @@ FEAT_START
             continue;
         }
 #elif defined (__loongarch64)
+        if (mp_info[i].phys_id == bsp_phys_id) {
+            continue;
+        }
 #else
 #error Unknown architecture
 #endif
@@ -1601,6 +1604,7 @@ FEAT_START
 #elif defined (__riscv)
     mp_response->bsp_hartid = bsp_hartid;
 #elif defined (__loongarch64)
+    mp_response->bsp_phys_id = bsp_phys_id;
 #else
 #error Unknown architecture
 #endif
