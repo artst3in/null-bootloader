@@ -130,13 +130,11 @@ static volatile struct limine_executable_address_request executable_address_requ
     .revision = 0, .response = NULL
 };
 
-#ifndef __loongarch__
 __attribute__((section(".limine_requests")))
 static volatile struct limine_mp_request _mp_request = {
     .id = LIMINE_MP_REQUEST_ID,
     .revision = 0, .response = NULL
 };
-#endif
 
 __attribute__((section(".limine_requests")))
 static volatile struct limine_dtb_request _dtb_request = {
@@ -266,7 +264,7 @@ void ap_entry(struct limine_mp_info *info) {
 #elif defined (__riscv)
     e9_printf("My Hart ID: %x", info->hartid);
 #elif defined (__loongarch__)
-    (void)info;
+    e9_printf("My Phys ID: %x", info->phys_id);
 #endif
 
     __atomic_fetch_add(&ctr, 1, __ATOMIC_SEQ_CST);
@@ -511,7 +509,6 @@ FEAT_START
 FEAT_END
 
 // TODO: LoongArch MP
-#ifndef __loongarch__
 FEAT_START
     e9_printf("");
     if (_mp_request.response == NULL) {
@@ -527,6 +524,8 @@ FEAT_START
     e9_printf("BSP MPIDR: %x", mp_response->bsp_mpidr);
 #elif defined (__riscv)
     e9_printf("BSP Hart ID: %x", mp_response->bsp_hartid);
+#elif defined (__loongarch__)
+    e9_printf("BSP Phys ID: %x", mp_response->bsp_phys_id);
 #endif
     e9_printf("CPU count: %d", mp_response->cpu_count);
     for (size_t i = 0; i < mp_response->cpu_count; i++) {
@@ -538,6 +537,8 @@ FEAT_START
         e9_printf("MPIDR: %x", cpu->mpidr);
 #elif defined (__riscv)
         e9_printf("Hart ID: %x", cpu->hartid);
+#elif defined (__loongarch__)
+        e9_printf("Phys ID: %x", cpu->phys_id);
 #endif
 
 
@@ -547,6 +548,8 @@ FEAT_START
         if (cpu->mpidr != mp_response->bsp_mpidr) {
 #elif defined (__riscv)
         if (cpu->hartid != mp_response->bsp_hartid) {
+#elif defined (__loongarch__)
+        if (cpu->phys_id != mp_response->bsp_phys_id) {
 #endif
             uint32_t old_ctr = __atomic_load_n(&ctr, __ATOMIC_SEQ_CST);
 
@@ -557,7 +560,6 @@ FEAT_START
         }
     }
 FEAT_END
-#endif
 
 FEAT_START
     e9_printf("");
