@@ -42,7 +42,10 @@ smp_trampoline_start:
         // Load the kernel-provided stack (reserved field).
         ld.d    $sp, $t1, 16
 
-        // Match the other trampolines by zeroing non-essential registers.
+        // Save entry point in $t0 (matching BSP convention).
+        move    $t0, $t8
+
+        // Zero non-essential registers.
         move    $ra, $zero
         move    $tp, $zero
         move    $a1, $zero
@@ -52,7 +55,6 @@ smp_trampoline_start:
         move    $a5, $zero
         move    $a6, $zero
         move    $a7, $zero
-        move    $t0, $zero
         move    $t1, $zero
         move    $t2, $zero
         move    $t3, $zero
@@ -60,6 +62,8 @@ smp_trampoline_start:
         move    $t5, $zero
         move    $t6, $zero
         move    $t7, $zero
+        move    $t8, $zero
+        move    $r21, $zero
         move    $fp, $zero
         move    $s0, $zero
         move    $s1, $zero
@@ -71,6 +75,6 @@ smp_trampoline_start:
         move    $s7, $zero
         move    $s8, $zero
 
-        jirl    $zero, $t8, 0
+        jirl    $zero, $t0, 0
 
 .section .note.GNU-stack,"",%progbits
