@@ -426,6 +426,17 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint32_t eax, ebx, ecx, edx;
 #endif
 
+#if defined (__aarch64__)
+    // Booting at EL2 without VHE is not supported.
+    if (current_el() == 2) {
+        uint64_t mmfr1;
+        asm volatile ("mrs %0, id_aa64mmfr1_el1" : "=r"(mmfr1));
+        if (!((mmfr1 >> 8) & 0xF)) {
+            panic(true, "limine: Booting at EL2 without VHE support is not supported");
+        }
+    }
+#endif
+
     char *kernel_path = config_get_value(config, 0, "PATH");
     if (kernel_path == NULL) {
         kernel_path = config_get_value(config, 0, "KERNEL_PATH");
@@ -1507,29 +1518,8 @@ FEAT_END
                             physical_base, virtual_base, direct_map_offset);
 
 #if defined (__aarch64__)
-    // aarch64 EL2
-    bool want_el2 = false;
-FEAT_START
-    struct limine_aarch64_el2_request *el2_request =
-        get_request(LIMINE_AARCH64_EL2_REQUEST_ID);
-    if (el2_request == NULL) {
-        break;
-    }
-
-    // Grant EL2 if we are at EL2 and VHE is active (E2H enabled early)
-    if (current_el() == 2) {
-        uint64_t hcr;
-        asm volatile ("mrs %0, hcr_el2" : "=r"(hcr));
-        if (hcr & (1ULL << 34)) {
-            want_el2 = true;
-
-            struct limine_aarch64_el2_response *el2_response =
-                ext_mem_alloc(sizeof(struct limine_aarch64_el2_response));
-
-            el2_request->response = reported_addr(el2_response);
-        }
-    }
-FEAT_END
+    // Enter at EL2 with VHE if we are at EL2 (VHE check done at function entry)
+    bool want_el2 = (current_el() == 2);
 #endif
 
     // MP
@@ -1553,7 +1543,7 @@ FEAT_START
 
     mp_info = init_smp(config, &cpu_count, &bsp_mpidr,
                         pagemap, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa), LIMINE_SCTLR,
-                        direct_map_offset, want_el2);
+                        direct_map_offset);
 #elif defined (__riscv)
     mp_info = init_smp(&cpu_count, pagemap, direct_map_offset);
 #elif defined (__loongarch64)
