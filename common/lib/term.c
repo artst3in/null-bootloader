@@ -298,6 +298,8 @@ void term_fallback(void) {
             0,
             FLANTERM_FB_ROTATE_0
         );
+
+        flanterm_fb_set_flush_callback(terms[0], (void *)fb_flush);
     }
 
     return;

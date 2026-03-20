@@ -475,40 +475,6 @@ static void generate_canvas(struct fb_info *fb) {
     }
 }
 
-#if defined (__riscv)
-__attribute__((target("arch=+zicbom")))
-static void riscv_flush_callback(volatile void *base, size_t length) {
-    const size_t cbom_block_size = 0x40;
-    uintptr_t start = ALIGN_DOWN((uintptr_t)base, cbom_block_size);
-    uintptr_t end = ALIGN_UP((uintptr_t)(base + length), cbom_block_size);
-    for (uintptr_t ptr = start; ptr < end; ptr += cbom_block_size) {
-        asm volatile("cbo.flush (%0)" :: "r"(ptr) : "memory");
-    }
-}
-static void riscv_flush_callback_nozicbom(volatile void *base, size_t length) {
-    (void)base;
-    (void)length;
-
-    // Without Zicbom, there is no portable instruction to flush dirty cache lines.
-    // Read through a dedicated eviction buffer to create cache pressure and displace
-    // dirty framebuffer lines. 128 KB covers typical RISC-V L1 D-caches (32-64 KB).
-    static volatile uint8_t *eviction_buf = NULL;
-    #define EVICTION_BUF_SIZE (128 * 1024)
-    if (eviction_buf == NULL) {
-        eviction_buf = ext_mem_alloc(EVICTION_BUF_SIZE);
-    }
-
-    volatile uint64_t *p = (volatile uint64_t *)eviction_buf;
-    for (size_t i = 0; i < EVICTION_BUF_SIZE / sizeof(uint64_t); i += (64 / sizeof(uint64_t))) {
-        (void)p[i];
-    }
-    asm volatile ("fence rw, rw" ::: "memory");
-}
-#elif defined (__aarch64__)
-static void aarch64_flush_callback(volatile void *base, size_t length) {
-    clean_dcache_poc((uintptr_t)base, (uintptr_t)base + length);
-}
-#endif
 
 bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
                 char *config, size_t width, size_t height) {
@@ -885,15 +851,7 @@ no_load_font:;
         term->rows = min_rows;
 
         flanterm_context_reinit(term);
-#if defined (__riscv)
-        if (riscv_check_isa_extension("zicbom", NULL, NULL)) {
-            flanterm_fb_set_flush_callback(term, riscv_flush_callback);
-        } else {
-            flanterm_fb_set_flush_callback(term, riscv_flush_callback_nozicbom);
-        }
-#elif defined (__aarch64__)
-        flanterm_fb_set_flush_callback(term, aarch64_flush_callback);
-#endif
+        flanterm_fb_set_flush_callback(term, (void *)fb_flush);
     }
 
     term_backend = GTERM;

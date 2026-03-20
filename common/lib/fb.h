@@ -40,4 +40,6 @@ void fb_init(struct fb_info **ret, size_t *_fbs_count,
 
 void fb_clear(struct fb_info *fb);
 
+void fb_flush(volatile void *base, size_t length);
+
 #endif
