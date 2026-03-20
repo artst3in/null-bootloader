@@ -1304,6 +1304,58 @@ FEAT_END
                            MEMMAP_FRAMEBUFFER, 0, false, false, true);
     }
 
+    // Check for page-level overlaps between framebuffer and other memory regions.
+    // The framebuffer is mapped with a different caching type, so overlapping pages
+    // must be resolved.
+    for (size_t i = 0; i < memmap_entries; i++) {
+        if (memmap[i].type != MEMMAP_FRAMEBUFFER) {
+            continue;
+        }
+
+        uint64_t fb_base = memmap[i].base;
+        uint64_t fb_top = fb_base + memmap[i].length;
+        uint64_t fb_aligned_base = ALIGN_DOWN(fb_base, 4096);
+        uint64_t fb_aligned_top = ALIGN_UP(fb_top, 4096);
+
+        // No overshoot means no possible overlap.
+        if (fb_aligned_base == fb_base && fb_aligned_top == fb_top) {
+            continue;
+        }
+
+        for (size_t j = 0; j < memmap_entries; j++) {
+            if (j == i || memmap[j].length == 0) {
+                continue;
+            }
+
+            uint64_t region_base = memmap[j].base;
+            uint64_t region_top = region_base + memmap[j].length;
+
+            // Check if this region overlaps with the framebuffer's page-aligned extent.
+            if (region_top <= fb_aligned_base || region_base >= fb_aligned_top) {
+                continue;
+            }
+
+            // There is a page-level overlap. Only USABLE regions can be trimmed.
+            if (memmap[j].type != MEMMAP_USABLE) {
+                panic(false, "limine: Framebuffer page-level overlap with non-trimmable memory type %x", memmap[j].type);
+            }
+
+            // Trim the usable region to not overlap with the framebuffer's
+            // page-aligned extent.
+            if (region_base < fb_aligned_base && region_top > fb_aligned_base) {
+                // Region extends before the framebuffer - trim end.
+                memmap[j].length = fb_aligned_base - region_base;
+            } else if (region_base < fb_aligned_top && region_top > fb_aligned_top) {
+                // Region extends after the framebuffer - trim start.
+                memmap[j].length = region_top - fb_aligned_top;
+                memmap[j].base = fb_aligned_top;
+            } else {
+                // Region is entirely within the framebuffer's page-aligned extent - zero it.
+                memmap[j].length = 0;
+            }
+        }
+    }
+
     // Framebuffer feature
 FEAT_START
     struct limine_framebuffer_request *framebuffer_request = get_request(LIMINE_FRAMEBUFFER_REQUEST_ID);
