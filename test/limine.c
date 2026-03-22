@@ -7,7 +7,7 @@
 #include <flanterm_backends/fb.h>
 
 __attribute__((section(".limine_requests")))
-static volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(5);
+static volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
 
 static void limine_main(void);
 

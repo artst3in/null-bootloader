@@ -51,7 +51,7 @@ static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kerne
     }
 }
 
-#define SUPPORTED_BASE_REVISION 5
+#define SUPPORTED_BASE_REVISION 6
 
 #define MAX_REQUESTS 128
 
@@ -561,6 +561,12 @@ noreturn void limine_load(char *config, char *cmdline) {
     if (base_rev_p2_ptr != NULL) {
         *base_rev_p2_ptr = 0;
     }
+
+#if !defined (__x86_64__) && !defined (__i386__)
+    if (base_revision < 6) {
+        panic(true, "limine: Base revision %u is no longer supported on this architecture (minimum: 6)", base_revision);
+    }
+#endif
 
     // Load requests
     uint64_t *limine_reqs = NULL;
