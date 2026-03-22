@@ -1362,6 +1362,8 @@ FEAT_END
         }
     }
 
+    struct limine_framebuffer *fbp = NULL;
+
     // Framebuffer feature
 FEAT_START
     struct limine_framebuffer_request *framebuffer_request = get_request(LIMINE_FRAMEBUFFER_REQUEST_ID);
@@ -1373,7 +1375,7 @@ FEAT_START
         break;
     }
 
-    struct limine_framebuffer *fbp = ext_mem_alloc(fbs_count * sizeof(struct limine_framebuffer));
+    fbp = ext_mem_alloc(fbs_count * sizeof(struct limine_framebuffer));
 
     struct limine_framebuffer_response *framebuffer_response =
         ext_mem_alloc(sizeof(struct limine_framebuffer_response));
@@ -1416,6 +1418,63 @@ FEAT_START
     framebuffer_response->framebuffers = reported_addr(fb_list);
 
     framebuffer_request->response = reported_addr(framebuffer_response);
+FEAT_END
+
+    // Flanterm FB init params feature
+FEAT_START
+    struct limine_flanterm_fb_init_params_request *fip_request = get_request(LIMINE_FLANTERM_FB_INIT_PARAMS_REQUEST_ID);
+    if (fip_request == NULL) {
+        break;
+    }
+
+    if (fbp == NULL || fbs_count == 0) {
+        break;
+    }
+
+    struct flanterm_params *fip_raw = ext_mem_alloc(fbs_count * sizeof(struct flanterm_params));
+    size_t fip_count = gterm_prepare_flanterm_params(fbs, fbs_count, fip_raw, fbs_count);
+
+    struct limine_flanterm_fb_init_params *fip_entries =
+        ext_mem_alloc(fbs_count * sizeof(struct limine_flanterm_fb_init_params));
+    uint64_t *fip_list = ext_mem_alloc(fbs_count * sizeof(uint64_t));
+
+    size_t fip_idx = 0;
+    for (size_t i = 0; i < fbs_count; i++) {
+        struct limine_flanterm_fb_init_params *entry = &fip_entries[i];
+
+        if (fbs[i].framebuffer_bpp == 32 && fip_idx < fip_count) {
+            struct flanterm_params *raw = &fip_raw[fip_idx];
+
+            entry->canvas = raw->canvas != NULL ? reported_addr(raw->canvas) : 0;
+            entry->canvas_size = raw->canvas_size;
+            memcpy(entry->ansi_colours, raw->ansi_colours, sizeof(raw->ansi_colours));
+            memcpy(entry->ansi_bright_colours, raw->ansi_bright_colours, sizeof(raw->ansi_bright_colours));
+            entry->default_bg = raw->default_bg;
+            entry->default_fg = raw->default_fg;
+            entry->default_bg_bright = raw->default_bg_bright;
+            entry->default_fg_bright = raw->default_fg_bright;
+            entry->font = reported_addr(raw->font);
+            entry->font_width = raw->font_width;
+            entry->font_height = raw->font_height;
+            entry->font_spacing = raw->font_spacing;
+            entry->font_scale_x = raw->font_scale_x;
+            entry->font_scale_y = raw->font_scale_y;
+            entry->margin = raw->margin;
+            entry->rotation = raw->rotation;
+
+            fip_idx++;
+        }
+
+        fip_list[i] = reported_addr(entry);
+    }
+
+    struct limine_flanterm_fb_init_params_response *fip_response =
+        ext_mem_alloc(sizeof(struct limine_flanterm_fb_init_params_response));
+
+    fip_response->entry_count = fbs_count;
+    fip_response->entries = reported_addr(fip_list);
+
+    fip_request->response = reported_addr(fip_response);
 FEAT_END
 
 no_fb:

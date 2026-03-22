@@ -276,6 +276,8 @@ static const uint8_t builtin_font[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+#define FONT_MAX 16384
+
 static struct image *background;
 
 static size_t margin = 64;
@@ -472,9 +474,267 @@ static void generate_canvas(struct fb_info *fb) {
         loop_internal(fb, effective_margin, gradient_stop_x, effective_margin, gradient_stop_y);
     } else {
         bg_canvas = NULL;
+        bg_canvas_size = 0;
     }
 }
 
+
+static void parse_palette(const char *str, uint32_t *colours) {
+    const char *first = str;
+    for (size_t i = 0; i < 8; i++) {
+        const char *last;
+        uint32_t col = strtoui(first, &last, 16);
+        if (first == last)
+            break;
+        colours[i] = col & 0xffffff;
+        if (*last == 0)
+            break;
+        first = last + 1;
+    }
+}
+
+struct gterm_config {
+    int fb_rotation;
+    uint32_t ansi_colours[8];
+    uint32_t ansi_bright_colours[8];
+    char *theme_background;
+    uint8_t *font;
+    size_t font_width;
+    size_t font_height;
+    size_t font_size;
+    size_t font_spacing;
+    size_t font_scale_x;
+    size_t font_scale_y;
+    bool font_scale_is_default;
+};
+
+static void gterm_parse_config(char *config, struct gterm_config *cfg) {
+    cfg->fb_rotation = FLANTERM_FB_ROTATE_0;
+    char *rotation_str = config_get_value(config, 0, "INTERFACE_ROTATION");
+    if (rotation_str != NULL) {
+        int rotation_val = strtoui(rotation_str, NULL, 10);
+        switch (rotation_val) {
+            case 90: cfg->fb_rotation = FLANTERM_FB_ROTATE_90; break;
+            case 180: cfg->fb_rotation = FLANTERM_FB_ROTATE_180; break;
+            case 270: cfg->fb_rotation = FLANTERM_FB_ROTATE_270; break;
+        }
+    }
+
+    cfg->ansi_colours[0] = 0x00000000;
+    cfg->ansi_colours[1] = 0x00aa0000;
+    cfg->ansi_colours[2] = 0x0000aa00;
+    cfg->ansi_colours[3] = 0x00aa5500;
+    cfg->ansi_colours[4] = 0x000000aa;
+    cfg->ansi_colours[5] = 0x00aa00aa;
+    cfg->ansi_colours[6] = 0x0000aaaa;
+    cfg->ansi_colours[7] = 0x00aaaaaa;
+
+    char *colours = config_get_value(config, 0, "TERM_PALETTE");
+    if (colours != NULL) {
+        parse_palette(colours, cfg->ansi_colours);
+    }
+
+    cfg->ansi_bright_colours[0] = 0x00555555;
+    cfg->ansi_bright_colours[1] = 0x00ff5555;
+    cfg->ansi_bright_colours[2] = 0x0055ff55;
+    cfg->ansi_bright_colours[3] = 0x00ffff55;
+    cfg->ansi_bright_colours[4] = 0x005555ff;
+    cfg->ansi_bright_colours[5] = 0x00ff55ff;
+    cfg->ansi_bright_colours[6] = 0x0055ffff;
+    cfg->ansi_bright_colours[7] = 0x00ffffff;
+
+    char *bright_colours = config_get_value(config, 0, "TERM_PALETTE_BRIGHT");
+    if (bright_colours != NULL) {
+        parse_palette(bright_colours, cfg->ansi_bright_colours);
+    }
+
+    default_bg = 0x00000000;
+    default_fg = 0x00aaaaaa;
+    default_bg_bright = 0x00555555;
+    default_fg_bright = 0x00ffffff;
+
+    cfg->theme_background = config_get_value(config, 0, "TERM_BACKGROUND");
+    if (cfg->theme_background != NULL) {
+        default_bg = strtoui(cfg->theme_background, NULL, 16);
+    }
+
+    char *theme_foreground = config_get_value(config, 0, "TERM_FOREGROUND");
+    if (theme_foreground != NULL) {
+        default_fg = strtoui(theme_foreground, NULL, 16) & 0xffffff;
+    }
+
+    char *theme_background_bright = config_get_value(config, 0, "TERM_BACKGROUND_BRIGHT");
+    if (theme_background_bright != NULL) {
+        default_bg_bright = strtoui(theme_background_bright, NULL, 16);
+    }
+
+    char *theme_foreground_bright = config_get_value(config, 0, "TERM_FOREGROUND_BRIGHT");
+    if (theme_foreground_bright != NULL) {
+        default_fg_bright = strtoui(theme_foreground_bright, NULL, 16);
+    }
+
+    size_t wallpaper_count = 0;
+    while (config_get_value(config, wallpaper_count, "WALLPAPER") != NULL)
+        wallpaper_count++;
+
+    background = NULL;
+    if (wallpaper_count > 0) {
+        char *background_path = config_get_value(config, rand32() % wallpaper_count, "WALLPAPER");
+        if (background_path != NULL) {
+            struct file_handle *bg_file;
+            if ((bg_file = uri_open(background_path)) != NULL) {
+                background = image_open(bg_file);
+                fclose(bg_file);
+            }
+        }
+    }
+
+    margin = 64;
+    margin_gradient = 4;
+
+    if (background == NULL) {
+        margin = 0;
+        margin_gradient = 0;
+    } else {
+        if (cfg->theme_background == NULL) {
+            default_bg = 0x80000000;
+        }
+    }
+
+    char *theme_margin = config_get_value(config, 0, "TERM_MARGIN");
+    if (theme_margin != NULL) {
+        margin = strtoui(theme_margin, NULL, 10);
+    }
+
+    char *theme_margin_gradient = config_get_value(config, 0, "TERM_MARGIN_GRADIENT");
+    if (theme_margin_gradient != NULL) {
+        margin_gradient = strtoui(theme_margin_gradient, NULL, 10);
+    }
+
+    if (margin_gradient > margin) {
+        margin_gradient = margin;
+    }
+
+    cfg->font_width = 8;
+    cfg->font_height = 16;
+    cfg->font_size = (cfg->font_width * cfg->font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
+
+    cfg->font = ext_mem_alloc(FONT_MAX);
+    memcpy(cfg->font, builtin_font, 4096);
+
+    size_t tmp_font_width, tmp_font_height;
+
+    char *menu_font_size = config_get_value(config, 0, "TERM_FONT_SIZE");
+    if (menu_font_size != NULL) {
+        if (!parse_resolution(&tmp_font_width, &tmp_font_height, NULL, menu_font_size)) {
+            print("Could not parse TERM_FONT_SIZE. Using default font.\n");
+            goto config_no_load_font;
+        }
+
+        if (tmp_font_width != 8) {
+            print("Font width must be 8, got %u. Using default font.\n", tmp_font_width);
+            goto config_no_load_font;
+        }
+
+        size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
+
+        if (tmp_font_size > FONT_MAX) {
+            print("Font would be too large (%U bytes, %u bytes allowed). Not loading.\n", (uint64_t)tmp_font_size, FONT_MAX);
+            goto config_no_load_font;
+        }
+
+        cfg->font_size = tmp_font_size;
+    }
+
+    char *menu_font = config_get_value(config, 0, "TERM_FONT");
+    if (menu_font != NULL) {
+        struct file_handle *f;
+        if ((f = uri_open(menu_font)) == NULL) {
+            print("menu: Could not open font file.\n");
+        } else {
+            if (cfg->font_size > f->size) {
+                print("Font size too large for provided font file. Not loading.\n");
+                fclose(f);
+                goto config_no_load_font;
+            }
+            fread(f, cfg->font, 0, cfg->font_size);
+            if (menu_font_size != NULL) {
+                cfg->font_width = tmp_font_width;
+                cfg->font_height = tmp_font_height;
+            }
+            fclose(f);
+        }
+    }
+
+config_no_load_font:;
+    cfg->font_spacing = 1;
+    char *font_spacing_str = config_get_value(config, 0, "TERM_FONT_SPACING");
+    if (font_spacing_str != NULL) {
+        cfg->font_spacing = strtoui(font_spacing_str, NULL, 10);
+    }
+
+    cfg->font_scale_x = 1;
+    cfg->font_scale_y = 1;
+    cfg->font_scale_is_default = true;
+
+    char *menu_font_scale = config_get_value(config, 0, "TERM_FONT_SCALE");
+    if (menu_font_scale != NULL) {
+        parse_resolution(&cfg->font_scale_x, &cfg->font_scale_y, NULL, menu_font_scale);
+        if (cfg->font_scale_x > 8 || cfg->font_scale_y > 8) {
+            cfg->font_scale_x = 1;
+            cfg->font_scale_y = 1;
+        } else {
+            cfg->font_scale_is_default = false;
+        }
+    }
+}
+
+static void gterm_fb_setup(struct fb_info *fb, char *config,
+                           struct gterm_config *cfg,
+                           size_t *out_scale_x, size_t *out_scale_y) {
+    if (cfg->fb_rotation == FLANTERM_FB_ROTATE_90 || cfg->fb_rotation == FLANTERM_FB_ROTATE_270) {
+        uint64_t tmp = fb->framebuffer_width;
+        fb->framebuffer_width = fb->framebuffer_height;
+        fb->framebuffer_height = tmp;
+    }
+
+    if (background != NULL) {
+        char *background_layout = config_get_value(config, 0, "WALLPAPER_STYLE");
+        if (background_layout != NULL && strcmp(background_layout, "centered") == 0) {
+            char *background_colour = config_get_value(config, 0, "BACKDROP");
+            if (background_colour == NULL)
+                background_colour = "0";
+            uint32_t bg_col = strtoui(background_colour, NULL, 16);
+            image_make_centered(background, fb->framebuffer_width, fb->framebuffer_height, bg_col);
+        } else if (background_layout != NULL && strcmp(background_layout, "tiled") == 0) {
+        } else {
+            image_make_stretched(background, fb->framebuffer_width, fb->framebuffer_height);
+        }
+    }
+
+    generate_canvas(fb);
+
+    *out_scale_x = cfg->font_scale_x;
+    *out_scale_y = cfg->font_scale_y;
+    if (cfg->font_scale_is_default) {
+        *out_scale_x = 1;
+        *out_scale_y = 1;
+        if (fb->framebuffer_width >= (1920 + 1920 / 3) && fb->framebuffer_height >= (1080 + 1080 / 3)) {
+            *out_scale_x = 2;
+            *out_scale_y = 2;
+        }
+        if (fb->framebuffer_width >= (3840 + 3840 / 3) && fb->framebuffer_height >= (2160 + 2160 / 3)) {
+            *out_scale_x = 4;
+            *out_scale_y = 4;
+        }
+    }
+
+    if (cfg->fb_rotation == FLANTERM_FB_ROTATE_90 || cfg->fb_rotation == FLANTERM_FB_ROTATE_270) {
+        uint64_t tmp = fb->framebuffer_width;
+        fb->framebuffer_width = fb->framebuffer_height;
+        fb->framebuffer_height = tmp;
+    }
+}
 
 bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
                 char *config, size_t width, size_t height) {
@@ -522,214 +782,8 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
         return false;
     }
 
-    // default scheme
-    margin = 64;
-    margin_gradient = 4;
-
-    int fb_rotation = FLANTERM_FB_ROTATE_0;
-    char *rotation_str = config_get_value(config, 0, "INTERFACE_ROTATION");
-    if (rotation_str != NULL) {
-        int rotation_val = strtoui(rotation_str, NULL, 10);
-        switch (rotation_val) {
-            case 90: fb_rotation = FLANTERM_FB_ROTATE_90; break;
-            case 180: fb_rotation = FLANTERM_FB_ROTATE_180; break;
-            case 270: fb_rotation = FLANTERM_FB_ROTATE_270; break;
-        }
-    }
-
-    uint32_t ansi_colours[8];
-
-    ansi_colours[0] = 0x00000000; // black
-    ansi_colours[1] = 0x00aa0000; // red
-    ansi_colours[2] = 0x0000aa00; // green
-    ansi_colours[3] = 0x00aa5500; // brown
-    ansi_colours[4] = 0x000000aa; // blue
-    ansi_colours[5] = 0x00aa00aa; // magenta
-    ansi_colours[6] = 0x0000aaaa; // cyan
-    ansi_colours[7] = 0x00aaaaaa; // grey
-
-    char *colours = config_get_value(config, 0, "TERM_PALETTE");
-    if (colours != NULL) {
-        const char *first = colours;
-        size_t i;
-        for (i = 0; i < 8; i++) {
-            const char *last;
-            uint32_t col = strtoui(first, &last, 16);
-            if (first == last)
-                break;
-            ansi_colours[i] = col & 0xffffff;
-            if (*last == 0)
-                break;
-            first = last + 1;
-        }
-    }
-
-    uint32_t ansi_bright_colours[8];
-
-    ansi_bright_colours[0] = 0x00555555; // black
-    ansi_bright_colours[1] = 0x00ff5555; // red
-    ansi_bright_colours[2] = 0x0055ff55; // green
-    ansi_bright_colours[3] = 0x00ffff55; // brown
-    ansi_bright_colours[4] = 0x005555ff; // blue
-    ansi_bright_colours[5] = 0x00ff55ff; // magenta
-    ansi_bright_colours[6] = 0x0055ffff; // cyan
-    ansi_bright_colours[7] = 0x00ffffff; // grey
-
-    char *bright_colours = config_get_value(config, 0, "TERM_PALETTE_BRIGHT");
-    if (bright_colours != NULL) {
-        const char *first = bright_colours;
-        size_t i;
-        for (i = 0; i < 8; i++) {
-            const char *last;
-            uint32_t col = strtoui(first, &last, 16);
-            if (first == last)
-                break;
-            ansi_bright_colours[i] = col & 0xffffff;
-            if (*last == 0)
-                break;
-            first = last + 1;
-        }
-    }
-
-    default_bg = 0x00000000; // background (black)
-    default_fg = 0x00aaaaaa; // foreground (grey)
-
-    default_bg_bright = 0x00555555; // background (black)
-    default_fg_bright = 0x00ffffff; // foreground (grey)
-
-    char *theme_background = config_get_value(config, 0, "TERM_BACKGROUND");
-    if (theme_background != NULL) {
-        default_bg = strtoui(theme_background, NULL, 16);
-    }
-
-    char *theme_foreground = config_get_value(config, 0, "TERM_FOREGROUND");
-    if (theme_foreground != NULL) {
-        default_fg = strtoui(theme_foreground, NULL, 16) & 0xffffff;
-    }
-
-    char *theme_background_bright = config_get_value(config, 0, "TERM_BACKGROUND_BRIGHT");
-    if (theme_background_bright != NULL) {
-        default_bg_bright = strtoui(theme_background_bright, NULL, 16);
-    }
-
-    char *theme_foreground_bright = config_get_value(config, 0, "TERM_FOREGROUND_BRIGHT");
-    if (theme_foreground_bright != NULL) {
-        default_fg_bright = strtoui(theme_foreground_bright, NULL, 16);
-    }
-
-    size_t wallpaper_count = 0;
-    while (config_get_value(config, wallpaper_count, "WALLPAPER") != NULL)
-        wallpaper_count++;
-
-    background = NULL;
-    if (wallpaper_count > 0) {
-        char *background_path = config_get_value(config, rand32() % wallpaper_count, "WALLPAPER");
-        if (background_path != NULL) {
-            struct file_handle *bg_file;
-            if ((bg_file = uri_open(background_path)) != NULL) {
-                background = image_open(bg_file);
-                fclose(bg_file);
-            }
-        }
-    }
-
-    if (background == NULL) {
-        margin = 0;
-        margin_gradient = 0;
-    } else {
-        if (theme_background == NULL) {
-            default_bg = 0x80000000;
-        }
-    }
-
-    char *theme_margin = config_get_value(config, 0, "TERM_MARGIN");
-    if (theme_margin != NULL) {
-        margin = strtoui(theme_margin, NULL, 10);
-    }
-
-    char *theme_margin_gradient = config_get_value(config, 0, "TERM_MARGIN_GRADIENT");
-    if (theme_margin_gradient != NULL) {
-        margin_gradient = strtoui(theme_margin_gradient, NULL, 10);
-    }
-
-    if (margin_gradient > margin) {
-        margin_gradient = margin;
-    }
-
-    size_t font_width = 8;
-    size_t font_height = 16;
-    size_t font_size = (font_width * font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
-
-#define FONT_MAX 16384
-    uint8_t *font = ext_mem_alloc(FONT_MAX);
-
-    memcpy(font, builtin_font, 4096);
-
-    size_t tmp_font_width, tmp_font_height;
-
-    char *menu_font_size = config_get_value(config, 0, "TERM_FONT_SIZE");
-    if (menu_font_size != NULL) {
-        if (!parse_resolution(&tmp_font_width, &tmp_font_height, NULL, menu_font_size)) {
-            print("Could not parse TERM_FONT_SIZE. Using default font.\n");
-            goto no_load_font;
-        }
-
-        if (tmp_font_width != 8) {
-            print("Font width must be 8, got %u. Using default font.\n", tmp_font_width);
-            goto no_load_font;
-        }
-
-        size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
-
-        if (tmp_font_size > FONT_MAX) {
-            print("Font would be too large (%U bytes, %u bytes allowed). Not loading.\n", (uint64_t)tmp_font_size, FONT_MAX);
-            goto no_load_font;
-        }
-
-        font_size = tmp_font_size;
-    }
-
-    char *menu_font = config_get_value(config, 0, "TERM_FONT");
-    if (menu_font != NULL) {
-        struct file_handle *f;
-        if ((f = uri_open(menu_font)) == NULL) {
-            print("menu: Could not open font file.\n");
-        } else {
-            if (font_size > f->size) {
-                print("Font size too large for provided font file. Not loading.\n");
-                fclose(f);
-                goto no_load_font;
-            }
-            fread(f, font, 0, font_size);
-            if (menu_font_size != NULL) {
-                font_width = tmp_font_width;
-                font_height = tmp_font_height;
-            }
-            fclose(f);
-        }
-    }
-
-no_load_font:;
-    size_t font_spacing = 1;
-    char *font_spacing_str = config_get_value(config, 0, "TERM_FONT_SPACING");
-    if (font_spacing_str != NULL) {
-        font_spacing = strtoui(font_spacing_str, NULL, 10);
-    }
-
-    size_t font_scale_x = 1;
-    size_t font_scale_y = 1;
-    bool font_scale_is_default = true;
-
-    char *menu_font_scale = config_get_value(config, 0, "TERM_FONT_SCALE");
-    if (menu_font_scale != NULL) {
-        parse_resolution(&font_scale_x, &font_scale_y, NULL, menu_font_scale);
-        if (font_scale_x > 8 || font_scale_y > 8) {
-            font_scale_x = 1;
-            font_scale_y = 1;
-        } else {
-            font_scale_is_default = false;
-        }
-    }
+    struct gterm_config cfg;
+    gterm_parse_config(config, &cfg);
 
     terms_i = 0;
     terms = ext_mem_alloc(fbs_count * sizeof(void *));
@@ -737,51 +791,12 @@ no_load_font:;
     for (size_t i = 0; i < fbs_count; i++) {
         struct fb_info *fb = &fbs[i];
 
-        // Ensure that this framebuffer uses 32-bits per pixel.
         if (fb->framebuffer_bpp != 32) {
             continue;
         }
 
-        if (fb_rotation == FLANTERM_FB_ROTATE_90 || fb_rotation == FLANTERM_FB_ROTATE_270) {
-            uint64_t tmp = fb->framebuffer_width;
-            fb->framebuffer_width = fb->framebuffer_height;
-            fb->framebuffer_height = tmp;
-        }
-
-        if (background != NULL) {
-            char *background_layout = config_get_value(config, 0, "WALLPAPER_STYLE");
-            if (background_layout != NULL && strcmp(background_layout, "centered") == 0) {
-                char *background_colour = config_get_value(config, 0, "BACKDROP");
-                if (background_colour == NULL)
-                    background_colour = "0";
-                uint32_t bg_col = strtoui(background_colour, NULL, 16);
-                image_make_centered(background, fb->framebuffer_width, fb->framebuffer_height, bg_col);
-            } else if (background_layout != NULL && strcmp(background_layout, "tiled") == 0) {
-            } else {
-                image_make_stretched(background, fb->framebuffer_width, fb->framebuffer_height);
-            }
-        }
-
-        generate_canvas(fb);
-
-        if (font_scale_is_default) {
-            font_scale_x = 1;
-            font_scale_y = 1;
-            if (fb->framebuffer_width >= (1920 + 1920 / 3) && fb->framebuffer_height >= (1080 + 1080 / 3)) {
-                font_scale_x = 2;
-                font_scale_y = 2;
-            }
-            if (fb->framebuffer_width >= (3840 + 3840 / 3) && fb->framebuffer_height >= (2160 + 2160 / 3)) {
-                font_scale_x = 4;
-                font_scale_y = 4;
-            }
-        }
-
-        if (fb_rotation == FLANTERM_FB_ROTATE_90 || fb_rotation == FLANTERM_FB_ROTATE_270) {
-            uint64_t tmp = fb->framebuffer_width;
-            fb->framebuffer_width = fb->framebuffer_height;
-            fb->framebuffer_height = tmp;
-        }
+        size_t font_scale_x, font_scale_y;
+        gterm_fb_setup(fb, config, &cfg, &font_scale_x, &font_scale_y);
 
         terms[terms_i] = flanterm_fb_init(ext_mem_alloc_size_t,
                             pmm_free_size_t,
@@ -791,12 +806,12 @@ no_load_font:;
                             fb->green_mask_size, fb->green_mask_shift,
                             fb->blue_mask_size, fb->blue_mask_shift,
                             bg_canvas,
-                            ansi_colours, ansi_bright_colours,
+                            cfg.ansi_colours, cfg.ansi_bright_colours,
                             &default_bg, &default_fg,
                             &default_bg_bright, &default_fg_bright,
-                            font, font_width, font_height, font_spacing,
+                            cfg.font, cfg.font_width, cfg.font_height, cfg.font_spacing,
                             font_scale_x, font_scale_y,
-                            margin, fb_rotation);
+                            margin, cfg.fb_rotation);
 
         if (terms[terms_i] != NULL) {
             terms_i++;
@@ -808,7 +823,7 @@ no_load_font:;
         }
     }
 
-    pmm_free(font, FONT_MAX);
+    pmm_free(cfg.font, FONT_MAX);
 
     if (background != NULL) {
         image_close(background);
@@ -862,4 +877,56 @@ no_load_font:;
     prev_valid = true;
 
     return true;
+}
+
+size_t gterm_prepare_flanterm_params(struct fb_info *fbs, size_t fbs_count,
+                                     struct flanterm_params *out, size_t out_max) {
+    struct gterm_config cfg;
+    gterm_parse_config(NULL, &cfg);
+
+    uint32_t configured_default_bg = default_bg;
+
+    size_t count = 0;
+
+    for (size_t i = 0; i < fbs_count && count < out_max; i++) {
+        struct fb_info *fb = &fbs[i];
+
+        if (fb->framebuffer_bpp != 32) {
+            continue;
+        }
+
+        size_t font_scale_x, font_scale_y;
+        gterm_fb_setup(fb, NULL, &cfg, &font_scale_x, &font_scale_y);
+
+        struct flanterm_params *p = &out[count];
+
+        p->canvas = bg_canvas;
+        p->canvas_size = bg_canvas_size;
+        bg_canvas = NULL;
+
+        memcpy(p->ansi_colours, cfg.ansi_colours, sizeof(cfg.ansi_colours));
+        memcpy(p->ansi_bright_colours, cfg.ansi_bright_colours, sizeof(cfg.ansi_bright_colours));
+        p->default_bg = configured_default_bg;
+        p->default_fg = default_fg;
+        p->default_bg_bright = default_bg_bright;
+        p->default_fg_bright = default_fg_bright;
+
+        p->font = cfg.font;
+        p->font_width = cfg.font_width;
+        p->font_height = cfg.font_height;
+        p->font_spacing = cfg.font_spacing;
+        p->font_scale_x = font_scale_x;
+        p->font_scale_y = font_scale_y;
+        p->margin = margin;
+        p->rotation = cfg.fb_rotation;
+
+        count++;
+    }
+
+    if (background != NULL) {
+        image_close(background);
+        background = NULL;
+    }
+
+    return count;
 }
