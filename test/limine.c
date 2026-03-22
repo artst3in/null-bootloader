@@ -179,6 +179,12 @@ static volatile struct limine_bootloader_performance_request _perf_request = {
     .revision = 0, .response = NULL,
 };
 
+__attribute__((section(".limine_requests")))
+static volatile struct limine_flanterm_fb_init_params_request fip_request = {
+    .id = LIMINE_FLANTERM_FB_INIT_PARAMS_REQUEST_ID,
+    .revision = 0, .response = NULL,
+};
+
 __attribute__((used, section(".limine_requests_end_marker")))
 static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
@@ -279,6 +285,24 @@ extern char executable_start[];
 
 struct flanterm_context *ft_ctx = NULL;
 
+static uint8_t alloc_pool[16 * 1024 * 1024];
+static size_t alloc_off = 0;
+
+static void *simple_malloc(size_t size) {
+    size = (size + 15) & ~(size_t)15;
+    if (alloc_off + size > sizeof(alloc_pool)) {
+        return NULL;
+    }
+    void *p = &alloc_pool[alloc_off];
+    alloc_off += size;
+    return p;
+}
+
+static void simple_free(void *ptr, size_t size) {
+    (void)ptr;
+    (void)size;
+}
+
 static void limine_main(void) {
     e9_printf("\nWe're alive");
 
@@ -296,22 +320,46 @@ static void limine_main(void) {
 
     struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
 
-    ft_ctx = flanterm_fb_init(
-        NULL,
-        NULL,
-        fb->address, fb->width, fb->height, fb->pitch,
-        fb->red_mask_size, fb->red_mask_shift,
-        fb->green_mask_size, fb->green_mask_shift,
-        fb->blue_mask_size, fb->blue_mask_shift,
-        NULL,
-        NULL, NULL,
-        NULL, NULL,
-        NULL, NULL,
-        NULL, 0, 0, 1,
-        0, 0,
-        0,
-        FLANTERM_FB_ROTATE_0
-    );
+    struct limine_flanterm_fb_init_params *fip = NULL;
+    if (fip_request.response != NULL && fip_request.response->entry_count > 0) {
+        fip = fip_request.response->entries[0];
+    }
+
+    if (fip != NULL) {
+        ft_ctx = flanterm_fb_init(
+            simple_malloc,
+            simple_free,
+            fb->address, fb->width, fb->height, fb->pitch,
+            fb->red_mask_size, fb->red_mask_shift,
+            fb->green_mask_size, fb->green_mask_shift,
+            fb->blue_mask_size, fb->blue_mask_shift,
+            fip->canvas,
+            fip->ansi_colours, fip->ansi_bright_colours,
+            &fip->default_bg, &fip->default_fg,
+            &fip->default_bg_bright, &fip->default_fg_bright,
+            fip->font, fip->font_width, fip->font_height, fip->font_spacing,
+            fip->font_scale_x, fip->font_scale_y,
+            fip->margin,
+            fip->rotation
+        );
+    } else {
+        ft_ctx = flanterm_fb_init(
+            NULL,
+            NULL,
+            fb->address, fb->width, fb->height, fb->pitch,
+            fb->red_mask_size, fb->red_mask_shift,
+            fb->green_mask_size, fb->green_mask_shift,
+            fb->blue_mask_size, fb->blue_mask_shift,
+            NULL,
+            NULL, NULL,
+            NULL, NULL,
+            NULL, NULL,
+            NULL, 0, 0, 1,
+            0, 0,
+            0,
+            FLANTERM_FB_ROTATE_0
+        );
+    }
 
     uint64_t executable_slide = (uint64_t)executable_start - 0xffffffff80000000;
 
@@ -419,6 +467,33 @@ FEAT_START
         for (size_t j = 0; j < fb->mode_count; j++) {
             e9_printf("  %dx%dx%d", fb->modes[j]->width, fb->modes[j]->height, fb->modes[j]->bpp);
         }
+    }
+FEAT_END
+
+FEAT_START
+    e9_printf("");
+    if (fip_request.response == NULL) {
+        e9_printf("Flanterm FB init params not passed");
+        break;
+    }
+    struct limine_flanterm_fb_init_params_response *fip_response = fip_request.response;
+    e9_printf("Flanterm FB init params feature, revision %d", fip_response->revision);
+    e9_printf("%d entry/entries", fip_response->entry_count);
+    for (size_t i = 0; i < fip_response->entry_count; i++) {
+        struct limine_flanterm_fb_init_params *p = fip_response->entries[i];
+        e9_printf("--- Entry %d ---", i);
+        e9_printf("Canvas: %x (size: %x)", p->canvas, p->canvas_size);
+        e9_printf("Default BG: %x, FG: %x", p->default_bg, p->default_fg);
+        e9_printf("Default BG bright: %x, FG bright: %x", p->default_bg_bright, p->default_fg_bright);
+        e9_printf("ANSI colours: %x %x %x %x %x %x %x %x",
+            p->ansi_colours[0], p->ansi_colours[1], p->ansi_colours[2], p->ansi_colours[3],
+            p->ansi_colours[4], p->ansi_colours[5], p->ansi_colours[6], p->ansi_colours[7]);
+        e9_printf("ANSI bright: %x %x %x %x %x %x %x %x",
+            p->ansi_bright_colours[0], p->ansi_bright_colours[1], p->ansi_bright_colours[2], p->ansi_bright_colours[3],
+            p->ansi_bright_colours[4], p->ansi_bright_colours[5], p->ansi_bright_colours[6], p->ansi_bright_colours[7]);
+        e9_printf("Font: %x (%dx%d)", p->font, p->font_width, p->font_height);
+        e9_printf("Font spacing: %d, scale: %dx%d", p->font_spacing, p->font_scale_x, p->font_scale_y);
+        e9_printf("Margin: %d, Rotation: %d", p->margin, p->rotation);
     }
 FEAT_END
 
