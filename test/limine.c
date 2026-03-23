@@ -583,7 +583,6 @@ FEAT_START
     e9_printf("Timestamp: %d", date_at_boot_response->timestamp);
 FEAT_END
 
-// TODO: LoongArch MP
 FEAT_START
     e9_printf("");
     if (_mp_request.response == NULL) {
