@@ -33,7 +33,7 @@ and a [Fluxer community](https://fluxer.gg/ZRviNMvT) if you need support, info, 
 * x86-64
 * aarch64 (arm64)
 * riscv64
-* loongarch64 (experimental support!)
+* loongarch64
 
 ### Supported boot protocols
 * Linux
@@ -73,13 +73,13 @@ are shipped in the `-binary` branches and tags of this repository
 (see [branches](https://codeberg.org/Limine/Limine/branches) and
 [tags](https://codeberg.org/Limine/Limine/tags)).
 
-For example, to clone the latest binary release of the `10.x` branch, one can do:
+For example, to clone the latest binary release of the `11.x` branch, one can do:
 ```bash
-git clone https://codeberg.org/Limine/Limine.git --branch=v10.x-binary --depth=1
+git clone https://codeberg.org/Limine/Limine.git --branch=v11.x-binary --depth=1
 ```
-or, to clone a specific binary point release (for example `10.8.5`):
+or, to clone a specific binary point release (for example `11.0.0`):
 ```bash
-git clone https://codeberg.org/Limine/Limine.git --branch=v10.8.5-binary --depth=1
+git clone https://codeberg.org/Limine/Limine.git --branch=v11.0.0-binary --depth=1
 ```
 
 In order to rebuild host utilities like `limine`, simply run `make` in the binary

@@ -1,3 +1,40 @@
+2026-03-23  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.0.0 ***
+
+    Noteworthy changes compared to the previous release, 10.8.5:
+
+    Breaking changes:
+        - Dropped support for base revisions 0, 1, 2, and 3 of the Limine boot
+          protocol for x86.
+        - Dropped support for all base revisions except 6 of the Limine boot
+          protocol for aarch64, loongarch64, and riscv64.
+
+    New features:
+        - Implement support for base revision 6 of the Limine boot protocol
+          (see specification for details).
+        - Added support for multiprocessor startup for the loongarch64 version
+          of the Limine boot protocol.
+        - Add a new feature to the Limine boot protocol,
+          `flanterm_fb_init_params`, that passes information to the booted
+          executable about the text terminal, as used by the bootloader, in a
+          Flanterm-compatible format.
+        - Add a new boot protocol, "efi_boot_entry", which allows rebooting
+          into other EFI boot menu entries by name.
+        - Support using a formatted path as the value for the `default_entry`
+          configuration option.
+
+    Bug fixes:
+        - Miscellaneous fixes relating to the Linux boot protocol on non-x86
+          ports.
+        - Improve feature to remember last booted entry by internally using the
+          same path format as `default_entry`.
+
+    Miscellaneous:
+        - LoongArch64 is no longer in an "experimental" state, but rather fully
+          supported.
+        - Updated the Flanterm library to 3.0.2.
+
 2026-03-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.8.5 ***
@@ -5,7 +42,7 @@
     Noteworthy changes compared to the previous release, 10.8.4:
 
     Bug fixes:
-        - Update the Flanterm library to 3.0.2 to fix a regression introduced
+        - Update the Flanterm library for a hotfix to a regression introduced
           in Flanterm 3.0.1 that would also cause misrenderings of the boot
           menu's text colour for selected entries.
 
