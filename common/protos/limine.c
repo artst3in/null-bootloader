@@ -59,31 +59,17 @@ static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kerne
 
 static int paging_mode;
 
-static uint64_t get_hhdm_span_top(int base_revision) {
-    uint64_t ret = base_revision >= 3 ? 0 : 0x100000000;
+static uint64_t get_hhdm_span_top(void) {
+    uint64_t ret = 0;
     for (size_t i = 0; i < memmap_entries; i++) {
-        if (((base_revision >= 1 && base_revision < 3) || base_revision >= 4) && (
-            memmap[i].type == MEMMAP_RESERVED
-         || memmap[i].type == MEMMAP_BAD_MEMORY)) {
-            continue;
-        }
-
-        if (base_revision == 3 && (
-            memmap[i].type != MEMMAP_USABLE
-         && memmap[i].type != MEMMAP_BOOTLOADER_RECLAIMABLE
-         && memmap[i].type != MEMMAP_KERNEL_AND_MODULES
-         && memmap[i].type != MEMMAP_FRAMEBUFFER
-         && memmap[i].type != MEMMAP_EFI_RECLAIMABLE)) {
+        if (memmap[i].type == MEMMAP_RESERVED
+         || memmap[i].type == MEMMAP_BAD_MEMORY) {
             continue;
         }
 
         uint64_t base = memmap[i].base;
         uint64_t length = memmap[i].length;
         uint64_t top = base + length;
-
-        if (base_revision < 3 && base < 0x100000000) {
-            base = 0x100000000;
-        }
 
         if (base >= top) {
             continue;
@@ -158,8 +144,7 @@ static void limine_memcpy_to_64(uint64_t dst, void *src, size_t count) {
 }
 #endif
 
-static pagemap_t build_pagemap(int base_revision,
-                               bool nx, struct mem_range *ranges, size_t ranges_count,
+static pagemap_t build_pagemap(bool nx, struct mem_range *ranges, size_t ranges_count,
                                uint64_t physical_base, uint64_t virtual_base,
                                uint64_t direct_map_offset) {
     pagemap_t pagemap = new_pagemap(paging_mode);
@@ -185,16 +170,6 @@ static pagemap_t build_pagemap(int base_revision,
         map_pages(pagemap, virt, phys, pf, ranges[i].length);
     }
 
-    // Map 0x1000->4GiB range to identity if base revision == 0
-    if (base_revision == 0) {
-        map_pages(pagemap, 0x1000, 0x1000, VMM_FLAG_WRITE, 0x100000000 - 0x1000);
-    }
-
-    // Map 0->4GiB range to HHDM if base revision < 3
-    if (base_revision < 3) {
-        map_pages(pagemap, direct_map_offset, 0, VMM_FLAG_WRITE, 0x100000000);
-    }
-
     size_t _memmap_entries = memmap_entries;
     struct memmap_entry *_memmap =
         ext_mem_alloc(_memmap_entries * sizeof(struct memmap_entry));
@@ -203,28 +178,14 @@ static pagemap_t build_pagemap(int base_revision,
 
     // Map all free memory regions to the higher half direct map offset
     for (size_t i = 0; i < _memmap_entries; i++) {
-        if (((base_revision >= 1 && base_revision < 3) || base_revision >= 4) && (
-            _memmap[i].type == MEMMAP_RESERVED
-         || _memmap[i].type == MEMMAP_BAD_MEMORY)) {
-            continue;
-        }
-
-        if (base_revision == 3 && (
-            _memmap[i].type != MEMMAP_USABLE
-         && _memmap[i].type != MEMMAP_BOOTLOADER_RECLAIMABLE
-         && _memmap[i].type != MEMMAP_KERNEL_AND_MODULES
-         && _memmap[i].type != MEMMAP_FRAMEBUFFER
-         && _memmap[i].type != MEMMAP_EFI_RECLAIMABLE)) {
+        if (_memmap[i].type == MEMMAP_RESERVED
+         || _memmap[i].type == MEMMAP_BAD_MEMORY) {
             continue;
         }
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
         uint64_t top    = base + length;
-
-        if (base_revision < 3 && base < 0x100000000) {
-            base = 0x100000000;
-        }
 
         if (base >= top) {
             continue;
@@ -234,9 +195,6 @@ static pagemap_t build_pagemap(int base_revision,
         uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
         uint64_t aligned_length = aligned_top - aligned_base;
 
-        if (base_revision == 0) {
-            map_pages(pagemap, aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
-        }
         map_pages(pagemap, direct_map_offset + aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
     }
 
@@ -254,17 +212,12 @@ static pagemap_t build_pagemap(int base_revision,
         uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
         uint64_t aligned_length = aligned_top - aligned_base;
 
-        if (base_revision == 0) {
-            map_pages(pagemap, aligned_base, aligned_base, VMM_FLAG_WRITE | VMM_FLAG_FB, aligned_length);
-        }
         map_pages(pagemap, direct_map_offset + aligned_base, aligned_base, VMM_FLAG_WRITE | VMM_FLAG_FB, aligned_length);
     }
 
     // XXX we do this as a quick and dirty way to switch to the higher half
 #if defined (__x86_64__) || defined (__i386__)
-    if (base_revision >= 1) {
-        map_pages(pagemap, 0, 0, VMM_FLAG_WRITE, 0x100000000);
-    }
+    map_pages(pagemap, 0, 0, VMM_FLAG_WRITE, 0x100000000);
 #endif
 
     return pagemap;
@@ -546,12 +499,11 @@ noreturn void limine_load(char *config, char *cmdline) {
             }
             base_revision_found = true;
             base_revision = p[2];
-            if (p[2] <= SUPPORTED_BASE_REVISION) {
-                // Set to 0 to mean "supported"
-                base_rev_p2_ptr = &p[2];
-            } else {
-                base_revision = SUPPORTED_BASE_REVISION;
+            if (p[2] > SUPPORTED_BASE_REVISION) {
+                panic(true, "limine: Requested base revision %u is too new (maximum supported: %u)", (int)p[2], SUPPORTED_BASE_REVISION);
             }
+            // Set to 0 to mean "supported"
+            base_rev_p2_ptr = &p[2];
             base_rev_p1_ptr = &p[1];
         }
     }
@@ -562,62 +514,52 @@ noreturn void limine_load(char *config, char *cmdline) {
         *base_rev_p2_ptr = 0;
     }
 
-#if !defined (__x86_64__) && !defined (__i386__)
+#if defined (__x86_64__) || defined (__i386__)
+    if (base_revision < 4) {
+        panic(true, "limine: Base revision %u is no longer supported (minimum: 4)", base_revision);
+    }
+#else
     if (base_revision < 6) {
         panic(true, "limine: Base revision %u is no longer supported on this architecture (minimum: 6)", base_revision);
     }
 #endif
 
     // Load requests
-    uint64_t *limine_reqs = NULL;
     requests = ext_mem_alloc(MAX_REQUESTS * sizeof(void *));
     requests_count = 0;
-    if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, kernel_file->size, &limine_reqs, ".limine_reqs", 0, slide)) {
-        for (size_t i = 0; ; i++) {
-            if (i >= MAX_REQUESTS) {
-                panic(true, "limine: Maximum requests exceeded");
-            }
-            if (limine_reqs[i] == 0) {
-                break;
-            }
-            requests[i] = (void *)(uintptr_t)((limine_reqs[i] - virtual_base) + physical_base);
-            requests_count++;
+    uint64_t common_magic[2] = { LIMINE_COMMON_MAGIC };
+    for (size_t i = 0; i < ALIGN_DOWN(image_size_before_bss, 8); i += 8) {
+        uint64_t *p = (void *)(uintptr_t)physical_base + i;
+
+        // Check if start marker hit
+        if (p[0] == limine_requests_start_marker[0] && p[1] == limine_requests_start_marker[1]
+         && p[2] == limine_requests_start_marker[2] && p[3] == limine_requests_start_marker[3]) {
+            requests_count = 0;
+            continue;
         }
-    } else {
-        uint64_t common_magic[2] = { LIMINE_COMMON_MAGIC };
-        for (size_t i = 0; i < ALIGN_DOWN(image_size_before_bss, 8); i += 8) {
-            uint64_t *p = (void *)(uintptr_t)physical_base + i;
 
-            // Check if start marker hit
-            if (p[0] == limine_requests_start_marker[0] && p[1] == limine_requests_start_marker[1]
-             && p[2] == limine_requests_start_marker[2] && p[3] == limine_requests_start_marker[3]) {
-                requests_count = 0;
-                continue;
-            }
-
-            // Check if end marker hit
-            if (p[0] == limine_requests_end_marker[0] && p[1] == limine_requests_end_marker[1]) {
-                break;
-            }
-
-            if (p[0] != common_magic[0]) {
-                continue;
-            }
-            if (p[1] != common_magic[1]) {
-                continue;
-            }
-
-            if (requests_count == MAX_REQUESTS) {
-                panic(true, "limine: Maximum requests exceeded");
-            }
-
-            // Check for a conflict
-            if (_get_request(p) != NULL) {
-                panic(true, "limine: Conflict detected for request ID %X %X", p[2], p[3]);
-            }
-
-            requests[requests_count++] = p;
+        // Check if end marker hit
+        if (p[0] == limine_requests_end_marker[0] && p[1] == limine_requests_end_marker[1]) {
+            break;
         }
+
+        if (p[0] != common_magic[0]) {
+            continue;
+        }
+        if (p[1] != common_magic[1]) {
+            continue;
+        }
+
+        if (requests_count == MAX_REQUESTS) {
+            panic(true, "limine: Maximum requests exceeded");
+        }
+
+        // Check for a conflict
+        if (_get_request(p) != NULL) {
+            panic(true, "limine: Conflict detected for request ID %X %X", p[2], p[3]);
+        }
+
+        requests[requests_count++] = p;
     }
 
 #if defined (__x86_64__) || defined (__i386__)
@@ -627,7 +569,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     }
 #endif
 
-    uint64_t hhdm_span_top = get_hhdm_span_top(base_revision);
+    uint64_t hhdm_span_top = get_hhdm_span_top();
 
 #if defined (__x86_64__) || defined (__i386__)
     uint64_t maxphyaddr;
@@ -1041,7 +983,7 @@ FEAT_START
     struct limine_rsdp_response *rsdp_response =
         ext_mem_alloc(sizeof(struct limine_rsdp_response));
 
-    rsdp_response->address = (base_revision <= 2 || base_revision >= 4) ? reported_addr(rsdp) : (uintptr_t)rsdp;
+    rsdp_response->address = reported_addr(rsdp);
 
     rsdp_request->response = reported_addr(rsdp_response);
 FEAT_END
@@ -1063,10 +1005,10 @@ FEAT_START
         ext_mem_alloc(sizeof(struct limine_smbios_response));
 
     if (smbios_entry_32) {
-        smbios_response->entry_32 = (base_revision <= 2 || base_revision >= 5) ? reported_addr(smbios_entry_32) : (uintptr_t)smbios_entry_32;
+        smbios_response->entry_32 = (base_revision >= 5) ? reported_addr(smbios_entry_32) : (uintptr_t)smbios_entry_32;
     }
     if (smbios_entry_64) {
-        smbios_response->entry_64 = (base_revision <= 2 || base_revision >= 5) ? reported_addr(smbios_entry_64) : (uintptr_t)smbios_entry_64;
+        smbios_response->entry_64 = (base_revision >= 5) ? reported_addr(smbios_entry_64) : (uintptr_t)smbios_entry_64;
     }
 
     smbios_request->response = reported_addr(smbios_response);
@@ -1083,7 +1025,7 @@ FEAT_START
     struct limine_efi_system_table_response *est_response =
         ext_mem_alloc(sizeof(struct limine_efi_system_table_response));
 
-    est_response->address = (base_revision <= 2 || base_revision >= 5) ? reported_addr(gST) : (uintptr_t)gST;
+    est_response->address = (base_revision >= 5) ? reported_addr(gST) : (uintptr_t)gST;
 
     est_request->response = reported_addr(est_response);
 FEAT_END
@@ -1615,24 +1557,17 @@ FEAT_START
 FEAT_END
 #endif
 
-    if (base_revision < 3) {
-        pmm_sanitiser_keep_first_page = false;
-        pmm_sanitise_entries(memmap, &memmap_entries, true);
-    }
-
-    if (base_revision >= 4) {
-        acpi_map_tables();
-        if (base_revision >= 5) {
-            smbios_map_tables();
+    acpi_map_tables();
+    if (base_revision >= 5) {
+        smbios_map_tables();
 #if defined (UEFI)
-            efi_map_runtime_entries();
+        efi_map_runtime_entries();
 #endif
-        }
-        pmm_sanitise_entries(memmap, &memmap_entries, true);
     }
+    pmm_sanitise_entries(memmap, &memmap_entries, true);
 
     pagemap_t pagemap = {0};
-    pagemap = build_pagemap(base_revision, nx_available, ranges, ranges_count,
+    pagemap = build_pagemap(nx_available, ranges, ranges_count,
                             physical_base, virtual_base, direct_map_offset);
 
 #if defined (__aarch64__)
@@ -1851,13 +1786,12 @@ FEAT_END
 
     uint64_t reported_stack = reported_addr(stack);
 
-    common_spinup(limine_spinup_32, 11,
+    common_spinup(limine_spinup_32, 10,
         paging_mode, (uint32_t)(uintptr_t)pagemap.top_level,
         (uint32_t)entry_point, (uint32_t)(entry_point >> 32),
         (uint32_t)reported_stack, (uint32_t)(reported_stack >> 32),
         (uint32_t)(uintptr_t)local_gdt, nx_available,
-        (uint32_t)direct_map_offset, (uint32_t)(direct_map_offset >> 32),
-        (uint32_t)base_revision
+        (uint32_t)direct_map_offset, (uint32_t)(direct_map_offset >> 32)
     );
 #elif defined (__aarch64__)
     vmm_assert_4k_pages();
