@@ -88,8 +88,13 @@ Miscellaneous:
 * `global_dtb` - If set, use this DTB instead of the firmware-provided DTB for
   Limine itself, as well as for any booted entry whose protocol supports DTBs
   and the DTB is not locally overridden with `dtb_path`.
-* `default_entry` - 1-based entry index of the entry which will be
-  automatically selected at startup. If unspecified, it is `1`.
+* `default_entry` - Entry which will be automatically selected at startup.
+  Can be a 1-based entry index (e.g. `1`), or an entry path (e.g.
+  `OSes/Arch Linux`). Entry paths use `/` as a directory separator; literal
+  `/`, `\`, and `#` characters in entry names must be escaped as `\/`, `\\`,
+  and `\#` respectively. If multiple sibling entries share the same name, append
+  `#N` to select the Nth duplicate (e.g. `Arch Linux#1` for the second entry
+  named `Arch Linux`). If unspecified, it is `1`.
 * `remember_last_entry` - If set to `yes`, remember last booted entry.
   (UEFI only).
 * `graphics` - If set to `no`, force CGA text mode for the boot menu, else use

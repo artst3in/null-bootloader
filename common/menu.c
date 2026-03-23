@@ -566,7 +566,6 @@ static inline bool should_skip_entry(struct menu_entry *entry) {
     return false;
 }
 
-#if defined(UEFI)
 // Count visible (non-skipped) entries in a subtree, respecting expansion state.
 static size_t count_visible_entries(struct menu_entry *entry) {
     size_t count = 0;
@@ -584,6 +583,7 @@ static size_t count_visible_entries(struct menu_entry *entry) {
     return count;
 }
 
+#if defined(UEFI)
 // Count same-named non-skipped siblings preceding this entry (for #N suffix).
 static size_t get_sibling_dup_index(struct menu_entry *entry) {
     struct menu_entry *first = entry->parent != NULL ? entry->parent->sub : menu_tree;
@@ -660,6 +660,7 @@ static void get_entry_path(struct menu_entry *entry, char *buf, size_t buf_size,
         buf[*pos] = '\0';
     }
 }
+#endif
 
 // Parse one component from an escaped path string.
 // Writes the unescaped name into name_buf and the duplicate index into *dup_index.
@@ -760,7 +761,6 @@ static bool find_entry_by_path(const char *path, struct menu_entry *current_entr
 
     return false;
 }
-#endif
 
 static size_t print_tree(size_t offset, size_t window, const char *shift, size_t level, size_t base_index, size_t selected_entry,
                       struct menu_entry *current_entry,
@@ -1121,9 +1121,34 @@ noreturn void _menu(bool first_run) {
 
     char *default_entry = config_get_value(NULL, 0, "DEFAULT_ENTRY");
     if (default_entry != NULL) {
-        selected_entry = strtoui(default_entry, NULL, 10);
-        if (selected_entry)
-            selected_entry--;
+        bool is_index = true;
+        for (const char *p = default_entry; *p != '\0'; p++) {
+            if (*p < '0' || *p > '9') {
+                is_index = false;
+                break;
+            }
+        }
+        if (is_index) {
+            selected_entry = strtoui(default_entry, NULL, 10);
+            if (selected_entry)
+                selected_entry--;
+        } else {
+            // Copy the path since find_entry_by_path calls config_get_value
+            // internally (via should_skip_entry), which clobbers the static buffer.
+            char default_entry_path[256];
+            size_t len = strlen(default_entry);
+            if (len >= sizeof(default_entry_path)) {
+                len = sizeof(default_entry_path) - 1;
+            }
+            memcpy(default_entry_path, default_entry, len);
+            default_entry_path[len] = '\0';
+            struct menu_entry *found_entry = NULL;
+            size_t found_index = 0;
+            find_entry_by_path(default_entry_path, menu_tree, 0, &found_entry, &found_index, true);
+            if (found_entry != NULL) {
+                selected_entry = found_index;
+            }
+        }
     }
 
 #if defined (UEFI)
