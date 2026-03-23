@@ -567,6 +567,65 @@ static inline bool should_skip_entry(struct menu_entry *entry) {
 }
 
 #if defined(UEFI)
+// Count visible (non-skipped) entries in a subtree, respecting expansion state.
+static size_t count_visible_entries(struct menu_entry *entry) {
+    size_t count = 0;
+    while (entry != NULL) {
+        if (should_skip_entry(entry)) {
+            entry = entry->next;
+            continue;
+        }
+        count++;
+        if (entry->sub && entry->expanded) {
+            count += count_visible_entries(entry->sub);
+        }
+        entry = entry->next;
+    }
+    return count;
+}
+
+// Count same-named non-skipped siblings preceding this entry (for #N suffix).
+static size_t get_sibling_dup_index(struct menu_entry *entry) {
+    struct menu_entry *first = entry->parent != NULL ? entry->parent->sub : menu_tree;
+    size_t index = 0;
+    for (struct menu_entry *e = first; e != entry; e = e->next) {
+        if (should_skip_entry(e)) {
+            continue;
+        }
+        if (strcmp(e->name, entry->name) == 0) {
+            index++;
+        }
+    }
+    return index;
+}
+
+// Write a name into buf, escaping \, / and # characters.
+// Returns number of bytes written (not counting NUL terminator).
+static size_t escape_name(const char *name, char *buf, size_t buf_size) {
+    if (buf_size == 0) {
+        return 0;
+    }
+    size_t j = 0;
+    for (size_t i = 0; name[i] != '\0'; i++) {
+        if (name[i] == '\\' || name[i] == '/' || name[i] == '#') {
+            if (j + 2 < buf_size) {
+                buf[j++] = '\\';
+                buf[j++] = name[i];
+            } else {
+                break;
+            }
+        } else {
+            if (j + 1 < buf_size) {
+                buf[j++] = name[i];
+            } else {
+                break;
+            }
+        }
+    }
+    buf[j] = '\0';
+    return j;
+}
+
 static void get_entry_path(struct menu_entry *entry, char *buf, size_t buf_size, size_t *pos) {
     if (entry == NULL || buf_size == 0) {
         return;
@@ -579,61 +638,127 @@ static void get_entry_path(struct menu_entry *entry, char *buf, size_t buf_size,
         }
     }
 
-    size_t name_len = strlen(entry->name);
-    size_t copy_len = name_len;
-    if (*pos + copy_len >= buf_size) {
-        copy_len = buf_size - *pos - 1;
+    size_t remaining = *pos < buf_size ? buf_size - *pos : 0;
+    *pos += escape_name(entry->name, buf + *pos, remaining);
+
+    size_t dup_index = get_sibling_dup_index(entry);
+    if (dup_index > 0 && *pos < buf_size - 1) {
+        buf[(*pos)++] = '#';
+        char digits[16];
+        size_t ndigits = 0;
+        size_t val = dup_index;
+        do {
+            digits[ndigits++] = '0' + (val % 10);
+            val /= 10;
+        } while (val > 0);
+        for (size_t i = ndigits; i > 0 && *pos < buf_size - 1; i--) {
+            buf[(*pos)++] = digits[i - 1];
+        }
     }
-    memcpy(buf + *pos, entry->name, copy_len);
-    *pos += copy_len;
 
     if (*pos < buf_size) {
         buf[*pos] = '\0';
     }
 }
 
-// Find entry by path string. If expand_dirs is true, searches all directories regardless
-// of expansion state and expands parent directories when the entry is found.
-static size_t find_entry_by_path(const char *path, struct menu_entry *current_entry,
-                                 size_t base_index, struct menu_entry **found_entry,
-                                 size_t *found_index, bool expand_dirs) {
-    size_t max_entries = 0;
-    bool found_in_subtree = false;
+// Parse one component from an escaped path string.
+// Writes the unescaped name into name_buf and the duplicate index into *dup_index.
+// Returns a pointer to the remainder of the path (past the separator).
+static const char *parse_path_component(const char *path, char *name_buf, size_t name_buf_size, size_t *dup_index) {
+    *dup_index = 0;
+    if (name_buf_size == 0) {
+        return path;
+    }
+    size_t j = 0;
+    const char *p = path;
+
+    while (*p != '\0' && *p != '/') {
+        if (*p == '\\' && p[1] != '\0') {
+            if (j < name_buf_size - 1) {
+                name_buf[j++] = p[1];
+            }
+            p += 2;
+            continue;
+        }
+        if (*p == '#') {
+            const char *q = p + 1;
+            if (*q >= '0' && *q <= '9') {
+                const char *start = q;
+                while (*q >= '0' && *q <= '9') {
+                    q++;
+                }
+                if (*q == '\0' || *q == '/') {
+                    *dup_index = strtoui(start, NULL, 10);
+                    p = q;
+                    break;
+                }
+            }
+        }
+        if (j < name_buf_size - 1) {
+            name_buf[j++] = *p;
+        }
+        p++;
+    }
+
+    name_buf[j] = '\0';
+
+    if (*p == '/') {
+        p++;
+    }
+    return p;
+}
+
+// Find an entry by its escaped path string. If expand_dirs is true, directories on the
+// path to the target are expanded. Returns true if found, writing the entry and its
+// visible index to *found_entry and *found_index.
+static bool find_entry_by_path(const char *path, struct menu_entry *current_entry,
+                                size_t base_index, struct menu_entry **found_entry,
+                                size_t *found_index, bool expand_dirs) {
+    char comp_name[64];
+    size_t dup_index = 0;
+    const char *rest = parse_path_component(path, comp_name, sizeof(comp_name), &dup_index);
+    bool is_last = (*rest == '\0');
+
+    size_t idx = base_index;
+    size_t same_name_count = 0;
 
     while (current_entry != NULL) {
         if (should_skip_entry(current_entry)) {
             current_entry = current_entry->next;
             continue;
         }
-        if (current_entry->sub == NULL) {
-            // Check if this entry matches the path
-            char entry_path[256];
-            size_t pos = 0;
-            get_entry_path(current_entry, entry_path, sizeof(entry_path), &pos);
-            if (strcmp(entry_path, path) == 0) {
+
+        bool name_matches = (strcmp(current_entry->name, comp_name) == 0);
+
+        if (name_matches && same_name_count == dup_index) {
+            if (is_last && current_entry->sub == NULL) {
                 *found_entry = current_entry;
                 if (found_index != NULL) {
-                    *found_index = base_index + max_entries;
+                    *found_index = idx;
                 }
-                found_in_subtree = true;
+                return true;
+            } else if (!is_last && current_entry->sub != NULL) {
+                if (expand_dirs) {
+                    current_entry->expanded = true;
+                }
+                return find_entry_by_path(rest, current_entry->sub,
+                                          idx + 1, found_entry, found_index, expand_dirs);
             }
         }
-        if (current_entry->sub && (expand_dirs || current_entry->expanded)) {
-            size_t sub_entries = find_entry_by_path(path, current_entry->sub,
-                                                    base_index + max_entries + 1,
-                                                    found_entry, found_index, expand_dirs);
-            if (expand_dirs && *found_entry != NULL && !found_in_subtree) {
-                current_entry->expanded = true;
-            }
-            // Only count sub-entries if directory is expanded.
-            if (current_entry->expanded) {
-                max_entries += sub_entries;
-            }
+
+        if (name_matches) {
+            same_name_count++;
         }
-        max_entries++;
+
+        idx++;
+        if (current_entry->sub && current_entry->expanded) {
+            idx += count_visible_entries(current_entry->sub);
+        }
+
         current_entry = current_entry->next;
     }
-    return max_entries;
+
+    return false;
 }
 #endif
 
