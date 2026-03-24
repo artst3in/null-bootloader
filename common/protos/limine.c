@@ -562,9 +562,9 @@ noreturn void limine_load(char *config, char *cmdline) {
         *base_rev_p2_ptr = 0;
     }
 
-#if !defined (__x86_64__) && !defined (__i386__)
+#if defined (__aarch64__)
     if (base_revision < 6) {
-        panic(true, "limine: Base revision %u is no longer supported on this architecture (minimum: 6)", base_revision);
+        panic(true, "limine: Base revision %u is no longer supported for aarch64 (minimum: 6)", base_revision);
     }
 #endif
 
