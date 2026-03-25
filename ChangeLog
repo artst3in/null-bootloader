@@ -1,3 +1,19 @@
+2026-03-25  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.1.0 ***
+
+    Noteworthy changes compared to the previous release, 11.0.0:
+
+    New features:
+        - Walk back previous breaking change where base revisions 0 through 3
+          were dropped on x86.
+        - Walk back previous breaking change where base revisions < 6 were
+          dropped on loongarch64 and riscv64 (it remains in effect on aarch64).
+
+    Miscellaneous:
+        - Improve Limine protocol page tables layout to better coalesce
+          contiguous 4KiB entries into 2MiB/1GiB pages.
+
 2026-03-23  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 11.0.0 ***
