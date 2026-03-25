@@ -201,12 +201,18 @@ static pagemap_t build_pagemap(int base_revision,
     for (size_t i = 0; i < _memmap_entries; i++)
         _memmap[i] = memmap[i];
 
-    // Map all free memory regions to the higher half direct map offset
+    // Map all free memory regions to the higher half direct map offset.
+    // Coalesce contiguous entries into single map_pages calls to maximise
+    // the use of large pages (2MiB/1GiB).
+    uint64_t pending_base = 0, pending_top = 0;
+
     for (size_t i = 0; i < _memmap_entries; i++) {
+        uint64_t aligned_base = 0, aligned_top = 0;
+
         if (((base_revision >= 1 && base_revision < 3) || base_revision >= 4) && (
             _memmap[i].type == MEMMAP_RESERVED
          || _memmap[i].type == MEMMAP_BAD_MEMORY)) {
-            continue;
+            goto flush;
         }
 
         if (base_revision == 3 && (
@@ -215,7 +221,7 @@ static pagemap_t build_pagemap(int base_revision,
          && _memmap[i].type != MEMMAP_KERNEL_AND_MODULES
          && _memmap[i].type != MEMMAP_FRAMEBUFFER
          && _memmap[i].type != MEMMAP_EFI_RECLAIMABLE)) {
-            continue;
+            goto flush;
         }
 
         uint64_t base   = _memmap[i].base;
@@ -227,17 +233,35 @@ static pagemap_t build_pagemap(int base_revision,
         }
 
         if (base >= top) {
+            goto flush;
+        }
+
+        aligned_base = ALIGN_DOWN(base, 0x1000);
+        aligned_top  = ALIGN_UP(top, 0x1000);
+
+        if (aligned_base == pending_top && pending_top != 0) {
+            pending_top = aligned_top;
             continue;
         }
 
-        uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
-        uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
-        uint64_t aligned_length = aligned_top - aligned_base;
-
-        if (base_revision == 0) {
-            map_pages(pagemap, aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
+flush:
+        if (pending_top > pending_base) {
+            uint64_t len = pending_top - pending_base;
+            if (base_revision == 0) {
+                map_pages(pagemap, pending_base, pending_base, VMM_FLAG_WRITE, len);
+            }
+            map_pages(pagemap, direct_map_offset + pending_base, pending_base, VMM_FLAG_WRITE, len);
         }
-        map_pages(pagemap, direct_map_offset + aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
+        pending_base = aligned_base;
+        pending_top = aligned_top;
+    }
+
+    if (pending_top > pending_base) {
+        uint64_t len = pending_top - pending_base;
+        if (base_revision == 0) {
+            map_pages(pagemap, pending_base, pending_base, VMM_FLAG_WRITE, len);
+        }
+        map_pages(pagemap, direct_map_offset + pending_base, pending_base, VMM_FLAG_WRITE, len);
     }
 
     // Map the framebuffer with appropriate permissions
