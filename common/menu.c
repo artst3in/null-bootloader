@@ -173,7 +173,7 @@ static bool editor_no_term_reset = false;
 
 char *config_entry_editor(const char *title, const char *orig_entry) {
     if (terms[0]->cols < 40 || terms[0]->rows < 16) {
-        panic(false, "Terminal too small (minimum 40x16 required)");
+        return NULL;
     }
 
     FOR_TERM(TERM->autoflush = false);
@@ -340,7 +340,9 @@ tab_part:
                     print(serial ? "<" : "←");
                 }
             }
-            window_size--;
+            if (window_size > 0) {
+                window_size--;
+            }
         }
 
         if (i == cursor_offset
@@ -969,7 +971,13 @@ noreturn void _menu(bool first_run) {
     menu_init_term();
 
     if (terms[0]->cols < 40 || terms[0]->rows < 16) {
-        panic(false, "Terminal too small (minimum 40x16 required)");
+        // Terminal too small for menu, fall back to text console
+#if defined (BIOS)
+        vga_textmode_init(true);
+#elif defined (UEFI)
+        serial = true;
+        term_fallback();
+#endif
     }
 
     size_t tree_offset = 0;

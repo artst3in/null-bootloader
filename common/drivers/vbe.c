@@ -162,6 +162,15 @@ struct fb_info *vbe_get_mode_list(size_t *count) {
         if (!(vbe_mode_info.mode_attributes & (1 << 7)))
             continue;
 
+        uint16_t pitch = (vbe_info.version_maj < 3)
+                       ? vbe_mode_info.bytes_per_scanline
+                       : vbe_mode_info.lin_bytes_per_scanline;
+        uint16_t bytes_per_pixel = vbe_mode_info.bpp / 8;
+        if (bytes_per_pixel == 0
+         || pitch % bytes_per_pixel != 0
+         || pitch < (uint32_t)vbe_mode_info.res_x * bytes_per_pixel)
+            continue;
+
         modes_count++;
     }
 
@@ -178,6 +187,15 @@ struct fb_info *vbe_get_mode_list(size_t *count) {
             continue;
         // We only support linear modes
         if (!(vbe_mode_info.mode_attributes & (1 << 7)))
+            continue;
+
+        uint16_t pitch = (vbe_info.version_maj < 3)
+                       ? vbe_mode_info.bytes_per_scanline
+                       : vbe_mode_info.lin_bytes_per_scanline;
+        uint16_t bytes_per_pixel = vbe_mode_info.bpp / 8;
+        if (bytes_per_pixel == 0
+         || pitch % bytes_per_pixel != 0
+         || pitch < (uint32_t)vbe_mode_info.res_x * bytes_per_pixel)
             continue;
 
         ret[j].memory_model = vbe_mode_info.memory_model;
@@ -251,9 +269,7 @@ bool init_vbe(struct fb_info *ret,
                 edid_width  += ((int)edid_info->det_timing_desc1[4] & 0xf0) << 4;
             int edid_height  = (int)edid_info->det_timing_desc1[5];
                 edid_height += ((int)edid_info->det_timing_desc1[7] & 0xf0) << 4;
-            // Sanity check EDID values
-            if (edid_width > 0 && edid_width <= 16384 &&
-                edid_height > 0 && edid_height <= 16384) {
+            if (edid_width && edid_height) {
                 target_width  = edid_width;
                 target_height = edid_height;
                 target_bpp    = 32;
@@ -315,6 +331,16 @@ retry:
                 ret->green_mask_shift   = vbe_mode_info.lin_green_mask_shift;
                 ret->blue_mask_size     = vbe_mode_info.lin_blue_mask_size;
                 ret->blue_mask_shift    = vbe_mode_info.lin_blue_mask_shift;
+            }
+
+            uint16_t bytes_per_pixel = ret->framebuffer_bpp / 8;
+            if (bytes_per_pixel == 0
+             || ret->framebuffer_pitch % bytes_per_pixel != 0
+             || ret->framebuffer_pitch < (uint32_t)ret->framebuffer_width * bytes_per_pixel) {
+                printv("vbe: Mode %x has invalid pitch %u (width=%u, bpp=%u), skipping.\n",
+                       vid_modes[i], (uint32_t)ret->framebuffer_pitch,
+                       (uint32_t)ret->framebuffer_width, (uint32_t)ret->framebuffer_bpp);
+                continue;
             }
 
             fb_clear(ret);

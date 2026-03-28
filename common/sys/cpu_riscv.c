@@ -314,6 +314,10 @@ void init_riscv(const char *config) {
         }
     }
 
+    if (cached_time_base_freq != 0) {
+        tsc_freq = cached_time_base_freq;
+    }
+
     if (bsp_hart == NULL) {
         panic(false, "riscv: missing `struct riscv_hart` for BSP");
     }

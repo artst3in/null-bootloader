@@ -36,7 +36,10 @@ struct trampoline_passed_info {
     uint64_t smp_tpl_bsp_apic_addr_msr;
     uint64_t smp_tpl_mtrr_restore;
     uint64_t smp_tpl_temp_stack;
+    uint64_t smp_tpl_lapic_setup;
 } __attribute__((packed));
+
+bool smp_configure_apic = false;
 
 static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
                          struct limine_mp_info *info_struct,
@@ -72,6 +75,8 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     passed_info->smp_tpl_bsp_apic_addr_msr = rdmsr(0x1b);
     passed_info->smp_tpl_mtrr_restore = (uint64_t)(uintptr_t)mtrr_restore;
     passed_info->smp_tpl_temp_stack = (uint64_t)(uintptr_t)temp_stack + 8192;
+    passed_info->smp_tpl_lapic_setup = smp_configure_apic
+        ? (uint64_t)(uintptr_t)lapic_configure_handoff_state : 0;
 
     asm volatile ("" ::: "memory");
 
@@ -79,10 +84,11 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
     if (x2apic) {
         x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) | 0x4500);
     } else {
+        lapic_icr_wait();
         lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
         lapic_write(LAPIC_REG_ICR0, 0x4500);
     }
-    delay(10000000);
+    stall(10000);
 
     // Send two Startup IPIs per Intel SDM recommendation (Vol 3, 8.4.4.1)
     for (int j = 0; j < 2; j++) {
@@ -90,17 +96,24 @@ static bool smp_start_ap(uint32_t lapic_id, struct gdtr *gdtr,
             x2apic_write(LAPIC_REG_ICR0, ((uint64_t)lapic_id << 32) |
                                          ((size_t)trampoline / 4096) | 0x4600);
         } else {
+            lapic_icr_wait();
             lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
             lapic_write(LAPIC_REG_ICR0, ((size_t)trampoline / 4096) | 0x4600);
         }
-        delay(200000); // ~200 us
+        if (j == 0) {
+            stall(200);
+        }
+    }
+
+    if (!x2apic) {
+        lapic_icr_wait();
     }
 
     for (int i = 0; i < 100; i++) {
         if (locked_read(&passed_info->smp_tpl_booted_flag) == 1) {
             return true;
         }
-        delay(10000000);
+        stall(10000);
     }
 
     return false;
@@ -125,27 +138,27 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 
     struct gdtr gdtr = gdt;
 
-    uint8_t bsp_lapic_id;
-    uint32_t bsp_x2apic_id;
+    uint32_t bsp_lapic_id;
 
-    // If x2APIC already enabled by BIOS, then xAPIC is not available
+    // If x2APIC already enabled by firmware, try to revert to xAPIC
     if (rdmsr(0x1b) & (1 << 10)) {
         if (!x2apic) {
-            panic(false, "smp: Kernel does not support x2APIC, but machine requires it");
+            if (!x2apic_disable()) {
+                panic(false, "smp: Kernel does not support x2APIC and x2APIC cannot be disabled");
+            }
+            printv("smp: Firmware had x2APIC enabled, reverted to xAPIC mode\n");
         }
     }
 
     x2apic = x2apic && x2apic_enable();
 
     if (x2apic) {
-        bsp_x2apic_id = x2apic_read(LAPIC_REG_ID);
-        bsp_lapic_id = bsp_x2apic_id;
+        bsp_lapic_id = x2apic_read(LAPIC_REG_ID);
     } else {
         bsp_lapic_id = lapic_read(LAPIC_REG_ID) >> 24;
-        bsp_x2apic_id = bsp_lapic_id;
     }
 
-    *_bsp_lapic_id = bsp_x2apic_id;
+    *_bsp_lapic_id = bsp_lapic_id;
 
     *cpu_count = 0;
 
@@ -234,6 +247,11 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 
                 printv("smp: [xAPIC] Found candidate AP for bring-up. LAPIC ID: %u\n", lapic->lapic_id);
 
+                // Set up per-AP LINT values before starting
+                if (smp_configure_apic) {
+                    lapic_prep_lint(madt, lapic->acpi_processor_uid, x2apic);
+                }
+
                 // Try to start the AP
                 if (!smp_start_ap(lapic->lapic_id, &gdtr, info_struct,
                                   paging_mode, (uintptr_t)pagemap.top_level,
@@ -267,12 +285,17 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
                 info_struct->lapic_id = x2lapic->x2apic_id;
 
                 // Do not try to restart the BSP
-                if (x2lapic->x2apic_id == bsp_x2apic_id) {
+                if (x2lapic->x2apic_id == bsp_lapic_id) {
                     (*cpu_count)++;
                     continue;
                 }
 
                 printv("smp: [x2APIC] Found candidate AP for bring-up. LAPIC ID: %u\n", x2lapic->x2apic_id);
+
+                // Set up per-AP LINT values before starting
+                if (smp_configure_apic) {
+                    lapic_prep_lint(madt, x2lapic->acpi_processor_uid, true);
+                }
 
                 // Try to start the AP
                 if (!smp_start_ap(x2lapic->x2apic_id, &gdtr, info_struct,
@@ -423,7 +446,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
         if (locked_read(&passed_info->smp_tpl_booted_flag) == 1) {
             return true;
         }
-        delay(100000);
+        stall(100);
     }
 
     return false;
@@ -804,7 +827,7 @@ static bool smp_start_ap(size_t hartid, size_t satp, struct limine_mp_info *info
         if (locked_read(&passed_info.smp_tpl_booted_flag) == 1)
             return true;
 
-        delay(100000);
+        stall(100);
     }
 
     return false;

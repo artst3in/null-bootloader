@@ -53,22 +53,39 @@ smp_trampoline_start:
     mov ebx, esi
 
     mov ecx, 0x1b
+    rdmsr
+    test eax, (1 << 10)
+    jz .write_apic_msr
+
+    ; Check if target also has x2APIC
+    test dword [ebx + (passed_info.bsp_apic_addr_msr_lo - smp_trampoline_start)], (1 << 10)
+    jnz .write_apic_msr
+
+    ; AP is x2APIC but target is xAPIC: go through disabled state
+    btr eax, 11
+    btr eax, 10
+    wrmsr
+
+  .write_apic_msr:
     mov eax, [ebx + (passed_info.bsp_apic_addr_msr_lo - smp_trampoline_start)]
     mov edx, [ebx + (passed_info.bsp_apic_addr_msr_hi - smp_trampoline_start)]
     bts eax, 11
     btr eax, 8
     wrmsr
-
-  .nox2apic:
     mov esp, [ebx + (passed_info.temp_stack - smp_trampoline_start)]
 
     mov eax, cr4
     bts eax, 5
     mov cr4, eax
 
+    ; Set EFER (LME + NX if available), all other bits cleared
     mov ecx, 0xc0000080
-    mov eax, 0x100
     xor edx, edx
+    mov eax, 1 << 8
+    test dword [ebx + (passed_info.target_mode - smp_trampoline_start)], (1 << 3)
+    jz .no_nx
+    or eax, 1 << 11
+  .no_nx:
     wrmsr
 
     test dword [ebx + (passed_info.target_mode - smp_trampoline_start)], (1 << 1)
@@ -82,13 +99,25 @@ smp_trampoline_start:
     mov eax, dword [ebx + (passed_info.pagemap - smp_trampoline_start)]
     mov cr3, eax
 
+    ; Enable CR0.PG (and WP if requested)
     mov eax, cr0
+    test dword [ebx + (passed_info.target_mode - smp_trampoline_start)], (1 << 4)
+    jz .no_wp
+    bts eax, 16
+  .no_wp:
     bts eax, 31
     mov cr0, eax
 
 %ifdef IA32_TARGET
     ; Synchronise MTRRs with BSP
     call [ebx + (passed_info.mtrr_restore - smp_trampoline_start)]
+
+    ; Configure local APIC handoff state (if pointer is set)
+    mov eax, dword [ebx + (passed_info.lapic_setup - smp_trampoline_start)]
+    test eax, eax
+    jz .skip_lapic_setup32
+    call eax
+  .skip_lapic_setup32:
 %endif
 
     lea eax, [ebx + (.mode64 - smp_trampoline_start)]
@@ -106,26 +135,15 @@ smp_trampoline_start:
     mov ss, ax
 
     mov ebx, ebx
-    test dword [rbx + (passed_info.target_mode - smp_trampoline_start)], (1 << 3)
-    jz .nonx
-
-    mov ecx, 0xc0000080
-    rdmsr
-    bts eax, 11
-    wrmsr
-
-  .nonx:
-    test dword [rbx + (passed_info.target_mode - smp_trampoline_start)], (1 << 4)
-    jz .nowp
-
-    mov rax, cr0
-    bts rax, 16
-    mov cr0, rax
-
-  .nowp:
     mov rax, qword [rbx + (passed_info.hhdm - smp_trampoline_start)]
     add qword [rbx + (passed_info.gdtr - smp_trampoline_start) + 2], rax
     lgdt [rbx + (passed_info.gdtr - smp_trampoline_start)]
+
+    ; Clear TSS busy bit and load TR
+    mov rcx, [rbx + (passed_info.gdtr - smp_trampoline_start) + 2]
+    mov byte [rcx + 0x3d], 0x89
+    mov ecx, 0x38
+    ltr cx
 
     lea rax, [rax + rbx + (parking64 - smp_trampoline_start)]
 
@@ -138,6 +156,13 @@ parking64:
 %ifdef X86_64_TARGET
     ; Synchronise MTRRs with BSP
     call [rbx + (passed_info.mtrr_restore - smp_trampoline_start)]
+
+    ; Configure local APIC handoff state (if pointer is set)
+    mov rax, [rbx + (passed_info.lapic_setup - smp_trampoline_start)]
+    test rax, rax
+    jz .skip_lapic_setup64
+    call rax
+  .skip_lapic_setup64:
 %endif
 
     mov edi, dword [rbx + (passed_info.smp_info_struct - smp_trampoline_start)]
@@ -181,24 +206,37 @@ parking64:
     mov rbx, cr3
     mov cr3, rbx
 
+    ; Switch to new stack (HHDM address, safe after lower half unmap)
     mov rsp, qword [rdi + 8]
+
+    ; Push fake return address
     push 0
+    mov rsi, rsp
+
+    ; Prepare iretq frame
+    push 0x30
+    push rsi
+    push 0x2
+    push 0x28
     push rax
-    xor rax, rax
-    xor rbx, rbx
-    xor rcx, rcx
-    xor rdx, rdx
-    xor rsi, rsi
-    xor rbp, rbp
-    xor r8,  r8
-    xor r9,  r9
-    xor r10, r10
-    xor r11, r11
-    xor r12, r12
-    xor r13, r13
-    xor r14, r14
-    xor r15, r15
-    ret
+
+    ; Zero out all GPRs (except rdi = mp_info pointer)
+    xor eax, eax
+    xor ebx, ebx
+    xor ecx, ecx
+    xor edx, edx
+    xor esi, esi
+    xor ebp, ebp
+    xor r8d,  r8d
+    xor r9d,  r9d
+    xor r10d, r10d
+    xor r11d, r11d
+    xor r12d, r12d
+    xor r13d, r13d
+    xor r14d, r14d
+    xor r15d, r15d
+
+    iretq
 
 invalid_idt:
     times 2 dq 0
@@ -221,6 +259,8 @@ passed_info:
     .mtrr_restore:
         dq 0
     .temp_stack:
+        dq 0
+    .lapic_setup:
         dq 0
 
 smp_trampoline_end:

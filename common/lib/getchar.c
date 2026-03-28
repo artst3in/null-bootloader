@@ -138,9 +138,6 @@ static int input_sequence(void) {
             break;
         }
 
-        if (val > 999) {
-            break;
-        }
         val *= 10;
         val += ret - '0';
     }
@@ -179,7 +176,7 @@ again:
                 case '\r':
                     return '\n';
                 case 0x1b:
-                    delay(10000);
+                    stall(10);
                     ret = serial_in();
                     if (ret == -1) {
                         return GETCHAR_ESCAPE;
@@ -239,9 +236,6 @@ static int input_sequence(bool ext,
             break;
         }
 
-        if (val > 999) {
-            break;
-        }
         val *= 10;
         val += kd.Key.UnicodeChar - '0';
     }
@@ -300,6 +294,7 @@ again:
     gBS->WaitForEvent(2, events, &which);
 
     if (which == 1) {
+        gBS->CloseEvent(events[1]);
         return 0;
     }
 
@@ -319,6 +314,7 @@ again:
     }
 
     if (serial == true && kd.Key.ScanCode == 0x08) {
+        gBS->CloseEvent(events[1]);
         return '\b';
     }
 
@@ -363,6 +359,7 @@ again:
         goto again;
     }
 
+    gBS->CloseEvent(events[1]);
     return ret;
 }
 #endif

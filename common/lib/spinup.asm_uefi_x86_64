@@ -95,6 +95,16 @@ bits 32
 
     xor eax, eax
     mov cr4, eax
+    mov cr3, eax
+
+    ; Clear TSS busy bit and load TR with base 0, limit 0
+    sub esp, 8
+    sgdt [esp]
+    mov eax, [esp + 2]
+    add esp, 8
+    mov byte [eax + 0x3d], 0x89
+    mov ax, 0x38
+    ltr ax
 
     call edi
 

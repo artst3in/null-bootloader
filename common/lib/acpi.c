@@ -255,6 +255,29 @@ void *acpi_get_table(const char *signature, int index) {
     return NULL;
 }
 
+static bool acpi_padding_is_safe(uint64_t base, uint64_t length) {
+    if (length == 0) {
+        return true;
+    }
+
+    uint64_t top = base + length;
+
+    for (size_t i = 0; i < memmap_entries; i++) {
+        uint64_t entry_base = memmap[i].base;
+        uint64_t entry_top  = entry_base + memmap[i].length;
+
+        if (entry_base >= top || entry_top <= base) {
+            continue;
+        }
+
+        if (memmap[i].type != MEMMAP_USABLE && memmap[i].type != MEMMAP_RESERVED) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static void map_single_table(uint64_t addr, uint32_t len) {
 #if defined (__i386__)
     if (addr >= 0x100000000) {
@@ -265,10 +288,20 @@ static void map_single_table(uint64_t addr, uint32_t len) {
 
     uint32_t length = len != (uint32_t)-1 ? len : *(uint32_t *)(uintptr_t)(addr + 4);
 
+    uint64_t aligned_base = ALIGN_DOWN(addr, 4096);
+    uint64_t aligned_top  = ALIGN_UP(addr + length, 4096);
+
+    if (!acpi_padding_is_safe(aligned_base, addr - aligned_base)) {
+        aligned_base = addr;
+    }
+    if (!acpi_padding_is_safe(addr + length, aligned_top - (addr + length))) {
+        aligned_top = addr + length;
+    }
+
     uint64_t memmap_type = pmm_check_type(addr);
 
     if (memmap_type != MEMMAP_ACPI_RECLAIMABLE && memmap_type != MEMMAP_ACPI_NVS) {
-        memmap_alloc_range(addr, length, MEMMAP_ACPI_TABLES, 0, true, false, true);
+        memmap_alloc_range(aligned_base, aligned_top - aligned_base, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
     }
 }
 
@@ -368,3 +401,75 @@ no_rsdt:;
         }
     }
 }
+
+void smbios_map_tables(void) {
+    void *smbios32_ptr = NULL, *smbios64_ptr = NULL;
+    acpi_get_smbios(&smbios32_ptr, &smbios64_ptr);
+
+    if (smbios32_ptr != NULL) {
+        struct smbios_entry_point_32 *smbios32 = smbios32_ptr;
+        map_single_table((uintptr_t)smbios32, smbios32->length);
+        if (smbios32->table_address != 0) {
+            map_single_table(smbios32->table_address, smbios32->table_length);
+        }
+    }
+
+    if (smbios64_ptr != NULL) {
+        struct smbios_entry_point_64 *smbios64 = smbios64_ptr;
+        map_single_table((uintptr_t)smbios64, smbios64->length);
+        if (smbios64->table_address != 0) {
+            map_single_table(smbios64->table_address, smbios64->table_maximum_size);
+        }
+    }
+}
+
+#if defined (UEFI)
+void efi_map_runtime_entries(void) {
+    size_t entry_count = efi_mmap_size / efi_desc_size;
+
+    for (size_t i = 0; i < entry_count; i++) {
+        EFI_MEMORY_DESCRIPTOR *entry = (void *)efi_mmap + i * efi_desc_size;
+
+        if (entry->Type != EfiRuntimeServicesCode
+         && entry->Type != EfiRuntimeServicesData) {
+            continue;
+        }
+
+        uint64_t base = entry->PhysicalStart;
+        uint64_t length;
+        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
+            continue;
+        }
+
+        memmap_alloc_range(base, length, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
+    }
+
+    // Explicitly map the EFI system table and the data it references.
+    // The UEFI spec does not guarantee these reside in EfiRuntimeServicesData,
+    // so we map them separately to ensure they are always accessible via HHDM.
+    map_single_table((uintptr_t)gST, sizeof(*gST));
+
+    if (gST->RuntimeServices != NULL) {
+        map_single_table((uintptr_t)gST->RuntimeServices,
+                         sizeof(*gST->RuntimeServices));
+    }
+
+    if (gST->ConfigurationTable != NULL && gST->NumberOfTableEntries > 0) {
+        uint64_t ct_size;
+        if (!__builtin_mul_overflow(gST->NumberOfTableEntries,
+                (uint64_t)sizeof(EFI_CONFIGURATION_TABLE), &ct_size)
+         && ct_size <= UINT32_MAX) {
+            map_single_table((uintptr_t)gST->ConfigurationTable, (uint32_t)ct_size);
+        }
+    }
+
+    if (gST->FirmwareVendor != NULL) {
+        size_t len = 0;
+        while (gST->FirmwareVendor[len] != 0) {
+            len++;
+        }
+        map_single_table((uintptr_t)gST->FirmwareVendor,
+                         (len + 1) * sizeof(*gST->FirmwareVendor));
+    }
+}
+#endif

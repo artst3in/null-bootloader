@@ -60,7 +60,17 @@ static struct gdt_desc gdt_descs[] = {
         .access      = 0b10010011,
         .granularity = 0b00000000,
         .base_hi     = 0x00
-    }
+    },
+
+    {   // 0x38: TSS descriptor low (base 0, limit 0)
+        .limit       = 0x0000,
+        .base_low    = 0x0000,
+        .base_mid    = 0x00,
+        .access      = 0x89,
+        .granularity = 0x00,
+        .base_hi     = 0x00
+    },
+    {0} // 0x40: TSS descriptor high (base upper = 0)
 };
 
 #if defined (BIOS)

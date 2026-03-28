@@ -85,7 +85,7 @@ if ! test -f version; then
     clone_repo_commit \
         https://codeberg.org/Limine/limine-protocol.git \
         limine-protocol \
-        42e836e30242c2c14f889fd76c6f9a57b0c18ec2
+        e42d010a761e4e9ac6bad1b578110ba72c61e1d9
 
     clone_repo_commit \
         https://codeberg.org/PicoEFI/PicoEFI.git \
@@ -104,7 +104,7 @@ if ! test -f version; then
     clone_repo_commit \
         https://codeberg.org/Mintsuki/Flanterm.git \
         flanterm \
-        281b72a74d0c09f4a5ba40f65b41e642acadca17
+        5d93c648bee81ce7d19f7a6671ec2bc3aaa834f2
 
     download_by_hash \
         https://github.com/nothings/stb/raw/5c205738c191bcb0abc65c4febfa9bd25ff35234/stb_image.h \

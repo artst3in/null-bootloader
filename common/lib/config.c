@@ -652,7 +652,7 @@ static char *config_get_entry(size_t *size, size_t index) {
 
     do {
         p++;
-    } while (*p != '\n');
+    } while (*p != '\n' && *p != '\0');
 
     ret = p;
 

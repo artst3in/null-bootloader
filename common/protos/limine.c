@@ -24,6 +24,7 @@
 #include <flanterm_backends/fb.h>
 #include <sys/pic.h>
 #include <sys/lapic.h>
+#include <sys/iommu.h>
 #include <sys/idt.h>
 #include <fs/file.h>
 #include <mm/pmm.h>
@@ -51,7 +52,7 @@ static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kerne
     }
 }
 
-#define SUPPORTED_BASE_REVISION 4
+#define SUPPORTED_BASE_REVISION 5
 
 #define MAX_REQUESTS 128
 
@@ -911,6 +912,24 @@ FEAT_START
     entrypoint_request->response = reported_addr(entrypoint_response);
 FEAT_END
 
+    // x86-64 Keep IOMMU feature
+#if defined (__x86_64__) || defined (__i386__)
+    bool keep_iommu = false;
+FEAT_START
+    struct limine_x86_64_keep_iommu_request *keep_iommu_request =
+        get_request(LIMINE_X86_64_KEEP_IOMMU_REQUEST_ID);
+    if (keep_iommu_request == NULL) {
+        break;
+    }
+
+    struct limine_x86_64_keep_iommu_response *keep_iommu_response =
+        ext_mem_alloc(sizeof(struct limine_x86_64_keep_iommu_response));
+
+    keep_iommu_request->response = reported_addr(keep_iommu_response);
+    keep_iommu = true;
+FEAT_END
+#endif
+
     // Bootloader info feature
 FEAT_START
     struct limine_bootloader_info_request *bootloader_info_request = get_request(LIMINE_BOOTLOADER_INFO_REQUEST_ID);
@@ -1035,10 +1054,10 @@ FEAT_START
         ext_mem_alloc(sizeof(struct limine_smbios_response));
 
     if (smbios_entry_32) {
-        smbios_response->entry_32 = base_revision <= 2 ? reported_addr(smbios_entry_32) : (uintptr_t)smbios_entry_32;
+        smbios_response->entry_32 = (base_revision <= 2 || base_revision >= 5) ? reported_addr(smbios_entry_32) : (uintptr_t)smbios_entry_32;
     }
     if (smbios_entry_64) {
-        smbios_response->entry_64 = base_revision <= 2 ? reported_addr(smbios_entry_64) : (uintptr_t)smbios_entry_64;
+        smbios_response->entry_64 = (base_revision <= 2 || base_revision >= 5) ? reported_addr(smbios_entry_64) : (uintptr_t)smbios_entry_64;
     }
 
     smbios_request->response = reported_addr(smbios_response);
@@ -1055,7 +1074,7 @@ FEAT_START
     struct limine_efi_system_table_response *est_response =
         ext_mem_alloc(sizeof(struct limine_efi_system_table_response));
 
-    est_response->address = base_revision <= 2 ? reported_addr(gST) : (uintptr_t)gST;
+    est_response->address = (base_revision <= 2 || base_revision >= 5) ? reported_addr(gST) : (uintptr_t)gST;
 
     est_request->response = reported_addr(est_response);
 FEAT_END
@@ -1482,6 +1501,12 @@ FEAT_END
 
     if (base_revision >= 4) {
         acpi_map_tables();
+        if (base_revision >= 5) {
+            smbios_map_tables();
+#if defined (UEFI)
+            efi_map_runtime_entries();
+#endif
+        }
         pmm_sanitise_entries(memmap, &memmap_entries, true);
     }
 
@@ -1499,6 +1524,7 @@ FEAT_START
     struct limine_mp_info *mp_info;
     size_t cpu_count;
 #if defined (__x86_64__) || defined (__i386__)
+    smp_configure_apic = base_revision >= 5;
     uint32_t bsp_lapic_id;
     mp_info = init_smp(&cpu_count, &bsp_lapic_id,
                         paging_mode,
@@ -1572,6 +1598,20 @@ FEAT_START
     mp_request->response = reported_addr(mp_response);
 FEAT_END
 
+#if defined (__x86_64__) || defined (__i386__)
+    // If there was no MP request, the kernel has no way to tell us it supports
+    // x2APIC. Try to disable it as a courtesy, but do not panic if we cannot
+    // since the kernel may be able to deal with it itself.
+    if (get_request(LIMINE_MP_REQUEST_ID) == NULL
+     && (rdmsr(0x1b) & (1 << 10))) {
+        if (x2apic_disable()) {
+            printv("limine: Firmware had x2APIC enabled, reverted to xAPIC mode\n");
+        } else {
+            printv("limine: Firmware has x2APIC enabled and it could not be disabled\n");
+        }
+    }
+#endif
+
 #if defined(__riscv)
     // RISC-V BSP Hart ID
 FEAT_START
@@ -1617,8 +1657,8 @@ FEAT_START
             case MEMMAP_USABLE:
                 _memmap[i].type = LIMINE_MEMMAP_USABLE;
                 break;
-            case MEMMAP_ACPI_TABLES:
-                _memmap[i].type = LIMINE_MEMMAP_ACPI_TABLES;
+            case MEMMAP_RESERVED_MAPPED:
+                _memmap[i].type = LIMINE_MEMMAP_RESERVED_MAPPED;
                 break;
             case MEMMAP_ACPI_RECLAIMABLE:
                 _memmap[i].type = LIMINE_MEMMAP_ACPI_RECLAIMABLE;
@@ -1666,8 +1706,16 @@ FEAT_END
     rm_int(0x15, &r, &r);
 #endif
 
+    if (!keep_iommu) {
+        iommu_disable_all();
+    }
+
     pic_mask_all();
-    io_apic_mask_all();
+    io_apic_mask_all(base_revision >= 5);
+
+    if (base_revision >= 5 && lapic_check()) {
+        lapic_configure_bsp();
+    }
 
     irq_flush_type = IRQ_PIC_APIC_FLUSH;
 

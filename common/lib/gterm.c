@@ -703,9 +703,15 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
 
     char *menu_font_size = config_get_value(config, 0, "TERM_FONT_SIZE");
     if (menu_font_size != NULL) {
-        parse_resolution(&tmp_font_width, &tmp_font_height, NULL, menu_font_size);
-        // XXX: Do not allow widths != 8
-        tmp_font_width = 8;
+        if (!parse_resolution(&tmp_font_width, &tmp_font_height, NULL, menu_font_size)) {
+            print("Could not parse TERM_FONT_SIZE. Using default font.\n");
+            goto no_load_font;
+        }
+
+        if (tmp_font_width != 8) {
+            print("Font width must be 8, got %u. Using default font.\n", tmp_font_width);
+            goto no_load_font;
+        }
 
         size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
 
@@ -793,6 +799,8 @@ no_load_font:;
         generate_canvas(fb);
 
         if (font_scale_is_default) {
+            font_scale_x = 1;
+            font_scale_y = 1;
             if (fb->framebuffer_width >= (1920 + 1920 / 3) && fb->framebuffer_height >= (1080 + 1080 / 3)) {
                 font_scale_x = 2;
                 font_scale_y = 2;

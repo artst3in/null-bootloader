@@ -1,3 +1,105 @@
+2026-03-12  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.5 ***
+
+    Noteworthy changes compared to the previous release, 10.8.4:
+
+    Bug fixes:
+        - Update the Flanterm library to 3.0.2 to fix a regression introduced
+          in Flanterm 3.0.1 that would also cause misrenderings of the boot
+          menu's text colour for selected entries.
+
+2026-03-11  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.4 ***
+
+    Noteworthy changes compared to the previous release, 10.8.3:
+
+    Bug fixes:
+        - Update the Flanterm library to 3.0.1 to fix a regression that would
+          cause misrenderings of the boot menu's text colour for selected
+          entries.
+
+2026-03-07  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.3 ***
+
+    Noteworthy changes compared to the previous release, 10.8.2:
+
+    Bug fixes:
+        - Preserve LAPIC register state across x2APIC-to-xAPIC transition.
+        - SMP: Widen bsp_lapic_id to uint32_t to avoid x2APIC ID truncation.
+        - Linux boot protocol: Validate RISC-V kernel header before trusting
+          image_size for allocation.
+        - Host tool: Replace GCC/Clang __builtin overflow checks with portable
+          C99 helpers.
+        - Host tool: Fix ENDSWAP width mismatch in GPT-to-MBR partition entry
+          conversion on big-endian hosts.
+        - BIOS HDD Stage 1: Fix 64-bit LBA calculation and carry propagation in
+          disk read loop.
+        - BIOS HDD Stage 1: Fix stack imbalance on int 13h/AH=48h failure.
+        - Add NULL terminator check in config_get_entry header line scan.
+        - Guard editor window_size decrement to prevent underflow on long line
+          wrapping.
+
+2026-02-26   Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.2 ***
+
+    Noteworthy changes compared to the previous release, 10.8.1:
+
+    Bug fixes:
+        - Revert broken/pointless legacy PIC reinitialisation logic on flush
+          that accidentally made it into 10.8.1.
+
+2026-02-26  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.1 ***
+
+    Noteworthy changes compared to the previous release, 10.8.0:
+
+    Bug fixes:
+        - Fix VT-d disable order to TE, IRE, QIE.
+        - Fix VT-d polling loop read order and remove polling timeout.
+        - SMP: Add xAPIC ICR delivery status checks to INIT-SIPI-SIPI sequence.
+        - Amend certain APIC-related issues of Limine boot protocol and
+          implement the corrected behaviour.
+
+2026-02-22  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 10.8.0 ***
+
+    Noteworthy changes compared to the previous release, 10.7.0:
+
+    New features:
+        - Limine boot protocol: Implement base revision 5.
+        - Limine boot protocol: Implement x86-64 Keep IOMMU feature.
+
+    Bug fixes:
+        - Fix font autoscaling not resetting per display in multi-display
+          configurations.
+        - Fix undefined behaviour in memmove() due to direct pointer
+          comparisons.
+        - Skip GOP and VBE modes with invalid pitch values.
+        - GOP: Work around firmware reporting incorrect pitch via QueryMode()
+          by fetching from gop->Mode->Info after SetMode().
+        - GOP: Ensure SetMode() is called at least once per handle to work
+          around firmware not initialising state without that.
+        - Fall back to EFI/BIOS console instead of panicking on small
+          terminals.
+
+    Miscellaneous:
+        - Disable Intel VT-d and AMD-Vi IOMMUs before kernel entry by default
+          for the Limine, multiboot1, and multiboot2 protocols.
+        - Try to gracefully disable x2APIC before handoff for the Limine
+          (unless kernel asks for it), multiboot1, and multiboot2 protocols.
+        - Replace cycle-based delay() with wall time calibrated stall().
+        - Prefer physical memory allocations below 4 GiB on x86.
+        - Align ACPI table memory map entries to page size where safe.
+        - Undo several overzealous limits and bounds checks added in prior
+          releases.
+        - Updated limine-protocol subproject to latest revision.
+
 2026-02-10  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.7.0 ***

@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <lib/misc.h>
 
 #if defined(__x86_64__) || defined(__i386__)
 
@@ -157,7 +156,7 @@ static inline void wrmsr(uint32_t msr, uint64_t value) {
 
 static inline uint64_t rdtsc(void) {
     uint32_t edx, eax;
-    asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    asm volatile ("rdtsc" : "=a" (eax), "=d" (edx) :: "memory");
     return ((uint64_t)edx << 32) | eax;
 }
 
@@ -232,7 +231,9 @@ static inline uint64_t rdtsc(void) {
 }
 
 static inline uint64_t tsc_freq_arch(void) {
-    return 0; // FIXME
+    uint64_t v;
+    asm volatile ("mrs %0, cntfrq_el0" : "=r" (v));
+    return v;
 }
 
 #define locked_read(var) ({ \
@@ -401,35 +402,30 @@ static inline uint64_t tsc_freq_arch(void) {
 #error Unknown architecture
 #endif
 
-static inline uint64_t tsc_freq(void) {
-    uint64_t freq = tsc_freq_arch();
-    if (freq != 0) {
-        return freq;
-    }
-
-#if defined(UEFI)
-    uint64_t tsc_start = rdtsc();
-    gBS->Stall(1000);
-    uint64_t tsc_end = rdtsc();
-
-    if (tsc_end < tsc_start)
-        return 0;
-
-    return (tsc_end - tsc_start) * 1000ULL;
-#else
-    return 0;
-#endif
-}
+extern uint64_t tsc_freq;
+void calibrate_tsc(void);
 
 static inline uint64_t rdtsc_usec(void) {
     uint64_t exec_ticks = rdtsc();
-    uint64_t freq = tsc_freq();
-    return freq != 0 ? 1000000ULL * exec_ticks / freq : 0;
+    if (tsc_freq == 0) {
+        return 0;
+    }
+    return exec_ticks / tsc_freq * 1000000
+         + exec_ticks % tsc_freq * 1000000 / tsc_freq;
 }
 
-static inline void delay(uint64_t cycles) {
-    uint64_t next_stop = rdtsc() + cycles;
-
+static inline void stall(uint64_t us) {
+#if defined(BIOS)
+    if (tsc_freq == 0) {
+        // ~1 us per inb on ISA/LPC bus
+        for (uint64_t i = 0; i < us; i++) {
+            inb(0x80);
+        }
+        return;
+    }
+#endif
+    uint64_t ticks = (tsc_freq * us + 999999) / 1000000;
+    uint64_t next_stop = rdtsc() + ticks;
     while (rdtsc() < next_stop);
 }
 
