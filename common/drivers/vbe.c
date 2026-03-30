@@ -231,7 +231,8 @@ struct fb_info *vbe_get_mode_list(size_t *count) {
 }
 
 bool init_vbe(struct fb_info *ret,
-              uint16_t target_width, uint16_t target_height, uint16_t target_bpp) {
+              uint16_t target_width, uint16_t target_height, uint16_t target_bpp,
+              bool preserve_screen) {
     printv("vbe: Initialising...\n");
 
     size_t current_fallback = 0;
@@ -343,7 +344,9 @@ retry:
                 continue;
             }
 
-            fb_clear(ret);
+            if (!preserve_screen) {
+                fb_clear(ret);
+            }
 
             return true;
         }
