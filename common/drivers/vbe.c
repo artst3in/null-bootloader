@@ -343,6 +343,8 @@ retry:
                 continue;
             }
 
+            fb_clear(ret);
+
             return true;
         }
     }

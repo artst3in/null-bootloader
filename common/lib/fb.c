@@ -34,6 +34,41 @@ void fb_init(struct fb_info **ret, size_t *_fbs_count,
     fb_fbs_count = *_fbs_count;
 }
 
+void fb_clear(struct fb_info *fb) {
+    for (size_t y = 0; y < fb->framebuffer_height; y++) {
+        switch (fb->framebuffer_bpp) {
+            case 32: {
+                uint32_t *fbp = (void *)(uintptr_t)fb->framebuffer_addr;
+                size_t row = (y * fb->framebuffer_pitch) / 4;
+                for (size_t x = 0; x < fb->framebuffer_width; x++) {
+                    fbp[row + x] = 0;
+                }
+                break;
+            }
+            case 16: {
+                uint16_t *fbp = (void *)(uintptr_t)fb->framebuffer_addr;
+                size_t row = (y * fb->framebuffer_pitch) / 2;
+                for (size_t x = 0; x < fb->framebuffer_width; x++) {
+                    fbp[row + x] = 0;
+                }
+                break;
+            }
+            default: {
+                uint8_t *fbp = (void *)(uintptr_t)fb->framebuffer_addr;
+                size_t row = y * fb->framebuffer_pitch;
+                size_t row_bytes = fb->framebuffer_width * (fb->framebuffer_bpp / 8);
+                for (size_t x = 0; x < row_bytes; x++) {
+                    fbp[row + x] = 0;
+                }
+                break;
+            }
+        }
+    }
+
+    fb_flush((volatile void *)(uintptr_t)fb->framebuffer_addr,
+             (size_t)fb->framebuffer_pitch * fb->framebuffer_height);
+}
+
 #if defined (__x86_64__) || defined (__i386__)
 static void fb_flush_x86(volatile void *base, size_t length) {
     static size_t clsz = 0;

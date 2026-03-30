@@ -178,6 +178,8 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 
     ret->framebuffer_addr = gop->Mode->FrameBufferBase;
 
+    fb_clear(ret);
+
     return true;
 }
 
