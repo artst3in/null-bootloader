@@ -238,7 +238,9 @@ void term_fallback(void) {
     if (!efi_boot_services_exited) {
 #endif
 
-        fallback_clear(NULL, true);
+        // XXX: Ideally we clear the screen, but that gets rid of the BGRT boot logo
+        // and is slow, so...
+        //fallback_clear(NULL, true);
 
         term->set_text_fg = (void *)dummy_handle;
         term->set_text_bg = (void *)dummy_handle;
