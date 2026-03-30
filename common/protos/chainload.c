@@ -293,7 +293,7 @@ noreturn void chainload(char *config, char *cmdline) {
 
     struct fb_info *fbinfo;
     size_t fb_count;
-    fb_init(&fbinfo, &fb_count, req_width, req_height, req_bpp, false);
+    fb_init(&fbinfo, &fb_count, req_width, req_height, req_bpp);
 
     size_t cmdline_len = strlen(cmdline);
     CHAR16 *new_cmdline;

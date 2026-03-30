@@ -542,7 +542,7 @@ no_modules:;
 #if defined (UEFI)
     gop_force_16 = true;
 #endif
-    fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp, false);
+    fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp);
     if (fbs_count == 0) {
 #if defined (UEFI)
         goto no_fb;

@@ -736,7 +736,7 @@ modeset:;
 
             struct fb_info *fbs;
             size_t fbs_count;
-            fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp, false);
+            fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp);
             if (fbs_count == 0) {
 #if defined (BIOS)
 textmode:

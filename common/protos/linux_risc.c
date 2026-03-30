@@ -245,7 +245,7 @@ static void prepare_efi_tables(struct boot_param *p, char *config) {
 
         term_notready();
 
-        fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp, false);
+        fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp);
 
         // TODO(qookie): Let the user pick a framebuffer if there's > 1
         if (fbs_count > 0) {
