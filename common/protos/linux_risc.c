@@ -126,7 +126,7 @@ static void load_module(struct boot_param *p, char *config) {
 
         p->module_size = module_file->size;
         p->module_base = ext_mem_alloc_type_aligned(
-                        ALIGN_UP(p->module_size, 4096),
+                        ALIGN_UP(p->module_size, 4096, panic(true, "linux: Alignment overflow")),
                         MEMMAP_KERNEL_AND_MODULES, 4096);
 
         fread(module_file, p->module_base, 0, p->module_size);
@@ -482,7 +482,7 @@ noreturn void linux_load(char *config, char *cmdline) {
 #endif
 
     p.kernel_base = ext_mem_alloc_type_aligned(
-                ALIGN_UP(text_offset + kernel_alloc_size, 4096),
+                ALIGN_UP(text_offset + kernel_alloc_size, 4096, panic(true, "linux: Alignment overflow")),
                 MEMMAP_KERNEL_AND_MODULES, 2 * 1024 * 1024);
     p.kernel_base += text_offset;
     fread(kernel_file, p.kernel_base, 0, p.kernel_size);

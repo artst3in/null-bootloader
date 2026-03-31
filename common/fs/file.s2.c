@@ -131,7 +131,7 @@ void *freadall_mode(struct file_handle *fd, uint32_t type, bool allow_high_alloc
             fd->fd = newptr;
         } else {
 #endif
-        memmap_alloc_range((uint64_t)(size_t)fd->fd, ALIGN_UP(fd->size, 4096), type, 0, true, false, false);
+        memmap_alloc_range((uint64_t)(size_t)fd->fd, ALIGN_UP(fd->size, 4096, panic(false, "Alignment overflow")), type, 0, true, false, false);
 #if defined (UEFI) && defined (__x86_64__)
         }
 #endif

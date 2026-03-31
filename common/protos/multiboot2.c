@@ -40,34 +40,36 @@ static size_t get_multiboot2_info_size(
     uint32_t section_entry_size, uint32_t section_num,
     uint32_t smbios_tag_size
 ) {
-    return ALIGN_UP(sizeof(struct multiboot2_start_tag), MULTIBOOT_TAG_ALIGN) +                                         // start
-        ALIGN_UP(sizeof(struct multiboot_tag_string) + strlen(cmdline) + 1, MULTIBOOT_TAG_ALIGN) +                      // cmdline
-        ALIGN_UP(sizeof(struct multiboot_tag_string) + sizeof(LIMINE_BRAND), MULTIBOOT_TAG_ALIGN) +                     // bootloader brand
-        ALIGN_UP(sizeof(struct multiboot_tag_framebuffer), MULTIBOOT_TAG_ALIGN) +                                       // framebuffer
-        ALIGN_UP(sizeof(struct multiboot_tag_new_acpi) + sizeof(struct rsdp), MULTIBOOT_TAG_ALIGN) +                    // new ACPI info
-        ALIGN_UP(sizeof(struct multiboot_tag_old_acpi) + 20, MULTIBOOT_TAG_ALIGN) +                                     // old ACPI info
-        ALIGN_UP(sizeof(struct multiboot_tag_elf_sections) + section_entry_size * section_num, MULTIBOOT_TAG_ALIGN) +   // ELF info
-        ALIGN_UP(modules_size, MULTIBOOT_TAG_ALIGN) +                                                                   // modules
-        ALIGN_UP(sizeof(struct multiboot_tag_load_base_addr), MULTIBOOT_TAG_ALIGN) +                                    // load base address
-        ALIGN_UP(smbios_tag_size, MULTIBOOT_TAG_ALIGN) +                                                                // SMBIOS
-        ALIGN_UP(sizeof(struct multiboot_tag_basic_meminfo), MULTIBOOT_TAG_ALIGN) +                                     // basic memory info
-        ALIGN_UP(sizeof(struct multiboot_tag_mmap) + sizeof(struct multiboot_mmap_entry) * MEMMAP_MAX, MULTIBOOT_TAG_ALIGN) +  // MMAP
+#define OVERFLOW panic(false, "multiboot2: info size overflow")
+    return ALIGN_UP(sizeof(struct multiboot2_start_tag), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_string) + strlen(cmdline) + 1, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_string) + sizeof(LIMINE_BRAND), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_framebuffer), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_new_acpi) + sizeof(struct rsdp), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_old_acpi) + 20, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_elf_sections) + section_entry_size * section_num, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(modules_size, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_load_base_addr), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(smbios_tag_size, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_basic_meminfo), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_mmap) + sizeof(struct multiboot_mmap_entry) * MEMMAP_MAX, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
         #if defined (UEFI)
-            ALIGN_UP(sizeof(struct multiboot_tag_efi_mmap) + (efi_desc_size * EFI_MEMMAP_MAX), MULTIBOOT_TAG_ALIGN) +          // EFI MMAP
+            ALIGN_UP(sizeof(struct multiboot_tag_efi_mmap) + (efi_desc_size * EFI_MEMMAP_MAX), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
             #if defined (__i386__)
-                ALIGN_UP(sizeof(struct multiboot_tag_efi32), MULTIBOOT_TAG_ALIGN) +                                     // EFI system table 32
-                ALIGN_UP(sizeof(struct multiboot_tag_efi32_ih), MULTIBOOT_TAG_ALIGN) +                                  // EFI image handle 32
+                ALIGN_UP(sizeof(struct multiboot_tag_efi32), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+                ALIGN_UP(sizeof(struct multiboot_tag_efi32_ih), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
             #elif defined (__x86_64__)
-                ALIGN_UP(sizeof(struct multiboot_tag_efi64), MULTIBOOT_TAG_ALIGN) +                                     // EFI system table 64
-                ALIGN_UP(sizeof(struct multiboot_tag_efi64_ih), MULTIBOOT_TAG_ALIGN) +                                  // EFI image handle 64
+                ALIGN_UP(sizeof(struct multiboot_tag_efi64), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+                ALIGN_UP(sizeof(struct multiboot_tag_efi64_ih), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
             #endif
         #endif
-        ALIGN_UP(sizeof(struct multiboot_tag_network) + DHCP_ACK_PACKET_LEN, MULTIBOOT_TAG_ALIGN) +                  // network info
-        ALIGN_UP(sizeof(struct multiboot_tag), MULTIBOOT_TAG_ALIGN);                                                    // end
+        ALIGN_UP(sizeof(struct multiboot_tag_network) + DHCP_ACK_PACKET_LEN, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag), MULTIBOOT_TAG_ALIGN, OVERFLOW);
+#undef OVERFLOW
 }
 
 #define append_tag(P, TAG) do { \
-    (P) += ALIGN_UP((TAG)->size, MULTIBOOT_TAG_ALIGN); \
+    (P) += ALIGN_UP((TAG)->size, MULTIBOOT_TAG_ALIGN, panic(false, "multiboot2: tag size overflow")); \
 } while (0)
 
 noreturn void multiboot2_load(char *config, char* cmdline) {
@@ -149,7 +151,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
     // Iterate through the entries...
     for (struct multiboot_header_tag *tag = (struct multiboot_header_tag*)(header + 1); // header + 1 to skip the header struct.
        tag < (struct multiboot_header_tag *)((uintptr_t)header + header->header_length) && tag->type != MULTIBOOT_HEADER_TAG_END;
-       tag = (struct multiboot_header_tag *)((uintptr_t)tag + ALIGN_UP(tag->size, MULTIBOOT_TAG_ALIGN))) {
+       tag = (struct multiboot_header_tag *)((uintptr_t)tag + ALIGN_UP(tag->size, MULTIBOOT_TAG_ALIGN, break))) {
         if (tag->size == 0) {
             break;
         }
@@ -381,7 +383,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
             default:
             case 0: case 1: // No preference / prefer lowest
                 reloc_ascend = true;
-                relocated_base = ALIGN_UP(reloc_tag.min_addr, reloc_tag.align);
+                relocated_base = ALIGN_UP(reloc_tag.min_addr, reloc_tag.align, goto reloc_fail);
                 if (CHECKED_ADD(relocated_base, ranges->length, goto reloc_fail) > reloc_tag.max_addr) {
                     goto reloc_fail;
                 }
@@ -440,7 +442,7 @@ reloc_fail:
 
         char *module_cmdline = conf_tuple.value2;
         if (!module_cmdline) module_cmdline = "";
-        modules_size += ALIGN_UP(sizeof(struct multiboot_tag_module) + strlen(module_cmdline) + 1, MULTIBOOT_TAG_ALIGN);
+        modules_size += ALIGN_UP(sizeof(struct multiboot_tag_module) + strlen(module_cmdline) + 1, MULTIBOOT_TAG_ALIGN, panic(false, "multiboot2: modules size overflow"));
     }
 
     struct smbios_entry_point_32* smbios_entry_32 = NULL;
@@ -451,9 +453,9 @@ reloc_fail:
     uint32_t smbios_tag_size = 0;
 
     if (smbios_entry_32 != NULL)
-        smbios_tag_size += ALIGN_UP(sizeof(struct multiboot_tag_smbios) + smbios_entry_32->length, MULTIBOOT_TAG_ALIGN);
+        smbios_tag_size += ALIGN_UP(sizeof(struct multiboot_tag_smbios) + smbios_entry_32->length, MULTIBOOT_TAG_ALIGN, panic(false, "multiboot2: tag size overflow"));
     if (smbios_entry_64 != NULL)
-        smbios_tag_size += ALIGN_UP(sizeof(struct multiboot_tag_smbios) + smbios_entry_64->length, MULTIBOOT_TAG_ALIGN);
+        smbios_tag_size += ALIGN_UP(sizeof(struct multiboot_tag_smbios) + smbios_entry_64->length, MULTIBOOT_TAG_ALIGN, panic(false, "multiboot2: tag size overflow"));
 
     size_t mb2_info_size = get_multiboot2_info_size(
         cmdline,

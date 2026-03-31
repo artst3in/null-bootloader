@@ -289,7 +289,7 @@ static void map_single_table(uint64_t addr, uint32_t len) {
     uint32_t length = len != (uint32_t)-1 ? len : *(uint32_t *)(uintptr_t)(addr + 4);
 
     uint64_t aligned_base = ALIGN_DOWN(addr, 4096);
-    uint64_t aligned_top  = ALIGN_UP(addr + length, 4096);
+    uint64_t aligned_top  = ALIGN_UP(addr + length, 4096, panic(false, "acpi: Alignment overflow"));
 
     if (!acpi_padding_is_safe(aligned_base, addr - aligned_base)) {
         aligned_base = addr;

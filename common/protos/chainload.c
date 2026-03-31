@@ -277,7 +277,7 @@ noreturn void chainload(char *config, char *cmdline) {
     size_t image_size = image->size;
 
     memmap_alloc_range_in(untouched_memmap, &untouched_memmap_entries,
-                          (uintptr_t)ptr, ALIGN_UP(image_size, 4096),
+                          (uintptr_t)ptr, ALIGN_UP(image_size, 4096, panic(true, "chainload: Alignment overflow")),
                           MEMMAP_RESERVED, MEMMAP_USABLE, true, false, true);
 
     EFI_DEVICE_PATH_PROTOCOL *efi_file_path = build_relative_efi_file_path(image);

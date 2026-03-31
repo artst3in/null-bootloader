@@ -28,7 +28,7 @@ bool elsewhere_append(
             }
         }
 
-        *target = ALIGN_UP(top, 4096);
+        *target = ALIGN_UP(top, 4096, return false);
     }
 
     uint64_t max_retries = 0x10000;
@@ -56,7 +56,7 @@ retry:
                 if (!flexible_target) {
                     return false;
                 }
-                *target = ALIGN_UP(top, 4096);
+                *target = ALIGN_UP(top, 4096, return false);
                 goto retry;
             }
         }

@@ -25,7 +25,7 @@ void *conv_mem_alloc(uint64_t count) {
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
 
-    count = ALIGN_UP(count, 4096);
+    count = ALIGN_UP(count, 4096, panic(false, "Alignment overflow"));
 
     for (;;) {
         if (base + count > 0x100000)
@@ -106,7 +106,7 @@ static bool align_entry(uint64_t *base, uint64_t *length) {
 
     uint64_t orig_base = *base;
 
-    *base = ALIGN_UP(*base, PAGE_SIZE);
+    *base = ALIGN_UP(*base, PAGE_SIZE, return false);
 
     *length -= (*base - orig_base);
     *length =  ALIGN_DOWN(*length, PAGE_SIZE);
@@ -297,7 +297,7 @@ void init_memmap(void) {
 
     // Allocate bootloader itself
     memmap_alloc_range(4096,
-        ALIGN_UP((uintptr_t)bss_end, 4096) - 4096, MEMMAP_BOOTLOADER_RECLAIMABLE, 0, true, false, false);
+        ALIGN_UP((uintptr_t)bss_end, 4096, panic(false, "Alignment overflow")) - 4096, MEMMAP_BOOTLOADER_RECLAIMABLE, 0, true, false, false);
 
     pmm_sanitise_entries(memmap, &memmap_entries, false);
 
@@ -438,7 +438,7 @@ void init_memmap(void) {
     untouched_memmap_entries = memmap_entries;
 
     // Allocate bootloader itself
-    size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096);
+    size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096, panic(false, "Alignment overflow"));
 
     memmap_alloc_range((uintptr_t)__slide, (uintptr_t)image_size,
                        MEMMAP_BOOTLOADER_RECLAIMABLE, 0, true, false, true);
@@ -583,7 +583,7 @@ void pmm_free_size_t(void *ptr, size_t length) {
 }
 
 void pmm_free(void *ptr, uint64_t count) {
-    count = ALIGN_UP(count, 4096);
+    count = ALIGN_UP(count, 4096, panic(false, "Alignment overflow"));
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
     memmap_alloc_range((uintptr_t)ptr, count, MEMMAP_USABLE, 0, false, false, true);

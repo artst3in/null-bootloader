@@ -83,7 +83,7 @@ static void fb_flush_x86(volatile void *base, size_t length) {
     }
 
     uintptr_t start = ALIGN_DOWN((uintptr_t)base, clsz);
-    uintptr_t end = ALIGN_UP((uintptr_t)base + length, clsz);
+    uintptr_t end = ALIGN_UP((uintptr_t)base + length, clsz, panic(false, "fb: Alignment overflow"));
     for (uintptr_t ptr = start; ptr < end; ptr += clsz) {
         asm volatile ("clflush (%0)" :: "r"(ptr) : "memory");
     }
@@ -103,7 +103,7 @@ __attribute__((target("arch=+zicbom")))
 static void fb_flush_riscv(volatile void *base, size_t length) {
     const size_t cbom_block_size = 0x40;
     uintptr_t start = ALIGN_DOWN((uintptr_t)base, cbom_block_size);
-    uintptr_t end = ALIGN_UP((uintptr_t)(base + length), cbom_block_size);
+    uintptr_t end = ALIGN_UP((uintptr_t)(base + length), cbom_block_size, panic(false, "fb: Alignment overflow"));
     for (uintptr_t ptr = start; ptr < end; ptr += cbom_block_size) {
         asm volatile("cbo.flush (%0)" :: "r"(ptr) : "memory");
     }
@@ -133,7 +133,7 @@ static void fb_flush_loongarch64(volatile void *base, size_t length) {
     // cacop Hit_Writeback_Inv_LEAF0 = 0x10 (D-cache L1 writeback+invalidate)
     const size_t clsz = 64;
     uintptr_t start = ALIGN_DOWN((uintptr_t)base, clsz);
-    uintptr_t end = ALIGN_UP((uintptr_t)base + length, clsz);
+    uintptr_t end = ALIGN_UP((uintptr_t)base + length, clsz, panic(false, "fb: Alignment overflow"));
     for (uintptr_t ptr = start; ptr < end; ptr += clsz) {
         asm volatile ("cacop 0x10, %0, 0" :: "r"(ptr) : "memory");
     }

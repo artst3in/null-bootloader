@@ -261,7 +261,7 @@ static struct iso9660_directory_entry *iso9660_next_entry(void *current, void *b
     if (entry->length == 0) {
         // Skip to next sector boundary
         uintptr_t current_addr = (uintptr_t)current;
-        uintptr_t next_sector = ALIGN_UP(current_addr + 1, ISO9660_SECTOR_SIZE);
+        uintptr_t next_sector = ALIGN_UP(current_addr + 1, ISO9660_SECTOR_SIZE, return NULL);
         if (next_sector >= (uintptr_t)buffer_end)
             return NULL;
         entry = (struct iso9660_directory_entry *)next_sector;
@@ -278,7 +278,7 @@ static struct iso9660_directory_entry *iso9660_next_entry(void *current, void *b
 
     // Handle zero-length entries (padding at sector boundaries)
     if (entry->length == 0) {
-        uintptr_t next_sector = ALIGN_UP((uintptr_t)next + 1, ISO9660_SECTOR_SIZE);
+        uintptr_t next_sector = ALIGN_UP((uintptr_t)next + 1, ISO9660_SECTOR_SIZE, return NULL);
         if (next_sector >= (uintptr_t)buffer_end)
             return NULL;
         entry = (struct iso9660_directory_entry *)next_sector;

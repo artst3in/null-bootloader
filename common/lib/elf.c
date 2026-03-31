@@ -801,7 +801,7 @@ static void elf64_get_ranges(uint8_t *elf, uint64_t slide, struct mem_range **_r
 
         uint64_t align = phdr->p_align <= 1 ? 1 : phdr->p_align;
         ranges[r].base = load_addr & ~(align - 1);
-        ranges[r].length = ALIGN_UP(this_top - ranges[r].base, align);
+        ranges[r].length = ALIGN_UP(this_top - ranges[r].base, align, panic(true, "elf: Alignment overflow"));
 
         if (phdr->p_flags & ELF_PF_X) {
             ranges[r].permissions |= MEM_RANGE_X;
@@ -921,9 +921,9 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
 
             if (ranges != NULL) {
                 uint64_t page_rounded_base = ALIGN_DOWN(phdr->p_vaddr, 4096);
-                uint64_t page_rounded_top = ALIGN_UP(phdr_end, 4096);
+                uint64_t page_rounded_top = ALIGN_UP(phdr_end, 4096, panic(true, "elf: PHDR alignment overflow"));
                 uint64_t page_rounded_base_in = ALIGN_DOWN(phdr_in->p_vaddr, 4096);
-                uint64_t page_rounded_top_in = ALIGN_UP(phdr_in_end, 4096);
+                uint64_t page_rounded_top_in = ALIGN_UP(phdr_in_end, 4096, panic(true, "elf: PHDR alignment overflow"));
 
                 if ((page_rounded_base >= page_rounded_base_in
                   && page_rounded_base < page_rounded_top_in)

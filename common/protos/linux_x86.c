@@ -395,10 +395,10 @@ noreturn void linux_load(char *config, char *cmdline) {
     if (setup_header->version >= 0x205 && setup_header->kernel_alignment > kernel_align) {
         kernel_align = setup_header->kernel_alignment;
     }
-    uintptr_t kernel_load_addr = ALIGN_UP(0x100000, kernel_align);
+    uintptr_t kernel_load_addr = ALIGN_UP(0x100000, kernel_align, panic(true, "linux: Alignment overflow"));
     for (;;) {
         if (memmap_alloc_range(kernel_load_addr,
-                ALIGN_UP(kernel_alloc_size, 4096),
+                ALIGN_UP(kernel_alloc_size, 4096, panic(true, "linux: Alignment overflow")),
                 MEMMAP_BOOTLOADER_RECLAIMABLE, MEMMAP_USABLE, false, false, false))
             break;
 
@@ -479,7 +479,7 @@ noreturn void linux_load(char *config, char *cmdline) {
             panic(true, "linux: Failed to allocate memory for modules");
         }
 
-        if (memmap_alloc_range(modules_mem_base, ALIGN_UP(size_of_all_modules, 0x100000),
+        if (memmap_alloc_range(modules_mem_base, ALIGN_UP(size_of_all_modules, 0x100000, panic(true, "linux: Alignment overflow")),
                                MEMMAP_BOOTLOADER_RECLAIMABLE, MEMMAP_USABLE, false, false, false))
             break;
 
@@ -580,7 +580,7 @@ set_textmode:;
 
 #if defined (BIOS)
         screen_info->orig_video_isVGA = VIDEO_TYPE_VLFB;
-        screen_info->lfb_size = DIV_ROUNDUP(screen_info->lfb_size, 65536);
+        screen_info->lfb_size = DIV_ROUNDUP(screen_info->lfb_size, 65536, panic(true, "linux: Alignment overflow"));
 #elif defined (UEFI)
         screen_info->orig_video_isVGA = VIDEO_TYPE_EFI;
 #endif

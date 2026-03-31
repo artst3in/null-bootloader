@@ -465,7 +465,7 @@ again:
         if (!headers_within_section) {
             struct mem_range *range = &ranges[range_index++];
             range->base = *virtual_base;
-            range->length = ALIGN_UP(nt_hdrs->OptionalHeader.SizeOfHeaders, 0x1000);
+            range->length = ALIGN_UP(nt_hdrs->OptionalHeader.SizeOfHeaders, 0x1000, panic(true, "pe: Alignment overflow"));
             range->permissions = MEM_RANGE_R;
         }
 
@@ -476,7 +476,7 @@ again:
 
             struct mem_range *range = &ranges[range_index++];
             range->base = *virtual_base + ALIGN_DOWN(section->VirtualAddress, alignment);
-            range->length = ALIGN_UP(section->VirtualSize + misalign, alignment);
+            range->length = ALIGN_UP(section->VirtualSize + misalign, alignment, panic(true, "pe: Alignment overflow"));
 
             if (section->Characteristics & IMAGE_SCN_MEM_EXECUTE) {
                 range->permissions |= MEM_RANGE_X;

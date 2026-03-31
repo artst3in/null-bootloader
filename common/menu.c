@@ -239,7 +239,7 @@ refresh:
         size_t x, y;
         print("\n");
         terms[0]->get_cursor_pos(terms[0], &x, &y);
-        set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2), y);
+        set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2, panic(false, "Alignment overflow")), y);
         print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
         print("\n\n");
     }
@@ -257,7 +257,7 @@ refresh:
                 // FALLTHRU
             default: {
                 size_t title_length = strlen(title);
-                if (i == (terms[0]->cols / 2) - DIV_ROUNDUP(title_length, 2) - 1 - 1) {
+                if (i == (terms[0]->cols / 2) - DIV_ROUNDUP(title_length, 2, panic(false, "Alignment overflow")) - 1 - 1) {
                     print(serial ? "|%s|" : "┤%s├", title);
                     i += (title_length + 2) - 1;
                 } else {
@@ -1240,7 +1240,7 @@ refresh:
         size_t x, y;
         print("\n");
         terms[0]->get_cursor_pos(terms[0], &x, &y);
-        set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2), y);
+        set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2, panic(false, "Alignment overflow")), y);
         print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
         print("\n\n\n\n");
     }
@@ -1266,7 +1266,7 @@ refresh:
 
     if (max_entries != 0) {
         size_t half_cols = terms[0]->cols / 2;
-        size_t half_tree = DIV_ROUNDUP(max_tree_len, 2);
+        size_t half_tree = DIV_ROUNDUP(max_tree_len, 2, panic(false, "Alignment overflow"));
         size_t tree_prefix_len = (half_cols > half_tree + 2) ? (half_cols - half_tree - 2) : 0;
         char *tree_prefix = ext_mem_alloc(tree_prefix_len + 1);
         memset(tree_prefix, ' ', tree_prefix_len);

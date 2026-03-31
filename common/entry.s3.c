@@ -46,8 +46,8 @@ noreturn void uefi_entry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) 
 
 #if defined (__x86_64__)
     if ((uintptr_t)__slide >= 0x100000000) {
-        size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096);
-        size_t image_size_pages = ALIGN_UP((size_t)image_size, 4096) / 4096;
+        size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096, panic(false, "Alignment overflow"));
+        size_t image_size_pages = ALIGN_UP((size_t)image_size, 4096, panic(false, "Alignment overflow")) / 4096;
         size_t new_base;
         for (new_base = 0x1000; new_base + (size_t)image_size < 0x100000000; new_base += 0x1000) {
             EFI_PHYSICAL_ADDRESS _new_base = (EFI_PHYSICAL_ADDRESS)new_base;

@@ -89,7 +89,7 @@ static uint64_t get_hhdm_span_top(int base_revision) {
             continue;
         }
 
-        uint64_t aligned_top = ALIGN_UP(top, 0x40000000);
+        uint64_t aligned_top = ALIGN_UP(top, 0x40000000, continue);
 
         if (aligned_top > ret) {
             ret = aligned_top;
@@ -134,7 +134,7 @@ static pagemap_t build_identity_map(void) {
         }
 
         uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
-        uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
+        uint64_t aligned_top    = ALIGN_UP(top, 0x1000, continue);
         uint64_t aligned_length = aligned_top - aligned_base;
 
         map_pages(pagemap, aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
@@ -237,7 +237,7 @@ static pagemap_t build_pagemap(int base_revision,
         }
 
         aligned_base = ALIGN_DOWN(base, 0x1000);
-        aligned_top  = ALIGN_UP(top, 0x1000);
+        aligned_top  = ALIGN_UP(top, 0x1000, continue);
 
         if (aligned_base == pending_top && pending_top != 0) {
             pending_top = aligned_top;
@@ -275,7 +275,7 @@ flush:
         uint64_t top    = CHECKED_ADD(base, length, continue);
 
         uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
-        uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
+        uint64_t aligned_top    = ALIGN_UP(top, 0x1000, continue);
         uint64_t aligned_length = aligned_top - aligned_base;
 
         if (base_revision == 0) {
@@ -1346,7 +1346,7 @@ FEAT_END
         uint64_t fb_base = memmap[i].base;
         uint64_t fb_top = CHECKED_ADD(fb_base, memmap[i].length, continue);
         uint64_t fb_aligned_base = ALIGN_DOWN(fb_base, 4096);
-        uint64_t fb_aligned_top = ALIGN_UP(fb_top, 4096);
+        uint64_t fb_aligned_top = ALIGN_UP(fb_top, 4096, continue);
 
         // No overshoot means no possible overlap.
         if (fb_aligned_base == fb_base && fb_aligned_top == fb_top) {

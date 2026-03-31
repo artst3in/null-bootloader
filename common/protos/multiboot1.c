@@ -35,18 +35,20 @@ static size_t get_multiboot1_info_size(
     size_t modules_count, size_t modules_cmdlines_size,
     uint32_t section_entry_size, uint32_t section_num
 ) {
-    return ALIGN_UP(sizeof(struct multiboot1_info), 16) +                   // base structure
-           ALIGN_UP(strlen(cmdline) + 1, 16) +                              // cmdline
-           ALIGN_UP(sizeof(LIMINE_BRAND), 16) +                             // bootloader brand
-           ALIGN_UP(section_entry_size * section_num, 16) +                 // ELF info
-           ALIGN_UP(sizeof(struct multiboot1_module) * modules_count, 16) + // modules count
-           ALIGN_UP(modules_cmdlines_size, 16) +                            // modules command lines
-           ALIGN_UP(sizeof(struct multiboot1_mmap_entry) * MEMMAP_MAX, 16);        // memory map
+#define OVERFLOW panic(false, "multiboot1: info size overflow")
+    return ALIGN_UP(sizeof(struct multiboot1_info), 16, OVERFLOW) +
+           ALIGN_UP(strlen(cmdline) + 1, 16, OVERFLOW) +
+           ALIGN_UP(sizeof(LIMINE_BRAND), 16, OVERFLOW) +
+           ALIGN_UP(section_entry_size * section_num, 16, OVERFLOW) +
+           ALIGN_UP(sizeof(struct multiboot1_module) * modules_count, 16, OVERFLOW) +
+           ALIGN_UP(modules_cmdlines_size, 16, OVERFLOW) +
+           ALIGN_UP(sizeof(struct multiboot1_mmap_entry) * MEMMAP_MAX, 16, OVERFLOW);
+#undef OVERFLOW
 }
 
 static void *mb1_info_alloc(void **mb1_info_raw, size_t size) {
     void *ret = *mb1_info_raw;
-    *mb1_info_raw += ALIGN_UP(size, 16);
+    *mb1_info_raw += ALIGN_UP(size, 16, panic(false, "multiboot: info alloc overflow"));
     return ret;
 }
 
@@ -188,7 +190,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
 
         char *module_cmdline = conf_tuple.value2;
         if (!module_cmdline) module_cmdline = "";
-        modules_cmdlines_size += ALIGN_UP(strlen(module_cmdline) + 1, 16);
+        modules_cmdlines_size += ALIGN_UP(strlen(module_cmdline) + 1, 16, panic(false, "multiboot: info size overflow"));
     }
 
     size_t mb1_info_size = get_multiboot1_info_size(

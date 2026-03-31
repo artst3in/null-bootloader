@@ -81,16 +81,16 @@ uint64_t strtoui(const char *s, const char **end, int base);
     CHECKED_ADD_res; \
 })
 
-#define DIV_ROUNDUP(a, b) ({ \
+#define DIV_ROUNDUP(a, b, onerror) ({ \
     __auto_type DIV_ROUNDUP_a = (a); \
     __auto_type DIV_ROUNDUP_b = (b); \
-    (DIV_ROUNDUP_a + (DIV_ROUNDUP_b - 1)) / DIV_ROUNDUP_b; \
+    CHECKED_ADD(DIV_ROUNDUP_a, DIV_ROUNDUP_b - 1, onerror) / DIV_ROUNDUP_b; \
 })
 
-#define ALIGN_UP(x, a) ({ \
+#define ALIGN_UP(x, a, onerror) ({ \
     __auto_type ALIGN_UP_value = (x); \
     __auto_type ALIGN_UP_align = (a); \
-    ALIGN_UP_value = DIV_ROUNDUP(ALIGN_UP_value, ALIGN_UP_align) * ALIGN_UP_align; \
+    ALIGN_UP_value = DIV_ROUNDUP(ALIGN_UP_value, ALIGN_UP_align, onerror) * ALIGN_UP_align; \
     ALIGN_UP_value; \
 })
 
