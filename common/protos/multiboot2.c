@@ -382,7 +382,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
             case 0: case 1: // No preference / prefer lowest
                 reloc_ascend = true;
                 relocated_base = ALIGN_UP(reloc_tag.min_addr, reloc_tag.align);
-                if (relocated_base + ranges->length > reloc_tag.max_addr) {
+                if (CHECKED_ADD(relocated_base, ranges->length, goto reloc_fail) > reloc_tag.max_addr) {
                     goto reloc_fail;
                 }
                 break;
@@ -399,13 +399,13 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
         }
 
         for (;;) {
-            if (check_usable_memory(relocated_base, relocated_base + ranges->length)) {
+            if (check_usable_memory(relocated_base, CHECKED_ADD(relocated_base, ranges->length, goto reloc_fail))) {
                 break;
             }
 
             if (reloc_ascend) {
                 relocated_base += reloc_tag.align;
-                if (relocated_base + ranges->length > reloc_tag.max_addr) {
+                if (CHECKED_ADD(relocated_base, ranges->length, goto reloc_fail) > reloc_tag.max_addr) {
                     goto reloc_fail;
                 }
             } else {

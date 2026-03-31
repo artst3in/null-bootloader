@@ -79,7 +79,7 @@ static uint64_t get_hhdm_span_top(int base_revision) {
 
         uint64_t base = memmap[i].base;
         uint64_t length = memmap[i].length;
-        uint64_t top = base + length;
+        uint64_t top = CHECKED_ADD(base, length, continue);
 
         if (base_revision < 3 && base < 0x100000000) {
             base = 0x100000000;
@@ -123,7 +123,7 @@ static pagemap_t build_identity_map(void) {
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
-        uint64_t top    = base + length;
+        uint64_t top    = CHECKED_ADD(base, length, continue);
 
         if (base < 0x100000000) {
             base = 0x100000000;
@@ -226,7 +226,7 @@ static pagemap_t build_pagemap(int base_revision,
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
-        uint64_t top    = base + length;
+        uint64_t top    = CHECKED_ADD(base, length, goto flush);
 
         if (base_revision < 3 && base < 0x100000000) {
             base = 0x100000000;
@@ -272,7 +272,7 @@ flush:
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
-        uint64_t top    = base + length;
+        uint64_t top    = CHECKED_ADD(base, length, continue);
 
         uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
         uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
@@ -1344,7 +1344,7 @@ FEAT_END
         }
 
         uint64_t fb_base = memmap[i].base;
-        uint64_t fb_top = fb_base + memmap[i].length;
+        uint64_t fb_top = CHECKED_ADD(fb_base, memmap[i].length, continue);
         uint64_t fb_aligned_base = ALIGN_DOWN(fb_base, 4096);
         uint64_t fb_aligned_top = ALIGN_UP(fb_top, 4096);
 
@@ -1359,7 +1359,7 @@ FEAT_END
             }
 
             uint64_t region_base = memmap[j].base;
-            uint64_t region_top = region_base + memmap[j].length;
+            uint64_t region_top = CHECKED_ADD(region_base, memmap[j].length, continue);
 
             // Check if this region overlaps with the framebuffer's page-aligned extent.
             if (region_top <= fb_aligned_base || region_base >= fb_aligned_top) {

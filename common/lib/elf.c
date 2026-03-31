@@ -887,10 +887,8 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
             }
         }
 
-        uint64_t phdr_end;
-        if (__builtin_add_overflow(phdr->p_vaddr, phdr->p_memsz, &phdr_end)) {
-            panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", i);
-        }
+        uint64_t phdr_end = CHECKED_ADD(phdr->p_vaddr, phdr->p_memsz,
+            panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", i));
 
         // check for overlapping phdrs
         for (uint16_t j = 0; j < hdr->ph_num; j++) {
@@ -910,10 +908,8 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
                 continue;
             }
 
-            uint64_t phdr_in_end;
-            if (__builtin_add_overflow(phdr_in->p_vaddr, phdr_in->p_memsz, &phdr_in_end)) {
-                panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", j);
-            }
+            uint64_t phdr_in_end = CHECKED_ADD(phdr_in->p_vaddr, phdr_in->p_memsz,
+                panic(true, "elf: p_vaddr + p_memsz overflow in PHDR %u", j));
 
             if ((phdr_in->p_vaddr >= phdr->p_vaddr
               && phdr_in->p_vaddr < phdr_end)
@@ -994,10 +990,8 @@ again:
         }
 
         // Validate p_offset + p_filesz doesn't overflow or exceed file size
-        uint64_t offset_end;
-        if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)) {
-            panic(true, "elf: p_offset + p_filesz overflow");
-        }
+        uint64_t offset_end = CHECKED_ADD(phdr->p_offset, phdr->p_filesz,
+            panic(true, "elf: p_offset + p_filesz overflow"));
         if (offset_end > file_size) {
             panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
@@ -1005,7 +999,8 @@ again:
         uint64_t load_addr = *physical_base + (phdr->p_vaddr - *virtual_base);
 
 #if defined (__aarch64__)
-        uint64_t this_top = load_addr + phdr->p_memsz;
+        uint64_t this_top = CHECKED_ADD(load_addr, phdr->p_memsz,
+            panic(true, "elf: load_addr + p_memsz overflow"));
 
         uint64_t mem_base, mem_size;
 
@@ -1082,7 +1077,8 @@ bool elf32_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
             min_paddr = phdr->p_paddr;
         }
 
-        uint64_t top = (uint64_t)phdr->p_paddr + phdr->p_memsz;
+        uint64_t top = CHECKED_ADD((uint64_t)phdr->p_paddr, phdr->p_memsz,
+            panic(true, "elf: p_paddr + p_memsz overflow"));
         if (top > max_paddr) {
             max_paddr = top;
         }
@@ -1107,7 +1103,9 @@ bool elf32_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
         }
-        if ((uint64_t)phdr->p_offset + phdr->p_filesz > file_size) {
+        uint64_t offset_end = CHECKED_ADD((uint64_t)phdr->p_offset, phdr->p_filesz,
+            panic(true, "elf: p_offset + p_filesz overflow"));
+        if (offset_end > file_size) {
             panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
@@ -1115,7 +1113,7 @@ bool elf32_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
 
         if (!entry_adjusted
          && *entry_point >= phdr->p_vaddr
-         && *entry_point < (phdr->p_vaddr + phdr->p_memsz)) {
+         && *entry_point < CHECKED_ADD(phdr->p_vaddr, phdr->p_memsz, continue)) {
             *entry_point -= phdr->p_vaddr;
             *entry_point += phdr->p_paddr;
             entry_adjusted = true;
@@ -1160,10 +1158,8 @@ bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
             min_paddr = phdr->p_paddr;
         }
 
-        uint64_t top;
-        if (__builtin_add_overflow(phdr->p_paddr, phdr->p_memsz, &top)) {
-            panic(true, "elf: p_paddr + p_memsz overflow");
-        }
+        uint64_t top = CHECKED_ADD(phdr->p_paddr, phdr->p_memsz,
+            panic(true, "elf: p_paddr + p_memsz overflow"));
         if (top > max_paddr) {
             max_paddr = top;
         }
@@ -1188,9 +1184,9 @@ bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
         if (phdr->p_filesz > phdr->p_memsz) {
             panic(true, "elf: p_filesz > p_memsz");
         }
-        uint64_t offset_end;
-        if (__builtin_add_overflow(phdr->p_offset, phdr->p_filesz, &offset_end)
-            || offset_end > file_size) {
+        uint64_t offset_end = CHECKED_ADD(phdr->p_offset, phdr->p_filesz,
+            panic(true, "elf: p_offset + p_filesz overflow"));
+        if (offset_end > file_size) {
             panic(true, "elf: p_offset + p_filesz exceeds file size");
         }
 
@@ -1198,7 +1194,7 @@ bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
 
         if (!entry_adjusted
          && *entry_point >= phdr->p_vaddr
-         && *entry_point < (phdr->p_vaddr + phdr->p_memsz)) {
+         && *entry_point < CHECKED_ADD(phdr->p_vaddr, phdr->p_memsz, continue)) {
             *entry_point -= phdr->p_vaddr;
             *entry_point += phdr->p_paddr;
             entry_adjusted = true;

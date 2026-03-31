@@ -442,9 +442,8 @@ noreturn void linux_load(char *config, char *cmdline) {
         if ((module = uri_open(module_path)) == NULL)
             panic(true, "linux: Failed to open module with path `%s`. Is the path correct?", module_path);
 
-        if (__builtin_add_overflow(size_of_all_modules, module->size, &size_of_all_modules)) {
-            panic(true, "linux: Total module size overflow");
-        }
+        size_of_all_modules = CHECKED_ADD(size_of_all_modules, module->size,
+            panic(true, "linux: Total module size overflow"));
 
         modules[i] = module;
     }

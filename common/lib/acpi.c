@@ -260,11 +260,11 @@ static bool acpi_padding_is_safe(uint64_t base, uint64_t length) {
         return true;
     }
 
-    uint64_t top = base + length;
+    uint64_t top = CHECKED_ADD(base, length, return false);
 
     for (size_t i = 0; i < memmap_entries; i++) {
         uint64_t entry_base = memmap[i].base;
-        uint64_t entry_top  = entry_base + memmap[i].length;
+        uint64_t entry_top  = CHECKED_ADD(entry_base, memmap[i].length, continue);
 
         if (entry_base >= top || entry_top <= base) {
             continue;

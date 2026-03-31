@@ -44,11 +44,11 @@ uint64_t strtoui(const char *s, const char **end, int base) {
                 *end = &s[i];
             return UINT64_MAX;
         }
-        if (__builtin_add_overflow(mul_result, (uint64_t)d, &n)) {
+        n = CHECKED_ADD(mul_result, (uint64_t)d, ({
             if (end != NULL)
                 *end = &s[i];
             return UINT64_MAX;
-        }
+        }));
     }
     return n;
 }

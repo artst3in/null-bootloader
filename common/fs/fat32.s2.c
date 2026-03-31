@@ -213,10 +213,7 @@ bytes_per_sector_valid:;
     switch (context->type) {
         case 12:
         case 16:
-            // Check for overflow in data_start_lba calculation
-            if (__builtin_add_overflow(context->root_start, context->root_size, &context->data_start_lba)) {
-                return 1;
-            }
+            context->data_start_lba = CHECKED_ADD(context->root_start, context->root_size, return 1);
             break;
         case 32:
             context->data_start_lba = context->root_start;
@@ -642,9 +639,7 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
         for (unsigned int i = 0; i < SIZEOF_ARRAY(current_part) - 1; i++) {
             // Check for overflow before computing path index
             unsigned int path_idx;
-            if (__builtin_add_overflow(i, current_index, &path_idx)) {
-                return NULL;  // Path index would overflow
-            }
+            path_idx = CHECKED_ADD(i, current_index, return NULL);
 
             if (path[path_idx] == 0) {
                 memcpy(current_part, path + current_index, i);
@@ -657,12 +652,7 @@ struct file_handle *fat32_open(struct volume *part, const char *path) {
             if (path[path_idx] == '/') {
                 memcpy(current_part, path + current_index, i);
                 current_part[i] = 0;
-                // Check for overflow before updating current_index
-                unsigned int new_index;
-                if (__builtin_add_overflow(current_index, i + 1, &new_index)) {
-                    return NULL;  // current_index would overflow
-                }
-                current_index = new_index;
+                current_index = CHECKED_ADD(current_index, i + 1, return NULL);
                 expect_directory = true;
                 found_terminator = true;
                 break;
