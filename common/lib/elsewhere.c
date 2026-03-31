@@ -21,7 +21,7 @@ bool elsewhere_append(
         uint64_t top = 0;
 
         for (size_t i = 0; i < *ranges_count; i++) {
-            uint64_t r_top = ranges[i].target + ranges[i].length;
+            uint64_t r_top = CHECKED_ADD(ranges[i].target, ranges[i].length, continue);
 
             if (top < r_top) {
                 top = r_top;
@@ -39,7 +39,7 @@ retry:
     }
 
     for (size_t i = 0; i < *ranges_count; i++) {
-        uint64_t t_top = *target + t_length;
+        uint64_t t_top = CHECKED_ADD(*target, t_length, return false);
 
         // Ensure allocation stays within 32-bit address space.
         if (t_top > 0x100000000) {
@@ -50,7 +50,7 @@ retry:
         {
             uint64_t base = ranges[i].target;
             uint64_t length = ranges[i].length;
-            uint64_t top = base + length;
+            uint64_t top = CHECKED_ADD(base, length, continue);
 
             if (elsewhere_overlap_check(base, top, *target, t_top)) {
                 if (!flexible_target) {
@@ -65,7 +65,7 @@ retry:
         {
             uint64_t base = ranges[i].elsewhere;
             uint64_t length = ranges[i].length;
-            uint64_t top = base + length;
+            uint64_t top = CHECKED_ADD(base, length, continue);
 
             if (elsewhere_overlap_check(base, top, *target, t_top)) {
                 if (!flexible_target) {

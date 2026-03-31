@@ -4,6 +4,7 @@
 #include <mm/pmm.h>
 #include <lib/rand.h>
 #include <lib/print.h>
+#include <lib/misc.h>
 
 static bool full_overlap_check(uint64_t base1, uint64_t top1,
                                uint64_t base2, uint64_t top2) {
@@ -24,7 +25,7 @@ bool check_usable_memory(uint64_t base, uint64_t top) {
             continue;
         }
 
-        uint64_t memmap_top = memmap[i].base + memmap[i].length;
+        uint64_t memmap_top = CHECKED_ADD(memmap[i].base, memmap[i].length, continue);
 
         if (full_overlap_check(base, top, memmap[i].base, memmap_top)) {
             return true;

@@ -71,6 +71,16 @@ uint64_t strtoui(const char *s, const char **end, int base);
     MAX_a > MAX_b ? MAX_a : MAX_b; \
 })
 
+#define CHECKED_ADD(a, b, onerror) ({ \
+    __auto_type CHECKED_ADD_a = (a); \
+    __auto_type CHECKED_ADD_b = (b); \
+    typeof(CHECKED_ADD_a + CHECKED_ADD_b) CHECKED_ADD_res; \
+    if (__builtin_add_overflow(CHECKED_ADD_a, CHECKED_ADD_b, &CHECKED_ADD_res)) { \
+        onerror; \
+    } \
+    CHECKED_ADD_res; \
+})
+
 #define DIV_ROUNDUP(a, b) ({ \
     __auto_type DIV_ROUNDUP_a = (a); \
     __auto_type DIV_ROUNDUP_b = (b); \
