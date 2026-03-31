@@ -97,7 +97,7 @@ if ! test -f version; then
         tinf \
         57ffa1f1d5e3dde19011b2127bd26d01689b694b
     mkdir -p decompressor/tinf
-    cp tinf/src/tinf.h tinf/src/tinflate.c tinf/src/tinfgzip.c decompressor/tinf/
+    cp tinf/src/tinf.h tinf/src/tinflate.c tinf/src/tinfgzip.c tinf/src/crc32.c decompressor/tinf/
     patch -p0 < decompressor/tinf.patch
     rm -f decompressor/tinf/*.orig
 
