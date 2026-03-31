@@ -429,7 +429,7 @@ noreturn void linux_load(char *config, char *cmdline) {
         goto no_modules;
     }
 
-    struct file_handle **modules = ext_mem_alloc(module_count * sizeof(struct file_handle *));
+    struct file_handle **modules = ext_mem_alloc_counted(module_count, sizeof(struct file_handle *));
 
     for (size_t i = 0; ; i++) {
         char *module_path = config_get_value(config, i, "MODULE_PATH");

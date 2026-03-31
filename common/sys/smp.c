@@ -209,7 +209,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
         return NULL;
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
     *cpu_count = 0;
 
     // Try to start all APs
@@ -532,7 +532,7 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
         }
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
     *cpu_count = 0;
 
     // Try to start all APs
@@ -662,7 +662,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
         max_cpus++;
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
 
     fdt_for_each_subnode(node, dtb, cpus) {
         const void *prop;
@@ -850,7 +850,7 @@ struct limine_mp_info *init_smp(size_t *cpu_count, pagemap_t pagemap, uint64_t h
         }
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(num_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(num_cpus, sizeof(struct limine_mp_info));
 
     *cpu_count = 0;
     for (struct riscv_hart *hart = hart_list; hart != NULL; hart = hart->next) {
@@ -1015,7 +1015,7 @@ static struct limine_mp_info *try_acpi_smp(size_t *cpu_count, uint32_t *bsp_phys
     if (max_cpus == 0)
         return NULL;
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
          (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
@@ -1131,7 +1131,7 @@ static struct limine_mp_info *try_dtb_smp(void *dtb, size_t *cpu_count,
     if (max_cpus == 0)
         return NULL;
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
 
     fdt_for_each_subnode(node, dtb, cpus) {
         const void *prop;

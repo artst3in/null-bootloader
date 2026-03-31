@@ -465,7 +465,7 @@ end_of_pt_segment:
         }
         relocs_i += dt_pltrelsz / rela_ent;
     }
-    struct elf64_rela **relocs = ext_mem_alloc(relocs_i * sizeof(struct elf64_rela *));
+    struct elf64_rela **relocs = ext_mem_alloc_counted(relocs_i, sizeof(struct elf64_rela *));
 
     if (relr_size != 0) {
         size_t relr_i;
@@ -780,7 +780,7 @@ static void elf64_get_ranges(uint8_t *elf, uint64_t slide, struct mem_range **_r
         panic(true, "elf: No higher half PHDRs exist");
     }
 
-    struct mem_range *ranges = ext_mem_alloc(ranges_count * sizeof(struct mem_range));
+    struct mem_range *ranges = ext_mem_alloc_counted(ranges_count, sizeof(struct mem_range));
 
     size_t r = 0;
     for (uint16_t i = 0; i < hdr->ph_num; i++) {

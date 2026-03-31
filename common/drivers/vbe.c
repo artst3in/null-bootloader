@@ -174,7 +174,7 @@ struct fb_info *vbe_get_mode_list(size_t *count) {
         modes_count++;
     }
 
-    struct fb_info *ret = ext_mem_alloc(modes_count * sizeof(struct fb_info));
+    struct fb_info *ret = ext_mem_alloc_counted(modes_count, sizeof(struct fb_info));
 
     for (size_t i = 0, j = 0; i < VBE_MAX_MODES && vid_modes[i] != 0xffff; i++) {
         struct vbe_mode_info_struct vbe_mode_info;

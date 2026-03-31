@@ -438,7 +438,7 @@ struct file_handle *iso9660_open(struct volume *vol, const char *path) {
             }
 
             // Allocate extent array
-            ret->extents = ext_mem_alloc(extent_count * sizeof(struct iso9660_extent));
+            ret->extents = ext_mem_alloc_counted(extent_count, sizeof(struct iso9660_extent));
             ret->extent_count = extent_count;
             ret->total_size = total_size;
 

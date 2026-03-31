@@ -966,7 +966,7 @@ noreturn void _menu(bool first_run) {
         rewound_bss = ext_mem_alloc(bss_size);
 #endif
         /* addition due to allocation potentially adding new memory map entries */
-        rewound_memmap = ext_mem_alloc((memmap_entries + 16) * sizeof(struct memmap_entry));
+        rewound_memmap = ext_mem_alloc_counted(memmap_entries + 16, sizeof(struct memmap_entry));
         memcpy(rewound_memmap, memmap, memmap_entries * sizeof(struct memmap_entry));
         rewound_memmap_entries = memmap_entries;
         memcpy(rewound_data, data_begin, data_size);

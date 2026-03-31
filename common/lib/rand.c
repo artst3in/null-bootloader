@@ -38,7 +38,7 @@ static void init_rand(void) {
     }
 #endif
 
-    status = ext_mem_alloc(n * sizeof(uint32_t));
+    status = ext_mem_alloc_counted(n, sizeof(uint32_t));
 
     srand(seed);
 

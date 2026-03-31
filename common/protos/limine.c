@@ -107,7 +107,7 @@ static pagemap_t build_identity_map(void) {
 
     size_t _memmap_entries = memmap_entries;
     struct memmap_entry *_memmap =
-        ext_mem_alloc(_memmap_entries * sizeof(struct memmap_entry));
+        ext_mem_alloc_counted(_memmap_entries, sizeof(struct memmap_entry));
     for (size_t i = 0; i < _memmap_entries; i++) {
         _memmap[i] = memmap[i];
     }
@@ -197,7 +197,7 @@ static pagemap_t build_pagemap(int base_revision,
 
     size_t _memmap_entries = memmap_entries;
     struct memmap_entry *_memmap =
-        ext_mem_alloc(_memmap_entries * sizeof(struct memmap_entry));
+        ext_mem_alloc_counted(_memmap_entries, sizeof(struct memmap_entry));
     for (size_t i = 0; i < _memmap_entries; i++)
         _memmap[i] = memmap[i];
 
@@ -594,7 +594,7 @@ noreturn void limine_load(char *config, char *cmdline) {
 
     // Load requests
     uint64_t *limine_reqs = NULL;
-    requests = ext_mem_alloc(MAX_REQUESTS * sizeof(void *));
+    requests = ext_mem_alloc_counted(MAX_REQUESTS, sizeof(void *));
     requests_count = 0;
     if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, kernel_file->size, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
@@ -1209,7 +1209,7 @@ FEAT_START
 
     module_response->revision = 2;
 
-    struct limine_file *modules = ext_mem_alloc(module_count * sizeof(struct limine_file));
+    struct limine_file *modules = ext_mem_alloc_counted(module_count, sizeof(struct limine_file));
 
     size_t final_module_count = 0;
     for (size_t i = 0; i < module_count; i++) {
@@ -1300,7 +1300,7 @@ FEAT_START
         fclose(f);
     }
 
-    uint64_t *modules_list = ext_mem_alloc(final_module_count * sizeof(uint64_t));
+    uint64_t *modules_list = ext_mem_alloc_counted(final_module_count, sizeof(uint64_t));
     for (size_t i = 0; i < final_module_count; i++) {
         modules_list[i] = reported_addr(&modules[i]);
     }
@@ -1400,17 +1400,17 @@ FEAT_START
         break;
     }
 
-    fbp = ext_mem_alloc(fbs_count * sizeof(struct limine_framebuffer));
+    fbp = ext_mem_alloc_counted(fbs_count, sizeof(struct limine_framebuffer));
 
     struct limine_framebuffer_response *framebuffer_response =
         ext_mem_alloc(sizeof(struct limine_framebuffer_response));
 
     framebuffer_response->revision = 1;
 
-    uint64_t *fb_list = ext_mem_alloc(fbs_count * sizeof(uint64_t));
+    uint64_t *fb_list = ext_mem_alloc_counted(fbs_count, sizeof(uint64_t));
 
     for (size_t i = 0; i < fbs_count; i++) {
-        uint64_t *modes_list = ext_mem_alloc(fbs[i].mode_count * sizeof(uint64_t));
+        uint64_t *modes_list = ext_mem_alloc_counted(fbs[i].mode_count, sizeof(uint64_t));
         for (size_t j = 0; j < fbs[i].mode_count; j++) {
             fbs[i].mode_list[j].memory_model = LIMINE_FRAMEBUFFER_RGB;
             modes_list[j] = reported_addr(&fbs[i].mode_list[j]);
@@ -1456,12 +1456,12 @@ FEAT_START
         break;
     }
 
-    struct flanterm_params *fip_raw = ext_mem_alloc(fbs_count * sizeof(struct flanterm_params));
+    struct flanterm_params *fip_raw = ext_mem_alloc_counted(fbs_count, sizeof(struct flanterm_params));
     size_t fip_count = gterm_prepare_flanterm_params(fbs, fbs_count, fip_raw, fbs_count);
 
     struct limine_flanterm_fb_init_params *fip_entries =
-        ext_mem_alloc(fbs_count * sizeof(struct limine_flanterm_fb_init_params));
-    uint64_t *fip_list = ext_mem_alloc(fbs_count * sizeof(uint64_t));
+        ext_mem_alloc_counted(fbs_count, sizeof(struct limine_flanterm_fb_init_params));
+    uint64_t *fip_list = ext_mem_alloc_counted(fbs_count, sizeof(uint64_t));
 
     size_t fip_idx = 0;
     for (size_t i = 0; i < fbs_count; i++) {
@@ -1741,7 +1741,7 @@ FEAT_START
 #error Unknown architecture
 #endif
 
-    uint64_t *mp_list = ext_mem_alloc(cpu_count * sizeof(uint64_t));
+    uint64_t *mp_list = ext_mem_alloc_counted(cpu_count, sizeof(uint64_t));
     for (size_t i = 0; i < cpu_count; i++) {
         mp_list[i] = reported_addr(&mp_info[i]);
     }
@@ -1789,7 +1789,7 @@ FEAT_START
     if (memmap_request != NULL) {
         memmap_response = ext_mem_alloc(sizeof(struct limine_memmap_response));
         _memmap = ext_mem_alloc(sizeof(struct limine_memmap_entry) * MEMMAP_MAX);
-        memmap_list = ext_mem_alloc(MEMMAP_MAX * sizeof(uint64_t));
+        memmap_list = ext_mem_alloc_counted(MEMMAP_MAX, sizeof(uint64_t));
     }
 
     size_t mmap_entries;

@@ -441,7 +441,7 @@ void init_io_apics(void) {
         }
     }
 
-    io_apics = ext_mem_alloc(max_io_apics * sizeof(struct madt_io_apic *));
+    io_apics = ext_mem_alloc_counted(max_io_apics, sizeof(struct madt_io_apic *));
     max_io_apics = 0;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;

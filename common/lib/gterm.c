@@ -786,7 +786,7 @@ bool gterm_init(struct fb_info **_fbs, size_t *_fbs_count,
     gterm_parse_config(config, &cfg);
 
     terms_i = 0;
-    terms = ext_mem_alloc(fbs_count * sizeof(void *));
+    terms = ext_mem_alloc_counted(fbs_count, sizeof(void *));
 
     for (size_t i = 0; i < fbs_count; i++) {
         struct fb_info *fb = &fbs[i];

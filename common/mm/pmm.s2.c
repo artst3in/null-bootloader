@@ -445,7 +445,7 @@ void init_memmap(void) {
 
     pmm_sanitise_entries(memmap, &memmap_entries, false);
 
-    recl = ext_mem_alloc(1024 * sizeof(struct memmap_entry));
+    recl = ext_mem_alloc_counted(1024, sizeof(struct memmap_entry));
 
     return;
 
@@ -615,6 +615,14 @@ void *ext_mem_alloc_size_t(size_t count) {
 
 void *ext_mem_alloc(uint64_t count) {
     return ext_mem_alloc_type(count, MEMMAP_BOOTLOADER_RECLAIMABLE);
+}
+
+void *ext_mem_alloc_counted(uint64_t count, uint64_t elem_size) {
+    uint64_t total;
+    if (__builtin_mul_overflow(count, elem_size, &total)) {
+        panic(false, "ext_mem_alloc_counted: allocation size overflow");
+    }
+    return ext_mem_alloc(total);
 }
 
 void *ext_mem_alloc_type(uint64_t count, uint32_t type) {

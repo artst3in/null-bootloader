@@ -337,16 +337,12 @@ static uint32_t *cache_cluster_chain(struct fat32_context *context,
         return NULL;
     }
 
-    size_t alloc_size;
-    if (__builtin_mul_overflow(chain_length, sizeof(uint32_t), &alloc_size)) {
-        return NULL;
-    }
-    uint32_t *cluster_chain = ext_mem_alloc(alloc_size);
+    uint32_t *cluster_chain = ext_mem_alloc_counted(chain_length, sizeof(uint32_t));
     cluster = initial_cluster;
     for (size_t i = 0; i < chain_length; i++) {
         cluster_chain[i] = cluster;
         if (read_cluster_from_map(context, cluster, &cluster) != 0) {
-            pmm_free(cluster_chain, alloc_size);
+            pmm_free(cluster_chain, chain_length * sizeof(uint32_t));
             return NULL;
         }
     }

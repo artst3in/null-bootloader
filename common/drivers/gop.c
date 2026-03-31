@@ -189,7 +189,7 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop) {
     UINTN modes_count = gop->Mode->MaxMode;
 
-    struct fb_info *ret = ext_mem_alloc(modes_count * sizeof(struct fb_info));
+    struct fb_info *ret = ext_mem_alloc_counted(modes_count, sizeof(struct fb_info));
 
     size_t actual_count = 0;
     for (size_t i = 0; i < modes_count; i++) {
@@ -198,7 +198,7 @@ static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL
         }
     }
 
-    struct fb_info *tmp = ext_mem_alloc(actual_count * sizeof(struct fb_info));
+    struct fb_info *tmp = ext_mem_alloc_counted(actual_count, sizeof(struct fb_info));
     memcpy(tmp, ret, actual_count * sizeof(struct fb_info));
 
     pmm_free(ret, modes_count * sizeof(struct fb_info));
@@ -248,7 +248,7 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
 
     size_t handles_count = handles_size / sizeof(EFI_HANDLE);
 
-    *ret = ext_mem_alloc(handles_count * sizeof(struct fb_info));
+    *ret = ext_mem_alloc_counted(handles_count, sizeof(struct fb_info));
 
     const struct resolution fallback_resolutions[] = {
         { 0,    0,   0  },   // Overridden by EDID

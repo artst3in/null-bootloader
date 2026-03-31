@@ -455,7 +455,7 @@ again:
             range_count++;
         }
 
-        struct mem_range *ranges = ext_mem_alloc(range_count * sizeof(struct mem_range));
+        struct mem_range *ranges = ext_mem_alloc_counted(range_count, sizeof(struct mem_range));
 
         *_ranges = ranges;
         *_ranges_count = range_count;
