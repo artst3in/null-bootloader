@@ -661,24 +661,27 @@ again:
         if (memmap[i].type != 1)
             continue;
 
-        int64_t entry_base = (int64_t)(memmap[i].base);
-        int64_t entry_top  = (int64_t)CHECKED_ADD(memmap[i].base, memmap[i].length, continue);
+        uint64_t entry_base = memmap[i].base;
+        uint64_t entry_top  = CHECKED_ADD(memmap[i].base, memmap[i].length, continue);
 
-        if ((uint64_t)entry_top > limit) {
-            entry_top = (int64_t)limit;
+        if (entry_top > limit) {
+            entry_top = limit;
             if (entry_base >= entry_top)
                 continue;
         }
 
-        int64_t alloc_base = ALIGN_DOWN(entry_top - (int64_t)count, alignment);
+        // Check if entry is too small before subtracting.
+        if (entry_top - entry_base < count)
+            continue;
 
-        // This entry is too small for us.
+        uint64_t alloc_base = ALIGN_DOWN(entry_top - count, alignment);
+
         if (alloc_base < entry_base)
             continue;
 
         // We now reserve the range we need.
-        int64_t aligned_length = entry_top - alloc_base;
-        memmap_alloc_range((uint64_t)alloc_base, (uint64_t)aligned_length, type, MEMMAP_USABLE, true, false, false);
+        uint64_t aligned_length = entry_top - alloc_base;
+        memmap_alloc_range(alloc_base, aligned_length, type, MEMMAP_USABLE, true, false, false);
 
         void *ret;
 
