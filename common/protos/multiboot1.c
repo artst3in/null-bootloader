@@ -39,8 +39,8 @@ static size_t get_multiboot1_info_size(
     return ALIGN_UP(sizeof(struct multiboot1_info), 16, OVERFLOW) +
            ALIGN_UP(strlen(cmdline) + 1, 16, OVERFLOW) +
            ALIGN_UP(sizeof(LIMINE_BRAND), 16, OVERFLOW) +
-           ALIGN_UP(section_entry_size * section_num, 16, OVERFLOW) +
-           ALIGN_UP(sizeof(struct multiboot1_module) * modules_count, 16, OVERFLOW) +
+           ALIGN_UP(CHECKED_MUL(section_entry_size, section_num, OVERFLOW), 16, OVERFLOW) +
+           ALIGN_UP(CHECKED_MUL(sizeof(struct multiboot1_module), modules_count, OVERFLOW), 16, OVERFLOW) +
            ALIGN_UP(modules_cmdlines_size, 16, OVERFLOW) +
            ALIGN_UP(sizeof(struct multiboot1_mmap_entry) * MEMMAP_MAX, 16, OVERFLOW);
 #undef OVERFLOW
@@ -234,7 +234,8 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
         mb1_info_alloc(&mb1_info_raw, sizeof(struct multiboot1_info));
 
     if (section_hdr_info_valid == true) {
-        size_t section_table_size = (size_t)section_hdr_info.section_entry_size * section_hdr_info.num;
+        size_t section_table_size = CHECKED_MUL(section_hdr_info.section_entry_size, section_hdr_info.num,
+            panic(true, "multiboot1: ELF section table size overflow"));
         if (section_hdr_info.section_offset > kernel_file_size ||
             section_table_size > kernel_file_size - section_hdr_info.section_offset) {
             panic(true, "multiboot1: ELF section headers out of bounds");

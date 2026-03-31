@@ -436,10 +436,7 @@ void efi_map_runtime_entries(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length;
-        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
-            continue;
-        }
+        uint64_t length = CHECKED_MUL(entry->NumberOfPages, (uint64_t)4096, continue);
 
         memmap_alloc_range(base, length, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
     }
@@ -455,12 +452,12 @@ void efi_map_runtime_entries(void) {
     }
 
     if (gST->ConfigurationTable != NULL && gST->NumberOfTableEntries > 0) {
-        uint64_t ct_size;
-        if (!__builtin_mul_overflow(gST->NumberOfTableEntries,
-                (uint64_t)sizeof(EFI_CONFIGURATION_TABLE), &ct_size)
-         && ct_size <= UINT32_MAX) {
+        uint64_t ct_size = CHECKED_MUL(gST->NumberOfTableEntries,
+                (uint64_t)sizeof(EFI_CONFIGURATION_TABLE), goto skip_ct);
+        if (ct_size <= UINT32_MAX) {
             map_single_table((uintptr_t)gST->ConfigurationTable, (uint32_t)ct_size);
         }
+skip_ct:;
     }
 
     if (gST->FirmwareVendor != NULL) {

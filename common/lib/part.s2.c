@@ -34,11 +34,7 @@ static bool cache_block(struct volume *volume, uint64_t block) {
 
     uint64_t xfer_size = volume->fastest_xfer_size;
 
-    // Check for overflow in sector offset calculation
-    uint64_t block_offset;
-    if (__builtin_mul_overflow(block, volume->fastest_xfer_size, &block_offset)) {
-        return false;
-    }
+    uint64_t block_offset = CHECKED_MUL(block, (uint64_t)volume->fastest_xfer_size, return false);
     uint64_t read_sector = CHECKED_ADD(first_sect, block_offset, return false);
 
     // Clamp xfer_size to remaining sectors in volume
@@ -75,10 +71,7 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
 
     if (volume->sect_count != (uint64_t)-1) {
         // sect_count is always in 512-byte sectors for both whole disks and partitions
-        uint64_t part_size;
-        if (__builtin_mul_overflow(volume->sect_count, (uint64_t)512, &part_size)) {
-            return false;
-        }
+        uint64_t part_size = CHECKED_MUL(volume->sect_count, (uint64_t)512, return false);
         if (loc >= part_size || count > part_size - loc) {
             return false;
         }
@@ -217,11 +210,7 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
         return INVALID_TABLE;
     }
 
-    // Check for potential integer overflow in offset calculation
-    uint64_t entry_offset;
-    if (__builtin_mul_overflow((uint64_t)header.partition_entry_lba, (uint64_t)lb_size, &entry_offset)) {
-        return INVALID_TABLE;  // Multiplication overflow
-    }
+    uint64_t entry_offset = CHECKED_MUL((uint64_t)header.partition_entry_lba, (uint64_t)lb_size, return INVALID_TABLE);
     // Use actual entry size from header for offset calculation
     uint64_t partition_offset = (uint64_t)partition * entry_size;
     entry_offset = CHECKED_ADD(entry_offset, partition_offset, return INVALID_TABLE);
@@ -243,11 +232,7 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
     // Calculate sector multiplier for lb_size conversion
     uint64_t sect_multiplier = lb_size / 512;
 
-    // Check for overflow in first_sect calculation
-    uint64_t first_sect_result;
-    if (__builtin_mul_overflow(entry.starting_lba, sect_multiplier, &first_sect_result)) {
-        return NO_PARTITION;  // Overflow in first_sect
-    }
+    uint64_t first_sect_result = CHECKED_MUL(entry.starting_lba, sect_multiplier, return NO_PARTITION);
 
     // Check for overflow in sect_count calculation
     // First compute partition size in logical blocks
@@ -257,10 +242,7 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
         return NO_PARTITION;  // Partition size +1 would overflow
     }
     uint64_t partition_blocks = partition_size + 1;
-    uint64_t sect_count_result;
-    if (__builtin_mul_overflow(partition_blocks, sect_multiplier, &sect_count_result)) {
-        return NO_PARTITION;  // Overflow in sect_count
-    }
+    uint64_t sect_count_result = CHECKED_MUL(partition_blocks, sect_multiplier, return NO_PARTITION);
 
 #if defined (UEFI)
     ret->efi_handle  = volume->efi_handle;

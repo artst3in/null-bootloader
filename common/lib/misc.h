@@ -81,6 +81,16 @@ uint64_t strtoui(const char *s, const char **end, int base);
     CHECKED_ADD_res; \
 })
 
+#define CHECKED_MUL(a, b, onerror) ({ \
+    __auto_type CHECKED_MUL_a = (a); \
+    __auto_type CHECKED_MUL_b = (b); \
+    typeof(CHECKED_MUL_a * CHECKED_MUL_b) CHECKED_MUL_res; \
+    if (__builtin_mul_overflow(CHECKED_MUL_a, CHECKED_MUL_b, &CHECKED_MUL_res)) { \
+        onerror; \
+    } \
+    CHECKED_MUL_res; \
+})
+
 #define DIV_ROUNDUP(a, b, onerror) ({ \
     __auto_type DIV_ROUNDUP_a = (a); \
     __auto_type DIV_ROUNDUP_b = (b); \

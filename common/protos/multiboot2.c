@@ -47,7 +47,7 @@ static size_t get_multiboot2_info_size(
         ALIGN_UP(sizeof(struct multiboot_tag_framebuffer), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
         ALIGN_UP(sizeof(struct multiboot_tag_new_acpi) + sizeof(struct rsdp), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
         ALIGN_UP(sizeof(struct multiboot_tag_old_acpi) + 20, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
-        ALIGN_UP(sizeof(struct multiboot_tag_elf_sections) + section_entry_size * section_num, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
+        ALIGN_UP(sizeof(struct multiboot_tag_elf_sections) + CHECKED_MUL(section_entry_size, section_num, OVERFLOW), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
         ALIGN_UP(modules_size, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
         ALIGN_UP(sizeof(struct multiboot_tag_load_base_addr), MULTIBOOT_TAG_ALIGN, OVERFLOW) +
         ALIGN_UP(smbios_tag_size, MULTIBOOT_TAG_ALIGN, OVERFLOW) +
@@ -505,7 +505,8 @@ reloc_fail:
             panic(true, "multiboot2: Cannot return ELF file information");
         }
     } else {
-        size_t section_table_size = (size_t)section_hdr_info.section_entry_size * section_hdr_info.num;
+        size_t section_table_size = CHECKED_MUL(section_hdr_info.section_entry_size, section_hdr_info.num,
+            panic(true, "multiboot2: ELF section table size overflow"));
         if (section_hdr_info.section_offset > kernel_file_size ||
             section_table_size > kernel_file_size - section_hdr_info.section_offset) {
             panic(true, "multiboot2: ELF section headers out of bounds");

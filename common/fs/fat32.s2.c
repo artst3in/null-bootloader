@@ -442,10 +442,11 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
         if (directory_cluster_chain == NULL)
             return -1;
 
-        // Check for integer overflow in allocation size
-        size_t alloc_size;
-        if (__builtin_mul_overflow(dir_chain_len, block_size, &alloc_size) || alloc_size > 256 * 1024 * 1024) {
-            // Limit directory size to 256MB to prevent memory exhaustion
+        size_t alloc_size = CHECKED_MUL(dir_chain_len, block_size, ({
+            pmm_free(directory_cluster_chain, dir_chain_len * sizeof(uint32_t));
+            return -1;
+        }));
+        if (alloc_size > 256 * 1024 * 1024) {
             pmm_free(directory_cluster_chain, dir_chain_len * sizeof(uint32_t));
             return -1;
         }
@@ -462,9 +463,8 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
     } else {
         dir_chain_len = DIV_ROUNDUP(context->root_entries * sizeof(struct fat32_directory_entry), block_size, return 1);
 
-        // Check for overflow
-        size_t alloc_size;
-        if (__builtin_mul_overflow(dir_chain_len, block_size, &alloc_size) || alloc_size > 256 * 1024 * 1024) {
+        size_t alloc_size = CHECKED_MUL(dir_chain_len, block_size, return -1);
+        if (alloc_size > 256 * 1024 * 1024) {
             return -1;
         }
 

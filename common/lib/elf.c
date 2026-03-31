@@ -835,12 +835,11 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
         panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
     }
 
-    // Validate program header offset and size don't overflow
-    uint64_t phdr_table_end;
-    if (__builtin_mul_overflow((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size, &phdr_table_end) ||
-        __builtin_add_overflow(phdr_table_end, hdr->phoff, &phdr_table_end)) {
-        panic(true, "elf: Program header table size overflow");
-    }
+    uint64_t phdr_table_end = CHECKED_ADD(
+        CHECKED_MUL((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size,
+            panic(true, "elf: Program header table size overflow")),
+        hdr->phoff,
+        panic(true, "elf: Program header table size overflow"));
 
     if (phdr_table_end > file_size) {
         panic(true, "elf: Program header table extends beyond file bounds");
