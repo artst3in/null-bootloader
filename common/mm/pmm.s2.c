@@ -630,7 +630,10 @@ void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alig
     (void)allow_high_allocs;
 #endif
 
-    count = ALIGN_UP(count, alignment);
+    if (__builtin_add_overflow(count, alignment - 1, &count)) {
+        panic(false, "ext_mem_alloc: count overflows when aligning");
+    }
+    count = ALIGN_DOWN(count, alignment);
 
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
