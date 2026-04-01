@@ -249,8 +249,8 @@ bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t
     IMAGE_NT_HEADERS64 *nt_hdrs = (IMAGE_NT_HEADERS64 *)(image + dos_hdr->e_lfanew);
 
     // Validate SizeOfOptionalHeader doesn't cause sections pointer to go out of bounds
-    size_t sections_offset = dos_hdr->e_lfanew + sizeof(uint32_t) + sizeof(IMAGE_FILE_HEADER) + nt_hdrs->FileHeader.SizeOfOptionalHeader;
-    size_t sections_end = sections_offset + (size_t)nt_hdrs->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
+    uint64_t sections_offset = (uint64_t)dos_hdr->e_lfanew + sizeof(uint32_t) + sizeof(IMAGE_FILE_HEADER) + nt_hdrs->FileHeader.SizeOfOptionalHeader;
+    uint64_t sections_end = sections_offset + (uint64_t)nt_hdrs->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
     if (sections_end > file_size) {
         panic(true, "pe: Section headers extend beyond file bounds");
     }
