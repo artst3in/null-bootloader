@@ -468,11 +468,11 @@ reloc_fail:
     size_t info_idx = 0;
 
     // Realloc elsewhere ranges to include mb2 info, modules, and elf sections
-    struct elsewhere_range *new_ranges = ext_mem_alloc(sizeof(struct elsewhere_range) *
-        (ranges_count
+    uint64_t ranges_max = ranges_count
        + 1 /* mb2 info range */
        + n_modules
-       + (section_hdr_info_valid ? section_hdr_info.num : 0)));
+       + (section_hdr_info_valid ? section_hdr_info.num : 0);
+    struct elsewhere_range *new_ranges = ext_mem_alloc_counted(ranges_max, sizeof(struct elsewhere_range));
 
     memcpy(new_ranges, ranges, sizeof(struct elsewhere_range) * ranges_count);
     pmm_free(ranges, sizeof(struct elsewhere_range) * ranges_count);
@@ -489,7 +489,7 @@ reloc_fail:
     uint64_t mb2_info_final_loc = 0x10000;
 
     if (!elsewhere_append(true /* flexible target */,
-            ranges, &ranges_count,
+            ranges, &ranges_count, ranges_max,
             mb2_info, &mb2_info_final_loc, mb2_info_size)) {
         panic(true, "multiboot2: Cannot allocate mb2 info");
     }
@@ -551,7 +551,7 @@ reloc_fail:
                 uint64_t section = (uint64_t)-1; /* no target preference, use top */
 
                 if (!elsewhere_append(true /* flexible target */,
-                        ranges, &ranges_count,
+                        ranges, &ranges_count, ranges_max,
                         kernel + shdr->sh_offset, &section, shdr->sh_size)) {
                     panic(true, "multiboot2: Cannot allocate elf sections");
                 }
@@ -576,7 +576,7 @@ reloc_fail:
                 uint64_t section = (uint64_t)-1; /* no target preference, use top */
 
                 if (!elsewhere_append(true /* flexible target */,
-                        ranges, &ranges_count,
+                        ranges, &ranges_count, ranges_max,
                         kernel + shdr->sh_offset, &section, shdr->sh_size)) {
                     panic(true, "multiboot2: Cannot allocate elf sections");
                 }
@@ -626,7 +626,7 @@ reloc_fail:
         uint64_t module_target = (uint64_t)-1;
 
         if (!elsewhere_append(true /* flexible target */,
-                ranges, &ranges_count,
+                ranges, &ranges_count, ranges_max,
                 module_addr, &module_target, f->size)) {
             panic(true, "multiboot2: Cannot allocate module");
         }

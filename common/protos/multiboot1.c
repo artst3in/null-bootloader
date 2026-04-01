@@ -202,11 +202,11 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
     );
 
     // Realloc elsewhere ranges to include mb1 info, modules, and elf sections
-    struct elsewhere_range *new_ranges = ext_mem_alloc(sizeof(struct elsewhere_range) *
-        (ranges_count
+    uint64_t ranges_max = ranges_count
        + 1 /* mb1 info range */
        + n_modules
-       + (section_hdr_info_valid ? section_hdr_info.num : 0)));
+       + (section_hdr_info_valid ? section_hdr_info.num : 0);
+    struct elsewhere_range *new_ranges = ext_mem_alloc_counted(ranges_max, sizeof(struct elsewhere_range));
 
     memcpy(new_ranges, ranges, sizeof(struct elsewhere_range) * ranges_count);
     pmm_free(ranges, sizeof(struct elsewhere_range) * ranges_count);
@@ -223,7 +223,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
     uint64_t mb1_info_final_loc = 0x10000;
 
     if (!elsewhere_append(true /* flexible target */,
-            ranges, &ranges_count,
+            ranges, &ranges_count, ranges_max,
             mb1_info_raw, &mb1_info_final_loc, mb1_info_size)) {
         panic(true, "multiboot1: Cannot allocate mb1 info");
     }
@@ -269,7 +269,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
                 uint64_t section = (uint64_t)-1; /* no target preference, use top */
 
                 if (!elsewhere_append(true /* flexible target */,
-                        ranges, &ranges_count,
+                        ranges, &ranges_count, ranges_max,
                         kernel + shdr->sh_offset, &section, shdr->sh_size)) {
                     panic(true, "multiboot1: Cannot allocate elf sections");
                 }
@@ -290,7 +290,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
                 uint64_t section = (uint64_t)-1; /* no target preference, use top */
 
                 if (!elsewhere_append(true /* flexible target */,
-                        ranges, &ranges_count,
+                        ranges, &ranges_count, ranges_max,
                         kernel + shdr->sh_offset, &section, shdr->sh_size)) {
                     panic(true, "multiboot1: Cannot allocate elf sections");
                 }
@@ -334,7 +334,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
             uint64_t module_target = (uint64_t)-1; /* no target preference, use top */
 
             if (!elsewhere_append(true /* flexible target */,
-                    ranges, &ranges_count,
+                    ranges, &ranges_count, ranges_max,
                     module_addr, &module_target, f->size)) {
                 panic(true, "multiboot1: Cannot allocate module");
             }
