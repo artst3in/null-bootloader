@@ -115,8 +115,22 @@ static const char *verify_kernel(struct linux_header *header) {
 }
 
 static void load_module(struct boot_param *p, char *config) {
-    char *module_path = config_get_value(config, 0, "MODULE_PATH");
-    if (module_path) {
+    size_t module_count;
+    for (module_count = 0; ; module_count++) {
+        if (config_get_value(config, module_count, "MODULE_PATH") == NULL)
+            break;
+    }
+
+    if (module_count == 0) {
+        return;
+    }
+
+    struct file_handle **modules = ext_mem_alloc_counted(module_count, sizeof(struct file_handle *));
+
+    size_t total_size = 0;
+    for (size_t i = 0; i < module_count; i++) {
+        char *module_path = config_get_value(config, i, "MODULE_PATH");
+
         print("linux: Loading module `%#`...\n", module_path);
 
         struct file_handle *module_file = uri_open(module_path);
@@ -124,15 +138,29 @@ static void load_module(struct boot_param *p, char *config) {
             panic(true, "linux: failed to open module `%s`. Is the path correct?", module_path);
         }
 
-        p->module_size = module_file->size;
-        p->module_base = ext_mem_alloc_type_aligned(
-                        ALIGN_UP(p->module_size, 4096, panic(true, "linux: Alignment overflow")),
-                        MEMMAP_KERNEL_AND_MODULES, 4096);
+        total_size = CHECKED_ADD(total_size, module_file->size,
+            panic(true, "linux: Total module size overflow"));
 
-        fread(module_file, p->module_base, 0, p->module_size);
-        fclose(module_file);
-        printv("linux: loaded module `%s` at %p, size %U\n", module_path, p->module_base, (uint64_t)p->module_size);
+        modules[i] = module_file;
     }
+
+    p->module_size = total_size;
+    p->module_base = ext_mem_alloc_type_aligned(
+                    ALIGN_UP(p->module_size, 4096, panic(true, "linux: Alignment overflow")),
+                    MEMMAP_KERNEL_AND_MODULES, 4096);
+
+    size_t offset = 0;
+    for (size_t i = 0; i < module_count; i++) {
+        fread(modules[i], p->module_base + offset, 0, modules[i]->size);
+        offset += modules[i]->size;
+        fclose(modules[i]);
+
+        char *module_path = config_get_value(config, i, "MODULE_PATH");
+        printv("linux: loaded module `%s` at %p, size %U\n", module_path,
+               p->module_base + offset - modules[i]->size, (uint64_t)modules[i]->size);
+    }
+
+    pmm_free(modules, module_count * sizeof(struct file_handle *));
 }
 
 static void prepare_device_tree_blob(struct boot_param *p) {
