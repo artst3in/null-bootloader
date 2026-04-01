@@ -205,9 +205,8 @@ static inline uint64_t tsc_freq_arch(void) {
     typeof(*var) locked_read__ret = 0; \
     asm volatile ( \
         "lock xadd %0, %1" \
-        : "+r" (locked_read__ret) \
-        : "m" (*(var)) \
-        : "memory" \
+        : "+r" (locked_read__ret), "+m" (*(var)) \
+        :: "memory" \
     ); \
     locked_read__ret; \
 })
