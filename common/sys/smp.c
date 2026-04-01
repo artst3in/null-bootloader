@@ -830,7 +830,7 @@ static bool smp_start_ap(size_t hartid, size_t satp, struct limine_mp_info *info
     passed_info.smp_tpl_info_struct = (uint64_t)info_struct;
     passed_info.smp_tpl_hhdm_offset = hhdm_offset;
 
-    asm volatile ("" ::: "memory");
+    asm volatile ("fence w,w" ::: "memory");
 
     struct sbiret ret = sbi_hart_start(hartid, (size_t)smp_trampoline_start, (size_t)&passed_info);
     if (ret.error != SBI_SUCCESS)
