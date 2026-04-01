@@ -189,38 +189,32 @@ static bool load_name(char *buf, size_t limit, struct iso9660_directory_entry *e
         sysarea_len--;
     }
 
-    int rrnamelen = 0;
-    unsigned char *nm_entry = NULL;
+    // Accumulate Rock Ridge name from possibly multiple NM entries
+    size_t name_len = 0;
+    bool found_nm = false;
     while ((sysarea_len >= 4) && (sysarea[3] == 1)) {
-        // Validate entry length doesn't exceed remaining sysarea
-        if (sysarea[2] > sysarea_len) {
+        if (sysarea[2] > sysarea_len || sysarea[2] == 0) {
             break;
         }
-        if (sysarea[0] == 'N' && sysarea[1] == 'M') {
-            // Validate Rock Ridge NM entry length
-            // sysarea[2] is total entry length, must be >= 5 (header) and within sysarea bounds
-            if (sysarea[2] >= 5 && sysarea[2] <= sysarea_len) {
-                rrnamelen = sysarea[2] - 5;
-                nm_entry = sysarea;
+        if (sysarea[0] == 'N' && sysarea[1] == 'M' && sysarea[2] >= 5) {
+            size_t frag_len = sysarea[2] - 5;
+            if (name_len + frag_len >= limit) {
+                panic(false, "iso9660: Filename size exceeded");
             }
-            break;
-        }
-        // Prevent infinite loop from zero-length entry
-        if (sysarea[2] == 0) {
-            break;
+            memcpy(buf + name_len, sysarea + 5, frag_len);
+            name_len += frag_len;
+            found_nm = true;
+
+            // Check CONTINUE flag (bit 0 of flags byte at offset 4)
+            if (!(sysarea[4] & 1)) {
+                break;
+            }
         }
         sysarea_len -= sysarea[2];
         sysarea += sysarea[2];
     }
 
-    size_t name_len = 0;
-    if (rrnamelen > 0 && nm_entry != NULL) {
-        /* rock ridge naming scheme */
-        name_len = rrnamelen;
-        if (name_len >= limit) {
-            panic(false, "iso9660: Filename size exceeded");
-        }
-        memcpy(buf, nm_entry + 5, name_len);
+    if (found_nm) {
         buf[name_len] = 0;
         return true;
     }
