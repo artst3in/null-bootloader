@@ -21,22 +21,62 @@ static bool rand_initialised = false;
 static uint32_t *status;
 static int ctr;
 
+static uint32_t hw_entropy(void) {
+#if defined (__x86_64__) || defined(__i386__)
+    uint32_t eax, ebx, ecx, edx;
+
+    if (cpuid(0x07, 0, &eax, &ebx, &ecx, &edx) && (ebx & (1 << 18))) {
+        return rdseed(uint32_t);
+    } else if (cpuid(0x01, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1 << 30))) {
+        return rdrand(uint32_t);
+    }
+#elif defined (__aarch64__)
+    // ARMv8.5-RNG: check ID_AA64ISAR0_EL1 RNDR field (bits [63:60])
+    uint64_t isar0;
+    asm volatile ("mrs %0, id_aa64isar0_el1" : "=r" (isar0));
+    if ((isar0 >> 60) & 0xf) {
+        uint64_t rndr;
+        // RNDR register: s3_3_c2_c4_0
+        bool ok;
+        asm volatile (
+            "mrs %0, s3_3_c2_c4_0\n\t"
+            "cset %w1, ne"
+            : "=r" (rndr), "=r" (ok)
+            :
+            : "cc"
+        );
+        if (ok) {
+            return (uint32_t)rndr;
+        }
+    }
+#endif
+
+#if defined (UEFI)
+    // Try EFI RNG protocol as a fallback for all UEFI platforms
+    {
+        EFI_GUID rng_guid = EFI_RNG_PROTOCOL_GUID;
+        EFI_RNG_PROTOCOL *rng = NULL;
+        if (gBS->LocateProtocol(&rng_guid, NULL, (void **)&rng) == EFI_SUCCESS && rng != NULL) {
+            uint32_t val;
+            if (rng->GetRNG(rng, NULL, sizeof(val), (UINT8 *)&val) == EFI_SUCCESS) {
+                return val;
+            }
+        }
+    }
+#endif
+
+    return 0;
+}
+
 static void init_rand(void) {
     uint32_t seed = ((uint32_t)0xc597060c * (uint32_t)rdtsc())
                   * ((uint32_t)0xce86d624)
                   ^ ((uint32_t)0xee0da130 * (uint32_t)rdtsc());
 
-    // TODO(qookie): aarch64 also has an optional HW random number generator
-#if defined (__x86_64__) || defined(__i386__)
-    uint32_t eax, ebx, ecx, edx;
-
-    // Check for rdseed
-    if (cpuid(0x07, 0, &eax, &ebx, &ecx, &edx) && (ebx & (1 << 18))) {
-        seed *= (seed ^ rdseed(uint32_t));
-    } else if (cpuid(0x01, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1 << 30))) {
-        seed *= (seed ^ rdrand(uint32_t));
+    uint32_t hw = hw_entropy();
+    if (hw != 0) {
+        seed *= (seed ^ hw);
     }
-#endif
 
     status = ext_mem_alloc_counted(n, sizeof(uint32_t));
 
