@@ -261,7 +261,35 @@ static bool elf64_is_relocatable(uint8_t *elf, struct elf64_hdr *hdr) {
     panic(true, "elf: ELF file type is ET_DYN, but PT_DYNAMIC segment missing");
 }
 
-static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *buffer, uint64_t vaddr, size_t size, uint64_t slide) {
+// Translate a virtual address to a file offset using the phdr table.
+// Returns false if the vaddr is not found in any PT_LOAD segment or the
+// translated offset exceeds file bounds.
+static bool elf64_translate_vaddr(uint8_t *elf, size_t file_size,
+        struct elf64_hdr *hdr, uint64_t *offset, uint64_t size_hint,
+        uint64_t *out_seg_size) {
+    for (uint16_t i = 0; i < hdr->ph_num; i++) {
+        struct elf64_phdr *phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
+
+        uint64_t seg_end = CHECKED_ADD(phdr->p_vaddr, phdr->p_filesz, continue);
+
+        if (phdr->p_vaddr <= *offset && seg_end > *offset) {
+            if (out_seg_size != NULL) {
+                *out_seg_size = phdr->p_filesz - (*offset - phdr->p_vaddr);
+            }
+            *offset -= phdr->p_vaddr;
+            *offset += phdr->p_offset;
+
+            // Validate translated offset + size_hint is within file
+            if (CHECKED_ADD(*offset, size_hint, return false) > file_size) {
+                return false;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool elf64_apply_relocations(uint8_t *elf, size_t file_size, struct elf64_hdr *hdr, void *buffer, uint64_t vaddr, size_t size, uint64_t slide) {
     if (hdr->phdr_size < sizeof(struct elf64_phdr)) {
         panic(true, "elf: phdr_size < sizeof(struct elf64_phdr)");
     }
@@ -284,6 +312,12 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
     uint64_t rela_size = 0;
     uint64_t rela_ent = 0;
 
+    // Validate phdr table is within file bounds
+    if (CHECKED_ADD(hdr->phoff, CHECKED_MUL((uint64_t)hdr->ph_num, (uint64_t)hdr->phdr_size,
+            return false), return false) > file_size) {
+        return false;
+    }
+
     // Find DYN segment
     for (uint16_t i = 0; i < hdr->ph_num; i++) {
         struct elf64_phdr *phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
@@ -291,7 +325,12 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
         if (phdr->p_type != PT_DYNAMIC)
             continue;
 
-        for (uint16_t j = 0; j < phdr->p_filesz / sizeof(struct elf64_dyn); j++) {
+        // Validate PT_DYNAMIC segment is within file bounds
+        if (CHECKED_ADD(phdr->p_offset, phdr->p_filesz, return false) > file_size) {
+            return false;
+        }
+
+        for (uint64_t j = 0; j < phdr->p_filesz / sizeof(struct elf64_dyn); j++) {
             struct elf64_dyn *dyn = (void *)elf + (phdr->p_offset + j * sizeof(struct elf64_dyn));
 
             switch (dyn->d_tag) {
@@ -346,91 +385,32 @@ static bool elf64_apply_relocations(uint8_t *elf, struct elf64_hdr *hdr, void *b
 end_of_pt_segment:
 
     if (rela_offset != 0) {
-        bool rela_translated = false;
-        for (uint16_t i = 0; i < hdr->ph_num; i++) {
-            struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
-
-            if (_phdr->p_vaddr <= rela_offset && _phdr->p_vaddr + _phdr->p_filesz > rela_offset) {
-                rela_offset -= _phdr->p_vaddr;
-                rela_offset += _phdr->p_offset;
-                rela_translated = true;
-                break;
-            }
-        }
-        if (!rela_translated) {
-            panic(true, "elf: RELA vaddr not in any PT_LOAD segment");
+        if (!elf64_translate_vaddr(elf, file_size, hdr, &rela_offset, rela_size, NULL)) {
+            panic(true, "elf: RELA vaddr translation failed or out of bounds");
         }
     }
 
     if (relr_offset != 0) {
-        bool relr_translated = false;
-        for (uint16_t i = 0; i < hdr->ph_num; i++) {
-            struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
-
-            if (_phdr->p_vaddr <= relr_offset && _phdr->p_vaddr + _phdr->p_filesz > relr_offset) {
-                relr_offset -= _phdr->p_vaddr;
-                relr_offset += _phdr->p_offset;
-                relr_translated = true;
-                break;
-            }
-        }
-        if (!relr_translated) {
-            panic(true, "elf: RELR vaddr not in any PT_LOAD segment");
+        if (!elf64_translate_vaddr(elf, file_size, hdr, &relr_offset, relr_size, NULL)) {
+            panic(true, "elf: RELR vaddr translation failed or out of bounds");
         }
     }
 
     if (symtab_offset != 0) {
-        bool symtab_translated = false;
-        for (uint16_t i = 0; i < hdr->ph_num; i++) {
-            struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
-
-            if (_phdr->p_vaddr <= symtab_offset && _phdr->p_vaddr + _phdr->p_filesz > symtab_offset) {
-                // Calculate size as remaining bytes in segment from symtab start
-                symtab_size = _phdr->p_filesz - (symtab_offset - _phdr->p_vaddr);
-                symtab_offset -= _phdr->p_vaddr;
-                symtab_offset += _phdr->p_offset;
-                symtab_translated = true;
-                break;
-            }
-        }
-        if (!symtab_translated) {
-            panic(true, "elf: SYMTAB vaddr not in any PT_LOAD segment");
+        if (!elf64_translate_vaddr(elf, file_size, hdr, &symtab_offset, 0, &symtab_size)) {
+            panic(true, "elf: SYMTAB vaddr translation failed or out of bounds");
         }
     }
 
     if (strtab_offset != 0) {
-        bool strtab_translated = false;
-        for (uint16_t i = 0; i < hdr->ph_num; i++) {
-            struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
-
-            if (_phdr->p_vaddr <= strtab_offset && _phdr->p_vaddr + _phdr->p_filesz > strtab_offset) {
-                // Calculate size as remaining bytes in segment from strtab start
-                strtab_size = _phdr->p_filesz - (strtab_offset - _phdr->p_vaddr);
-                strtab_offset -= _phdr->p_vaddr;
-                strtab_offset += _phdr->p_offset;
-                strtab_translated = true;
-                break;
-            }
-        }
-        if (!strtab_translated) {
-            panic(true, "elf: STRTAB vaddr not in any PT_LOAD segment");
+        if (!elf64_translate_vaddr(elf, file_size, hdr, &strtab_offset, 0, &strtab_size)) {
+            panic(true, "elf: STRTAB vaddr translation failed or out of bounds");
         }
     }
 
     if (dt_jmprel != 0) {
-        bool jmprel_translated = false;
-        for (uint16_t i = 0; i < hdr->ph_num; i++) {
-            struct elf64_phdr *_phdr = (void *)elf + (hdr->phoff + i * hdr->phdr_size);
-
-            if (_phdr->p_vaddr <= dt_jmprel && _phdr->p_vaddr + _phdr->p_filesz > dt_jmprel) {
-                dt_jmprel -= _phdr->p_vaddr;
-                dt_jmprel += _phdr->p_offset;
-                jmprel_translated = true;
-                break;
-            }
-        }
-        if (!jmprel_translated) {
-            panic(true, "elf: JMPREL vaddr not in any PT_LOAD segment");
+        if (!elf64_translate_vaddr(elf, file_size, hdr, &dt_jmprel, dt_pltrelsz, NULL)) {
+            panic(true, "elf: JMPREL vaddr translation failed or out of bounds");
         }
     }
 
@@ -668,7 +648,9 @@ bool elf64_load_section(uint8_t *elf, size_t file_size, void *buffer, const char
     }
 
     // Validate section header table is within file bounds
-    uint64_t shdr_table_end = (uint64_t)hdr->shoff + (uint64_t)hdr->sh_num * hdr->shdr_size;
+    uint64_t shdr_table_end = CHECKED_ADD(hdr->shoff,
+        CHECKED_MUL((uint64_t)hdr->sh_num, (uint64_t)hdr->shdr_size, return false),
+        return false);
     if (shdr_table_end > file_size) {
         return false;
     }
@@ -710,7 +692,7 @@ bool elf64_load_section(uint8_t *elf, size_t file_size, void *buffer, const char
                 return false;
             }
             memcpy(buffer, elf + section->sh_offset, section->sh_size);
-            return elf64_apply_relocations(elf, hdr, buffer, section->sh_addr, section->sh_size, slide);
+            return elf64_apply_relocations(elf, file_size, hdr, buffer, section->sh_addr, section->sh_size, slide);
         }
     }
 
@@ -1014,7 +996,7 @@ again:
             bss_size = phdr->p_memsz - phdr->p_filesz;
         }
 
-        if (!elf64_apply_relocations(elf, hdr, (void *)(uintptr_t)load_addr, phdr->p_vaddr, phdr->p_memsz, slide)) {
+        if (!elf64_apply_relocations(elf, file_size, hdr, (void *)(uintptr_t)load_addr, phdr->p_vaddr, phdr->p_memsz, slide)) {
             panic(true, "elf: Failed to apply relocations");
         }
 
