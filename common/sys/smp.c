@@ -168,8 +168,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        // Prevent infinite loop on zero-length MADT entry
-        if (*(madt_ptr + 1) == 0) {
+        // Skip zero-length or out-of-bounds MADT entries
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -218,8 +219,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        // Prevent infinite loop on zero-length MADT entry
-        if (*(madt_ptr + 1) == 0) {
+        // Skip zero-length or out-of-bounds MADT entries
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -512,7 +514,8 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0) {
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -539,7 +542,8 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0) {
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -997,7 +1001,8 @@ static struct limine_mp_info *try_acpi_smp(size_t *cpu_count, uint32_t *bsp_phys
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
          (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
          madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0)
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length)
             break;
 
         if (*madt_ptr != MADT_ENTRY_CORE_PIC)
@@ -1020,7 +1025,8 @@ static struct limine_mp_info *try_acpi_smp(size_t *cpu_count, uint32_t *bsp_phys
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
          (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
          madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0)
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length)
             break;
 
         if (*madt_ptr != MADT_ENTRY_CORE_PIC)
