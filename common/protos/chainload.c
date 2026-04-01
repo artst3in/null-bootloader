@@ -297,7 +297,7 @@ noreturn void chainload(char *config, char *cmdline) {
 
     size_t cmdline_len = strlen(cmdline);
     CHAR16 *new_cmdline;
-    status = gBS->AllocatePool(EfiLoaderData, (cmdline_len + 1) * sizeof(CHAR16), (void **)&new_cmdline);
+    status = gBS->AllocatePool(EfiLoaderData, CHECKED_MUL(cmdline_len + 1, sizeof(CHAR16), panic(true, "efi: Allocation size overflow")), (void **)&new_cmdline);
     if (status) {
         panic(true, "efi: Allocation failure");
     }

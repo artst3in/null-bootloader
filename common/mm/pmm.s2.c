@@ -328,13 +328,15 @@ void init_memmap(void) {
         goto fail;
     }
 
-    status = gBS->AllocatePool(EfiLoaderData, memmap_max_entries * sizeof(struct memmap_entry), (void **)&memmap);
+    size_t memmap_alloc_size = CHECKED_MUL(memmap_max_entries, sizeof(struct memmap_entry), goto fail);
+
+    status = gBS->AllocatePool(EfiLoaderData, memmap_alloc_size, (void **)&memmap);
     if (status) {
         gBS->FreePool(efi_mmap);
         goto fail;
     }
 
-    status = gBS->AllocatePool(EfiLoaderData, memmap_max_entries * sizeof(struct memmap_entry), (void **)&untouched_memmap);
+    status = gBS->AllocatePool(EfiLoaderData, memmap_alloc_size, (void **)&untouched_memmap);
     if (status) {
         gBS->FreePool(efi_mmap);
         gBS->FreePool(memmap);

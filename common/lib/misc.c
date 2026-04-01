@@ -266,7 +266,7 @@ bool efi_exit_boot_services(void) {
     }
 
     EFI_MEMORY_DESCRIPTOR *efi_copy;
-    status = gBS->AllocatePool(EfiLoaderData, efi_mmap_size * 2, (void **)&efi_copy);
+    status = gBS->AllocatePool(EfiLoaderData, CHECKED_MUL(efi_mmap_size, (UINTN)2, goto fail), (void **)&efi_copy);
     if (status) {
         goto fail;
     }
