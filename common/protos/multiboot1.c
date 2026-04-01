@@ -361,8 +361,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
     char *lowmem_cmdline = mb1_info_alloc(&mb1_info_raw, strlen(cmdline) + 1);
     strcpy(lowmem_cmdline, cmdline);
     multiboot1_info->cmdline = (uint32_t)(size_t)lowmem_cmdline - mb1_info_slide;
-    if (cmdline)
-        multiboot1_info->flags |= (1 << 2);
+    multiboot1_info->flags |= (1 << 2);
 
     char *bootload_name = LIMINE_BRAND;
     char *lowmem_bootname = mb1_info_alloc(&mb1_info_raw, strlen(bootload_name) + 1);
