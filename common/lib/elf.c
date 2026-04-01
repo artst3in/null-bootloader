@@ -1126,7 +1126,6 @@ bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
         panic(true, "elf: Program header table extends beyond file bounds");
     }
 
-    size_t image_size = 0;
     uint64_t min_paddr = (uint64_t)-1;
     uint64_t max_paddr = 0;
     for (uint16_t i = 0; i < hdr->ph_num; i++) {
@@ -1145,7 +1144,10 @@ bool elf64_load_elsewhere(uint8_t *elf, size_t file_size, uint64_t *entry_point,
             max_paddr = top;
         }
     }
-    image_size = max_paddr - min_paddr;
+    uint64_t image_size = max_paddr - min_paddr;
+    if (image_size > SIZE_MAX) {
+        panic(true, "elf: Image size exceeds address space");
+    }
 
     void *elsewhere = ext_mem_alloc(image_size);
 
