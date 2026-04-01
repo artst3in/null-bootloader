@@ -24,7 +24,8 @@ static bool cache_block(struct volume *volume, uint64_t block) {
 
     if (volume->cache == NULL)
         volume->cache =
-            ext_mem_alloc(volume->fastest_xfer_size * volume->sector_size);
+            ext_mem_alloc(CHECKED_MUL((uint64_t)volume->fastest_xfer_size, (uint64_t)volume->sector_size,
+                panic(false, "cache_block: block size overflow")));
 
     if (volume->first_sect % (volume->sector_size / 512)) {
         return false;
