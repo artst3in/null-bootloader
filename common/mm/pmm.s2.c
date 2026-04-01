@@ -387,6 +387,10 @@ void init_memmap(void) {
         uint64_t base = entry->PhysicalStart;
         uint64_t length = CHECKED_MUL(entry->NumberOfPages, (uint64_t)4096, continue);
 
+        if (memmap_entries == memmap_max_entries) {
+            panic(false, "Memory map exhausted.");
+        }
+
         memmap[memmap_entries].base = base;
         memmap[memmap_entries].length = length;
         memmap[memmap_entries].type = our_type;
