@@ -37,7 +37,11 @@ struct image *image_open(struct file_handle *file) {
 
     pmm_free(src, file->size);
 
-    if (image->img == NULL) {
+    if (image->img == NULL || x == 0 || y == 0) {
+        if (image->img != NULL) {
+            // stbi allocated but dimensions are degenerate
+            pmm_free(image->img, (size_t)x * (size_t)y * 4);
+        }
         pmm_free(image, sizeof(struct image));
         return NULL;
     }
