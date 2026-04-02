@@ -139,6 +139,9 @@ int init_config_disk(struct volume *part) {
 opened:
     case_insensitive_fopen = old_cif;
 
+    if (f->size > SIZE_MAX - 2) {
+        panic(false, "Config file too large");
+    }
     size_t config_size = f->size + 2;
     config_addr = ext_mem_alloc(config_size);
 
