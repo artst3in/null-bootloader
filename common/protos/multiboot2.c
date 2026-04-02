@@ -214,6 +214,8 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
             }
             case MULTIBOOT_HEADER_TAG_CONSOLE_FLAGS: {
 #if defined (UEFI)
+                if (tag->size < sizeof(struct multiboot_header_tag_console_flags))
+                    break;
                 struct multiboot_header_tag_console_flags *flags = (void *)tag;
                 if ((flags->console_flags & (1 << 1)) && (flags->console_flags & (1 << 0))) {
                     panic(true, "multiboot2: OS requested EGA text mode, but UEFI does not support it");
@@ -222,15 +224,21 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                 break;
             }
             case MULTIBOOT_HEADER_TAG_FRAMEBUFFER: {
+                if (tag->size < sizeof(struct multiboot_header_tag_framebuffer))
+                    break;
                 fbtag = (void *)tag;
                 break;
             }
             case MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS: {
+                if (tag->size < sizeof(struct multiboot_header_tag_entry_address))
+                    break;
                 struct multiboot_header_tag_entry_address *entrytag = (void *)tag;
                 entry_point = entrytag->entry_addr;
                 break;
             }
             case MULTIBOOT_HEADER_TAG_ADDRESS: {
+                if (tag->size < sizeof(struct multiboot_header_tag_address))
+                    break;
                 addresstag = (void *)tag;
                 break;
             }
@@ -245,6 +253,8 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
                 break;
 
             case MULTIBOOT_HEADER_TAG_RELOCATABLE: {
+                if (tag->size < sizeof(struct multiboot_header_tag_relocatable))
+                    break;
                 has_reloc_header = true;
                 struct multiboot_header_tag_relocatable *reloc_tag_ptr = (void *)tag;
                 reloc_tag = *reloc_tag_ptr;
