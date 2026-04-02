@@ -463,6 +463,9 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
 
     for (size_t i = 0; i < count; i++) {
         if (m[i].type == MEMMAP_EFI_RECLAIMABLE) {
+            if (recl_i >= 1024) {
+                panic(false, "pmm: Too many EFI reclaimable entries");
+            }
             recl[recl_i++] = m[i];
         }
     }
