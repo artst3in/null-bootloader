@@ -640,7 +640,9 @@ static void gterm_parse_config(char *config, struct gterm_config *cfg) {
             goto config_no_load_font;
         }
 
-        size_t tmp_font_size = (tmp_font_width * tmp_font_height * FLANTERM_FB_FONT_GLYPHS) / 8;
+        size_t tmp_font_size = CHECKED_MUL(
+            CHECKED_MUL(tmp_font_width, tmp_font_height, goto config_no_load_font),
+            FLANTERM_FB_FONT_GLYPHS, goto config_no_load_font) / 8;
 
         if (tmp_font_size > FONT_MAX) {
             print("Font would be too large (%U bytes, %u bytes allowed). Not loading.\n", (uint64_t)tmp_font_size, FONT_MAX);
