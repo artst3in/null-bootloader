@@ -436,7 +436,11 @@ static void generate_canvas(struct fb_info *fb) {
         if (bg_canvas != NULL) {
             pmm_free(bg_canvas, bg_canvas_size);
         }
-        bg_canvas_size = fb->framebuffer_width * fb->framebuffer_height * sizeof(uint32_t);
+        bg_canvas_size = CHECKED_MUL(
+            CHECKED_MUL(fb->framebuffer_width, fb->framebuffer_height,
+                panic(false, "gterm: canvas size overflow")),
+            sizeof(uint32_t),
+            panic(false, "gterm: canvas size overflow"));
         bg_canvas = ext_mem_alloc(bg_canvas_size);
 
         // Clamp margin to half the framebuffer dimensions to prevent underflow

@@ -48,14 +48,16 @@ struct image *image_open(struct file_handle *file) {
 
     // Convert ABGR to XRGB
     uint32_t *pptr = (void *)image->img;
-    size_t pixel_count = (size_t)x * (size_t)y;
+    size_t pixel_count = CHECKED_MUL((size_t)x, (size_t)y,
+        ({ pmm_free(image, sizeof(struct image)); return NULL; }));
     for (size_t i = 0; i < pixel_count; i++) {
         pptr[i] = (pptr[i] & 0x0000ff00) | ((pptr[i] & 0x00ff0000) >> 16) | ((pptr[i] & 0x000000ff) << 16);
     }
 
     image->x_size = x;
     image->y_size = y;
-    image->pitch = x * 4;
+    image->pitch = (int)CHECKED_MUL((size_t)x, (size_t)4,
+        ({ pmm_free(image, sizeof(struct image)); return NULL; }));
     image->bpp = 32;
     image->img_width = x;
     image->img_height = y;
