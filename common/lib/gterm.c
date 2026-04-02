@@ -436,10 +436,9 @@ static void generate_canvas(struct fb_info *fb) {
         if (bg_canvas != NULL) {
             pmm_free(bg_canvas, bg_canvas_size);
         }
-        bg_canvas_size = CHECKED_MUL(
-            CHECKED_MUL(fb->framebuffer_width, fb->framebuffer_height,
-                panic(false, "gterm: canvas size overflow")),
-            sizeof(uint32_t),
+        bg_canvas_size = CHECKED_MUL(fb->framebuffer_width, fb->framebuffer_height,
+            panic(false, "gterm: canvas size overflow"));
+        bg_canvas_size = CHECKED_MUL(bg_canvas_size, sizeof(uint32_t),
             panic(false, "gterm: canvas size overflow"));
         bg_canvas = ext_mem_alloc(bg_canvas_size);
 
@@ -640,9 +639,10 @@ static void gterm_parse_config(char *config, struct gterm_config *cfg) {
             goto config_no_load_font;
         }
 
-        size_t tmp_font_size = CHECKED_MUL(
-            CHECKED_MUL(tmp_font_width, tmp_font_height, goto config_no_load_font),
-            FLANTERM_FB_FONT_GLYPHS, goto config_no_load_font) / 8;
+        size_t tmp_font_size = CHECKED_MUL(tmp_font_width, tmp_font_height,
+            goto config_no_load_font);
+        tmp_font_size = CHECKED_MUL(tmp_font_size, FLANTERM_FB_FONT_GLYPHS,
+            goto config_no_load_font) / 8;
 
         if (tmp_font_size > FONT_MAX) {
             print("Font would be too large (%U bytes, %u bytes allowed). Not loading.\n", (uint64_t)tmp_font_size, FONT_MAX);
