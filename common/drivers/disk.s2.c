@@ -620,12 +620,15 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
     // Fallback to unique sector matching
     uint64_t bdev_size = ((uint64_t)block_io->Media->LastBlock + 1) * (uint64_t)block_io->Media->BlockSize;
     if (bdev_size >= UNIQUE_SECTOR_POOL_SIZE) {
+        // Pre-calculate unique sectors before reading query data into
+        // the pool, since find_unique_sectors() uses the same buffer.
+        find_unique_sectors();
+
         status = block_io->ReadBlocks(block_io, block_io->Media->MediaId,
                                       0,
                                       UNIQUE_SECTOR_POOL_SIZE,
                                       unique_sector_pool);
         if (status == 0) {
-            find_unique_sectors();
 
             uint8_t b2b[BLAKE2B_OUT_BYTES];
             blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);
