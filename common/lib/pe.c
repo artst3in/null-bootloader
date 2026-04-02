@@ -183,6 +183,10 @@ static void pe64_validate(uint8_t *image, size_t file_size) {
         panic(true, "pe: Not a valid PE32+ file");
     }
 
+    if (nt_hdrs->FileHeader.SizeOfOptionalHeader < sizeof(IMAGE_OPTIONAL_HEADER64)) {
+        panic(true, "pe: SizeOfOptionalHeader too small");
+    }
+
 #if defined(__x86_64__) || defined(__i386__)
     if (nt_hdrs->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) {
         panic(true, "pe: Not an x86-64 PE file");
