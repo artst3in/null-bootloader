@@ -26,10 +26,20 @@ static uint32_t hw_entropy(void) {
     uint32_t eax, ebx, ecx, edx;
 
     if (cpuid(0x07, 0, &eax, &ebx, &ecx, &edx) && (ebx & (1 << 18))) {
-        uint32_t val = rdseed(uint32_t);
+        uint32_t val =
+#if defined (__x86_64__)
+            (uint32_t)rdseed(uint64_t); // Always do a 64-bit op on 64-bit to work around CPU bugs.
+#elif defined (__i386__)
+            rdseed(uint32_t);
+#endif
         if (val != 0) return val;
     } else if (cpuid(0x01, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1 << 30))) {
-        uint32_t val = rdrand(uint32_t);
+        uint32_t val =
+#if defined (__x86_64__)
+            (uint32_t)rdrand(uint64_t); // As above.
+#elif defined (__i386__)
+            rdrand(uint32_t);
+#endif
         if (val != 0) return val;
     }
 #elif defined (__aarch64__)
