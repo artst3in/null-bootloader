@@ -862,7 +862,7 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
         }
 
         if (phdr->p_vaddr < FIXED_HIGHER_HALF_OFFSET_64) {
-            if (!*is_reloc) {
+            if (!is_reloc || !*is_reloc) {
                 panic(true, "elf: Lower half PHDRs are not allowed");
             }
             lower_to_higher = true;
@@ -884,7 +884,7 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
             }
 
             if (phdr_in->p_vaddr < FIXED_HIGHER_HALF_OFFSET_64) {
-                if (!*is_reloc) {
+                if (!is_reloc || !*is_reloc) {
                     continue;
                 }
             }
@@ -949,7 +949,7 @@ bool elf64_load(uint8_t *elf, size_t file_size, uint64_t *entry_point, uint64_t 
     }
 
 again:
-    if (*is_reloc && kaslr) {
+    if (is_reloc && *is_reloc && kaslr) {
         slide = (rand32() & ~(max_align - 1)) + (lower_to_higher ? FIXED_HIGHER_HALF_OFFSET_64 - min_vaddr : 0);
 
         if (*virtual_base + slide + image_size < 0xffffffff80000000 /* this comparison relies on overflow */) {
