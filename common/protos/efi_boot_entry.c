@@ -63,6 +63,10 @@ static bool find_boot_entry(CHAR16 *entry, uint16_t *out) {
             continue; 
         }
         /* Get the description */
+        if (buf_size < sizeof(uint32_t) + sizeof(uint16_t) + sizeof(CHAR16)) {
+            pmm_free(buf, buf_size);
+            continue;
+        }
         CHAR16 *desc = (CHAR16 *)(buf + sizeof(uint32_t) + sizeof(uint16_t));
         if (uefi_string_matches(desc, entry)) {
             *out = boot_order[i];
