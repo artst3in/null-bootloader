@@ -181,7 +181,11 @@ static bool elf64_validate(struct elf64_hdr *hdr) {
     return true;
 }
 
-int elf_bits(uint8_t *elf) {
+int elf_bits(uint8_t *elf, size_t file_size) {
+    if (file_size < sizeof(struct elf64_hdr)) {
+        return -1;
+    }
+
     struct elf64_hdr *hdr = (void *)elf;
 
     if (strncmp((char *)hdr->ident, "\177ELF", 4)) {

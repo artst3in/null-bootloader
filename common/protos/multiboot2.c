@@ -344,7 +344,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
         ranges->length = full_size;
     } else {
         uint64_t e;
-        int bits = elf_bits(kernel);
+        int bits = elf_bits(kernel, kernel_file_size);
 
         switch (bits) {
             case 32:
@@ -526,7 +526,7 @@ reloc_fail:
 
         memcpy(tag->sections, kernel + section_hdr_info.section_offset, section_table_size);
 
-        int bits = elf_bits(kernel);
+        int bits = elf_bits(kernel, kernel_file_size);
 
         if ((bits == 64 && section_hdr_info.section_entry_size < sizeof(struct elf64_shdr)) ||
             (bits == 32 && section_hdr_info.section_entry_size < sizeof(struct elf32_shdr))) {

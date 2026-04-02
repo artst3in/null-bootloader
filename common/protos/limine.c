@@ -42,7 +42,7 @@ enum executable_format {
 };
 
 static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kernel_size) {
-    if (elf_bits(kernel) != -1) {
+    if (elf_bits(kernel, kernel_size) != -1) {
         return EXECUTABLE_FORMAT_ELF;
     } else if (pe_bits(kernel, kernel_size) != -1) {
         return EXECUTABLE_FORMAT_PE;

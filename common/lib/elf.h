@@ -19,7 +19,7 @@ struct elf_section_hdr_info {
     uint64_t section_offset;
 };
 
-int elf_bits(uint8_t *elf);
+int elf_bits(uint8_t *elf, size_t file_size);
 
 struct elf_section_hdr_info elf64_section_hdr_info(uint8_t *elf);
 struct elf_section_hdr_info elf32_section_hdr_info(uint8_t *elf);

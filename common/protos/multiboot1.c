@@ -158,7 +158,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
         ranges->target = header.load_addr;
         ranges->length = full_size;
     } else {
-        int bits = elf_bits(kernel);
+        int bits = elf_bits(kernel, kernel_file_size);
 
         switch (bits) {
             case 32:
@@ -251,7 +251,7 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
 
         memcpy(sections, kernel + section_hdr_info.section_offset, section_table_size);
 
-        int bits = elf_bits(kernel);
+        int bits = elf_bits(kernel, kernel_file_size);
 
         for (size_t i = 0; i < section_hdr_info.num; i++) {
             if (bits == 64) {
