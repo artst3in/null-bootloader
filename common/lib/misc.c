@@ -170,9 +170,11 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
     if (dtb) {
         printv("dtb: dtb has size %X\n", (uint64_t)size);
 
-        void *new_tab = ext_mem_alloc(size + extra_size);
+        size_t new_size = CHECKED_ADD(size, extra_size,
+            panic(true, "dtb: size overflow"));
+        void *new_tab = ext_mem_alloc(new_size);
 
-        ret = fdt_open_into(dtb, new_tab, size + extra_size);
+        ret = fdt_open_into(dtb, new_tab, new_size);
         if (ret < 0) {
             panic(true, "dtb: failed to resize new DTB");
         }
