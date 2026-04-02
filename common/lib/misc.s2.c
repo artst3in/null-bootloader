@@ -38,12 +38,12 @@ uint64_t strtoui(const char *s, const char **end, int base) {
                 *end = &s[i];
             break;
         }
-        uint64_t mul_result = CHECKED_MUL(n, (uint64_t)base, ({
+        uint64_t mul_result = CHECKED_MUL(n, base, ({
             if (end != NULL)
                 *end = &s[i];
             return UINT64_MAX;
         }));
-        n = CHECKED_ADD(mul_result, (uint64_t)d, ({
+        n = CHECKED_ADD(mul_result, d, ({
             if (end != NULL)
                 *end = &s[i];
             return UINT64_MAX;

@@ -436,7 +436,7 @@ void efi_map_runtime_entries(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length = CHECKED_MUL(entry->NumberOfPages, (uint64_t)4096, continue);
+        uint64_t length = CHECKED_MUL(entry->NumberOfPages, 4096, continue);
 
         memmap_alloc_range(base, length, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
     }

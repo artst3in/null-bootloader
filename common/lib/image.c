@@ -56,7 +56,7 @@ struct image *image_open(struct file_handle *file) {
 
     image->x_size = x;
     image->y_size = y;
-    image->pitch = (int)CHECKED_MUL((size_t)x, (size_t)4,
+    image->pitch = (int)CHECKED_MUL((size_t)x, 4,
         ({ pmm_free(image, sizeof(struct image)); return NULL; }));
     image->bpp = 32;
     image->img_width = x;

@@ -72,7 +72,7 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
 
     if (volume->sect_count != (uint64_t)-1) {
         // sect_count is always in 512-byte sectors for both whole disks and partitions
-        uint64_t part_size = CHECKED_MUL(volume->sect_count, (uint64_t)512, return false);
+        uint64_t part_size = CHECKED_MUL(volume->sect_count, 512, return false);
         if (loc >= part_size || count > part_size - loc) {
             return false;
         }
@@ -211,7 +211,7 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
         return INVALID_TABLE;
     }
 
-    uint64_t entry_offset = CHECKED_MUL((uint64_t)header.partition_entry_lba, (uint64_t)lb_size, return INVALID_TABLE);
+    uint64_t entry_offset = CHECKED_MUL(header.partition_entry_lba, lb_size, return INVALID_TABLE);
     // Use actual entry size from header for offset calculation
     uint64_t partition_offset = (uint64_t)partition * entry_size;
     entry_offset = CHECKED_ADD(entry_offset, partition_offset, return INVALID_TABLE);
@@ -407,8 +407,8 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
 
     // Check for overflow in first_sect calculation
     uint64_t first_sect_64 = CHECKED_ADD(extended_part->first_sect, ebr_sector, return NO_PARTITION);
-    first_sect_64 = CHECKED_ADD(first_sect_64, (uint64_t)entry.first_sect, return NO_PARTITION);
-    (void)CHECKED_ADD(first_sect_64, (uint64_t)entry.sect_count, return NO_PARTITION);
+    first_sect_64 = CHECKED_ADD(first_sect_64, entry.first_sect, return NO_PARTITION);
+    (void)CHECKED_ADD(first_sect_64, entry.sect_count, return NO_PARTITION);
 
 #if defined (UEFI)
     ret->efi_handle  = extended_part->efi_handle;

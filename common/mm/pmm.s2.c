@@ -385,7 +385,7 @@ void init_memmap(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length = CHECKED_MUL(entry->NumberOfPages, (uint64_t)4096, continue);
+        uint64_t length = CHECKED_MUL(entry->NumberOfPages, 4096, continue);
 
         if (memmap_entries == memmap_max_entries) {
             panic(false, "Memory map exhausted.");
@@ -482,7 +482,7 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
             uint64_t base = r->base;
             uint64_t top = CHECKED_ADD(base, r->length, continue);
             uint64_t efi_base = entry->PhysicalStart;
-            uint64_t efi_size = CHECKED_MUL(entry->NumberOfPages, (uint64_t)4096, continue);
+            uint64_t efi_size = CHECKED_MUL(entry->NumberOfPages, 4096, continue);
 
             if (efi_base < base) {
                 if (efi_size <= base - efi_base)
