@@ -144,7 +144,8 @@ noreturn void multiboot1_load(char *config, char *cmdline) {
             panic(true, "multiboot1: load_src + load_size exceeds kernel file size");
         }
 
-        size_t full_size = load_size + bss_size;
+        size_t full_size = CHECKED_ADD(load_size, bss_size,
+            panic(true, "multiboot1: load_size + bss_size overflow"));
 
         void *elsewhere = ext_mem_alloc(full_size);
 
