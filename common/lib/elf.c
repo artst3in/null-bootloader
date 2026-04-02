@@ -208,12 +208,17 @@ int elf_bits(uint8_t *elf, size_t file_size) {
     }
 }
 
-struct elf_section_hdr_info elf64_section_hdr_info(uint8_t *elf) {
+struct elf_section_hdr_info elf64_section_hdr_info(uint8_t *elf, size_t file_size) {
     struct elf_section_hdr_info info = {0};
 
     struct elf64_hdr *hdr = (void *)elf;
 
     elf64_validate(hdr);
+
+    if (CHECKED_ADD(CHECKED_MUL(hdr->sh_num, hdr->shdr_size, return info),
+            hdr->shoff, return info) > file_size) {
+        return info;
+    }
 
     info.num = hdr->sh_num;
     info.section_entry_size = hdr->shdr_size;
@@ -223,12 +228,17 @@ struct elf_section_hdr_info elf64_section_hdr_info(uint8_t *elf) {
     return info;
 }
 
-struct elf_section_hdr_info elf32_section_hdr_info(uint8_t *elf) {
+struct elf_section_hdr_info elf32_section_hdr_info(uint8_t *elf, size_t file_size) {
     struct elf_section_hdr_info info = {0};
 
     struct elf32_hdr *hdr = (void *)elf;
 
     elf32_validate(hdr);
+
+    if (CHECKED_ADD(CHECKED_MUL(hdr->sh_num, hdr->shdr_size, return info),
+            hdr->shoff, return info) > file_size) {
+        return info;
+    }
 
     info.num = hdr->sh_num;
     info.section_entry_size = hdr->shdr_size;
