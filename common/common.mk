@@ -125,6 +125,7 @@ ifeq ($(TARGET),uefi-ia32)
         -fshort-wchar \
         -m32 \
         -march=i686 \
+        -malign-double \
         -mabi=sysv \
         -mno-80387 \
         -mno-mmx
