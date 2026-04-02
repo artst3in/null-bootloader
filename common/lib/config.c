@@ -361,7 +361,12 @@ int init_config(size_t config_size) {
         uint8_t hash_buf[BLAKE2B_OUT_BYTES];
 
         for (size_t i = 0; i < BLAKE2B_OUT_BYTES; i++) {
-            hash_buf[i] = digit_to_int(config_b2sum[i * 2]) << 4 | digit_to_int(config_b2sum[i * 2 + 1]);
+            int hi = digit_to_int(config_b2sum[i * 2]);
+            int lo = digit_to_int(config_b2sum[i * 2 + 1]);
+            if (hi == -1 || lo == -1) {
+                panic(false, "!!! INVALID CHARACTER IN CONFIG CHECKSUM !!!");
+            }
+            hash_buf[i] = hi << 4 | lo;
         }
 
         if (memcmp(hash_buf, out_buf, BLAKE2B_OUT_BYTES) != 0) {
