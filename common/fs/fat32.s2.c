@@ -428,6 +428,7 @@ static bool fat32_filename_to_8_3(char *dest, const char *src) {
 static int fat32_open_in(struct fat32_context* context, struct fat32_directory_entry* directory, struct fat32_directory_entry* file, const char* name) {
     size_t block_size = context->sectors_per_cluster * context->bytes_per_sector;
     char current_lfn[FAT32_LFN_MAX_FILENAME_LENGTH] = {0};
+    unsigned int lfn_expected = 0;
 
     size_t dir_chain_len;
     struct fat32_directory_entry *directory_entries;
@@ -506,17 +507,23 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
         if (directory_entries[i].attribute == FAT32_LFN_ATTRIBUTE) {
             struct fat32_lfn_entry* lfn = (struct fat32_lfn_entry*) &directory_entries[i];
 
+            const unsigned int seq_num = lfn->sequence_number & 0b00011111;
+
             if (lfn->sequence_number & 0b01000000) {
                 // this lfn is the first entry in the table, clear the lfn buffer
                 memset(current_lfn, ' ', sizeof(current_lfn));
+                lfn_expected = seq_num;
             }
 
-            const unsigned int seq_num = lfn->sequence_number & 0b00011111;
-            if (seq_num == 0) {
-                continue;  // Invalid sequence number, skip
+            if (seq_num == 0 || seq_num != lfn_expected) {
+                lfn_expected = 0;  // Invalidate: out of order or gap
+                continue;
             }
+            lfn_expected--;
+
             const unsigned int lfn_index = (seq_num - 1U) * 13U;
             if (lfn_index >= FAT32_LFN_MAX_ENTRIES * 13) {
+                lfn_expected = 0;
                 continue;
             }
 
@@ -524,7 +531,7 @@ static int fat32_open_in(struct fat32_context* context, struct fat32_directory_e
             fat32_lfncpy(current_lfn, sizeof(current_lfn), lfn_index + 5, lfn->name2, 6);
             fat32_lfncpy(current_lfn, sizeof(current_lfn), lfn_index + 11, lfn->name3, 2);
 
-            if (lfn_index != 0)
+            if (seq_num != 1)
                 continue;
 
             // remove trailing spaces
