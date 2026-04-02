@@ -26,9 +26,11 @@ static uint32_t hw_entropy(void) {
     uint32_t eax, ebx, ecx, edx;
 
     if (cpuid(0x07, 0, &eax, &ebx, &ecx, &edx) && (ebx & (1 << 18))) {
-        return rdseed(uint32_t);
+        uint32_t val = rdseed(uint32_t);
+        if (val != 0) return val;
     } else if (cpuid(0x01, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1 << 30))) {
-        return rdrand(uint32_t);
+        uint32_t val = rdrand(uint32_t);
+        if (val != 0) return val;
     }
 #elif defined (__aarch64__)
     // ARMv8.5-RNG: check ID_AA64ISAR0_EL1 RNDR field (bits [63:60])

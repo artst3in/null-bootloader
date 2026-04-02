@@ -170,24 +170,28 @@ static inline uint64_t tsc_freq_arch(void) {
 }
 
 #define rdrand(type) ({ \
-    type rdrand__ret; \
-    asm volatile ( \
-        "1: " \
-        "rdrand %0;" \
-        "jnc 1b;" \
-        : "=r" (rdrand__ret) \
-    ); \
+    type rdrand__ret = 0; \
+    for (int rdrand__i = 0; rdrand__i < 10; rdrand__i++) { \
+        bool rdrand__ok; \
+        asm volatile ( \
+            "rdrand %0; setc %1" \
+            : "=r" (rdrand__ret), "=qm" (rdrand__ok) \
+        ); \
+        if (rdrand__ok) break; \
+    } \
     rdrand__ret; \
 })
 
 #define rdseed(type) ({ \
-    type rdseed__ret; \
-    asm volatile ( \
-        "1: " \
-        "rdseed %0;" \
-        "jnc 1b;" \
-        : "=r" (rdseed__ret) \
-    ); \
+    type rdseed__ret = 0; \
+    for (int rdseed__i = 0; rdseed__i < 10; rdseed__i++) { \
+        bool rdseed__ok; \
+        asm volatile ( \
+            "rdseed %0; setc %1" \
+            : "=r" (rdseed__ret), "=qm" (rdseed__ok) \
+        ); \
+        if (rdseed__ok) break; \
+    } \
     rdseed__ret; \
 })
 
