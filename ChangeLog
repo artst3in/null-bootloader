@@ -1,3 +1,35 @@
+2026-04-02  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.2.0 ***
+
+    Noteworthy changes compared to the previous release, 11.1.0:
+
+    New features:
+        - Enforce hash verification of loaded files when UEFI Secure Boot is
+          active. When Secure Boot is detected, Limine requires an enrolled
+          config checksum, BLAKE2B hashes on all file paths, disables the
+          config editor, and forces hash_mismatch_panic to yes.
+        - Linux boot protocol: Load and concatenate all modules on non-x86, not
+          just the first.
+        - ISO 9660: Handle Rock Ridge NM continuation entries.
+
+    Bug fixes:
+        - Use -malign-double for IA-32 UEFI builds to match UEFI specification
+          struct alignment.
+        - Fix unique sector pool being clobbered by find_unique_sectors().
+        - Revert GOP workaround that called SetMode() on every handle to avoid
+          clearing the screen where unnecessary/ugly.
+        - Do not call ClearScreen() on EFI fallback terminal init for the same
+          reason.
+        - Miscellaneous fixes for low severity bugs found with static analysis.
+
+    Miscellaneous:
+        - Re-enable decompressor bounds checks, CRC32, and length validation.
+        - Mix hardware entropy on non-x86 via RNDR instruction and EFI RNG
+          protocol and add support for aarch64 hardware RNG.
+        - Prefer 64-bit rdrand/rdseed on x86-64 over 32-bit. Fixes potential
+          issues on certain unpatched Zen 5 systems.
+
 2026-03-25  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 11.1.0 ***
