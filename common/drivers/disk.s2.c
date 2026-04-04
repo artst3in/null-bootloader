@@ -266,6 +266,13 @@ void disk_create_index(void) {
         bool is_atapi = (dpte != NULL && (dpte->flags & (1 << 6)));
         block->is_optical = is_atapi || (block->sector_size == 2048 && is_removable);
 
+        // Ugly workaround for VMware, because it puts the optical drive at 0x9f but does
+        // not expose DPTE.
+        if (drive == 0x9f && block->sector_size == 2048) {
+            is_removable = true;
+            block->is_optical = true;
+        }
+
         if (!is_removable && !block->is_optical) {
             if (consumed_bda_disks == bda_disk_count) {
                 pmm_free(block, sizeof(struct volume));
