@@ -235,9 +235,11 @@ refresh:
             print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
             print("\n\n");
         }
+        terms[0]->get_cursor_pos(terms[0], &x, &y);
+        set_cursor_pos_helper((terms[0]->cols - 32) / 2, y);
+        print("%sESC\e[0m Discard and Exit    %sF10\e[0m Boot", interface_help_colour, interface_help_colour);
+        print("\n\n");
     }
-
-    print("    %sESC\e[0m Discard and Exit    %sF10\e[0m Boot\n\n", interface_help_colour, interface_help_colour);
 
     print(serial ? "/" : "┌");
     for (size_t i = 0; i < terms[0]->cols - 2; i++) {
@@ -1287,6 +1289,9 @@ noreturn void _menu(bool first_run) {
     }
 #endif
 
+    if (timeout > 9999)
+        timeout = 9999;
+
 #if defined(UEFI)
     bool reboot_to_firmware_supported = reboot_to_fw_ui_supported();
 #endif
@@ -1308,7 +1313,7 @@ noreturn void _menu(bool first_run) {
 
     menu_init_term();
 
-    if (terms[0]->cols < 40 || terms[0]->rows < 16) {
+    if (terms[0]->cols < 70 || terms[0]->rows < 16) {
         // Terminal too small for menu, fall back to text console
 #if defined (BIOS)
         vga_textmode_init(true);
@@ -1319,11 +1324,18 @@ noreturn void _menu(bool first_run) {
     }
 
     size_t tree_offset = 0;
-    size_t branding_offset = (menu_branding[0] != '\0') ? 2 : 0;
+    size_t header_offset = (menu_branding[0] != '\0') ? 2 : 0;
+    bool has_secondary_help = editor_enabled;
+#if defined(UEFI)
+    has_secondary_help = has_secondary_help || reboot_to_firmware_supported;
+#endif
+    if (has_secondary_help) {
+        header_offset += 2;
+    }
 
 refresh:
-    if (selected_entry >= tree_offset + terms[0]->rows - 7 - branding_offset) {
-        tree_offset = selected_entry - (terms[0]->rows - 8 - branding_offset);
+    if (selected_entry >= tree_offset + terms[0]->rows - 8 - header_offset) {
+        tree_offset = selected_entry - (terms[0]->rows - 9 - header_offset);
     }
     if (selected_entry < tree_offset) {
         tree_offset = selected_entry;
@@ -1361,7 +1373,7 @@ refresh:
     }
 
     size_t max_tree_len, max_tree_height;
-    max_entries = print_tree(tree_offset, terms[0]->rows - 7 - branding_offset, NULL, 0, 0, selected_entry, menu_tree,
+    max_entries = print_tree(tree_offset, terms[0]->rows - 8 - header_offset, NULL, 0, 0, selected_entry, menu_tree,
                              &selected_menu_entry, &max_tree_len, &max_tree_height);
 
     if (max_entries != 0) {
@@ -1371,13 +1383,17 @@ refresh:
         char *tree_prefix = ext_mem_alloc(tree_prefix_len + 1);
         memset(tree_prefix, ' ', tree_prefix_len);
 
-        if (max_tree_height > terms[0]->rows - 9 - branding_offset) {
-            max_tree_height = terms[0]->rows - 9 - branding_offset;
+        if (max_tree_height > terms[0]->rows - 8 - header_offset) {
+            max_tree_height = terms[0]->rows - 8 - header_offset;
         }
 
-        set_cursor_pos_helper(0, terms[0]->rows / 2 - max_tree_height / 2);
+        size_t tree_start = terms[0]->rows / 2 - max_tree_height / 2;
+        if (tree_start < 4 + header_offset) {
+            tree_start = 4 + header_offset;
+        }
+        set_cursor_pos_helper(0, tree_start);
 
-        max_entries = print_tree(tree_offset, terms[0]->rows - 7 - branding_offset, tree_prefix, 0, 0, selected_entry, menu_tree,
+        max_entries = print_tree(tree_offset, terms[0]->rows - 8 - header_offset, tree_prefix, 0, 0, selected_entry, menu_tree,
                                  &selected_menu_entry, NULL, NULL);
 
         pmm_free(tree_prefix, tree_prefix_len + 1);
@@ -1389,38 +1405,53 @@ refresh:
 
         if (max_entries != 0) {
             if (tree_offset > 0) {
-                set_cursor_pos_helper(terms[0]->cols / 2 - 1, 2 + branding_offset);
+                set_cursor_pos_helper(terms[0]->cols / 2 - 1, 3 + header_offset);
                 print(serial ? "^^^" : "↑↑↑");
             }
 
-            if (tree_offset + (terms[0]->rows - 7 - branding_offset) < max_entries) {
-                set_cursor_pos_helper(terms[0]->cols / 2 - 1, terms[0]->rows - 3);
+            if (tree_offset + (terms[0]->rows - 8 - header_offset) < max_entries) {
+                set_cursor_pos_helper(terms[0]->cols / 2 - 1, terms[0]->rows - 4);
                 print(serial ? "vvv" : "↓↓↓");
             }
         }
 
         if (!help_hidden) {
-            set_cursor_pos_helper(0, 1 + branding_offset);
             if (max_entries != 0) {
+                size_t primary_row = 1 + header_offset - (has_secondary_help ? 2 : 0);
                 if (selected_menu_entry->sub == NULL) {
-                    print("    %sARROWS\e[0m Select    %sENTER\e[0m Boot    %s%s",
-                          interface_help_colour, interface_help_colour, interface_help_colour,
-                          editor_enabled ? "E\e[0m Edit" : "\e[0m");
+                    if (editor_enabled) {
+                        set_cursor_pos_helper((terms[0]->cols - 37) / 2, primary_row);
+                        print("%sARROWS\e[0m Select    %sENTER\e[0m Boot    %sE\e[0m Edit",
+                              interface_help_colour, interface_help_colour, interface_help_colour);
+                    } else {
+                        set_cursor_pos_helper((terms[0]->cols - 27) / 2, primary_row);
+                        print("%sARROWS\e[0m Select    %sENTER\e[0m Boot",
+                              interface_help_colour, interface_help_colour);
+                    }
                 } else {
-                    print("    %sARROWS\e[0m Select    %sENTER\e[0m %s",
-                          interface_help_colour, interface_help_colour,
-                          selected_menu_entry->expanded ? "Collapse" : "Expand");
+                    const char *action = selected_menu_entry->expanded ? "Collapse" : "Expand";
+                    size_t len = 23 + strlen(action);
+                    set_cursor_pos_helper((terms[0]->cols - len) / 2, primary_row);
+                    print("%sARROWS\e[0m Select    %sENTER\e[0m %s",
+                          interface_help_colour, interface_help_colour, action);
                 }
             }
+            if (has_secondary_help) {
+                size_t secondary_row = 1 + header_offset;
 #if defined(UEFI)
-            if (reboot_to_firmware_supported) {
-                set_cursor_pos_helper(terms[0]->cols - (editor_enabled ? 37 : 20), 1 + branding_offset);
-                print("%sS\e[0m Firmware Setup", interface_help_colour);
-            }
+                if (reboot_to_firmware_supported && editor_enabled) {
+                    set_cursor_pos_helper((terms[0]->cols - 33) / 2, secondary_row);
+                    print("%sS\e[0m Firmware Setup    %sB\e[0m Blank Entry",
+                          interface_help_colour, interface_help_colour);
+                } else if (reboot_to_firmware_supported) {
+                    set_cursor_pos_helper((terms[0]->cols - 16) / 2, secondary_row);
+                    print("%sS\e[0m Firmware Setup", interface_help_colour);
+                } else
 #endif
-            if (editor_enabled) {
-                set_cursor_pos_helper(terms[0]->cols - 17, 1 + branding_offset);
-                print("%sB\e[0m Blank Entry", interface_help_colour);
+                if (editor_enabled) {
+                    set_cursor_pos_helper((terms[0]->cols - 13) / 2, secondary_row);
+                    print("%sB\e[0m Blank Entry", interface_help_colour);
+                }
             }
         }
         set_cursor_pos_helper(x, y);
@@ -1437,7 +1468,7 @@ refresh:
             size_t ndigits = 1;
             for (size_t tmp = i / 10; tmp > 0; tmp /= 10) ndigits++;
             size_t msg_len = 65 + ndigits;
-            set_cursor_pos_helper((terms[0]->cols - msg_len) / 2, terms[0]->rows - 2);
+            set_cursor_pos_helper(msg_len < terms[0]->cols ? (terms[0]->cols - msg_len) / 2 : 0, terms[0]->rows - 2);
             FOR_TERM(TERM->scroll_enabled = false);
             print("\e[2K%sBooting automatically in %s%U%s, press any key to stop the countdown...\e[0m",
                   interface_help_colour, interface_help_colour_bright, (uint64_t)i, interface_help_colour);
