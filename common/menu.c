@@ -4,6 +4,7 @@
 #include <stdnoreturn.h>
 #include <config.h>
 #include <menu.h>
+#include <lib/bli.h>
 #include <lib/print.h>
 #include <lib/misc.h>
 #include <lib/libc.h>
@@ -1167,56 +1168,92 @@ noreturn void _menu(bool first_run) {
 
     size_t selected_entry = 0;
 
-    char *default_entry = config_get_value(NULL, 0, "DEFAULT_ENTRY");
-    if (default_entry != NULL) {
-        bool is_index = true;
-        for (const char *p = default_entry; *p != '\0'; p++) {
-            if (*p < '0' || *p > '9') {
-                is_index = false;
-                break;
-            }
-        }
-        if (is_index) {
-            selected_entry = strtoui(default_entry, NULL, 10);
-            if (selected_entry)
-                selected_entry--;
-        } else {
-            // Copy the path since find_entry_by_path calls config_get_value
-            // internally (via should_skip_entry), which clobbers the static buffer.
-            char default_entry_path[256];
-            size_t len = strlen(default_entry);
-            if (len >= sizeof(default_entry_path)) {
-                len = sizeof(default_entry_path) - 1;
-            }
-            memcpy(default_entry_path, default_entry, len);
-            default_entry_path[len] = '\0';
+    bool has_entry = false;
+
+#if defined (UEFI)
+    {
+        char path[256];
+        if (bli_get_oneshot_entry(path, 256)) {
+            // Find the entry with this path, expand directories, and get its index.
             struct menu_entry *found_entry = NULL;
             size_t found_index = 0;
-            find_entry_by_path(default_entry_path, menu_tree, 0, &found_entry, &found_index, true);
+            find_entry_by_path(path, menu_tree, 0, &found_entry, &found_index, true);
             if (found_entry != NULL) {
                 selected_entry = found_index;
+                has_entry = true;
+            }
+        }
+    }
+#endif
+
+    if (!has_entry) {
+        char *default_entry = config_get_value(NULL, 0, "DEFAULT_ENTRY");
+        if (default_entry != NULL) {
+            bool is_index = true;
+            for (const char *p = default_entry; *p != '\0'; p++) {
+                if (*p < '0' || *p > '9') {
+                    is_index = false;
+                    break;
+                }
+            }
+            if (is_index) {
+                selected_entry = strtoui(default_entry, NULL, 10);
+                if (selected_entry)
+                    selected_entry--;
+            } else {
+                // Copy the path since find_entry_by_path calls config_get_value
+                // internally (via should_skip_entry), which clobbers the static buffer.
+                char default_entry_path[256];
+                size_t len = strlen(default_entry);
+                if (len >= sizeof(default_entry_path)) {
+                    len = sizeof(default_entry_path) - 1;
+                }
+                memcpy(default_entry_path, default_entry, len);
+                default_entry_path[len] = '\0';
+                struct menu_entry *found_entry = NULL;
+                size_t found_index = 0;
+                find_entry_by_path(default_entry_path, menu_tree, 0, &found_entry, &found_index, true);
+                if (found_entry != NULL) {
+                    selected_entry = found_index;
+                }
             }
         }
     }
 
 #if defined (UEFI)
-    char *remember_last = config_get_value(NULL, 0, "REMEMBER_LAST_ENTRY");
-    if (remember_last != NULL && strcasecmp(remember_last, "yes") == 0) {
-        char last_entry_path[256];
-        UINTN getvar_size = sizeof(last_entry_path);
-        if (gRT->GetVariable(L"LimineLastBootedEntry",
-                             &limine_efi_vendor_guid,
-                             NULL,
-                             &getvar_size,
-                             last_entry_path) == 0 && getvar_size > 0) {
-            // Ensure NUL termination
-            last_entry_path[getvar_size < sizeof(last_entry_path) ? getvar_size : sizeof(last_entry_path) - 1] = '\0';
+    if (!has_entry) {
+        char *remember_last = config_get_value(NULL, 0, "REMEMBER_LAST_ENTRY");
+        if (remember_last != NULL && strcasecmp(remember_last, "yes") == 0) {
+            char last_entry_path[256];
+            UINTN getvar_size = sizeof(last_entry_path);
+            if (gRT->GetVariable(L"LimineLastBootedEntry",
+                                 &limine_efi_vendor_guid,
+                                 NULL,
+                                 &getvar_size,
+                                 last_entry_path) == 0 && getvar_size > 0) {
+                // Ensure NUL termination
+                last_entry_path[getvar_size < sizeof(last_entry_path) ? getvar_size : sizeof(last_entry_path) - 1] = '\0';
+                // Find the entry with this path, expand directories, and get its index.
+                struct menu_entry *found_entry = NULL;
+                size_t found_index = 0;
+                find_entry_by_path(last_entry_path, menu_tree, 0, &found_entry, &found_index, true);
+                if (found_entry != NULL) {
+                    selected_entry = found_index;
+                    has_entry = true;
+                }
+            }
+        }
+    }
+    if (!has_entry) {
+        char path[256];
+        if (bli_get_default_entry(path, 256)) {
             // Find the entry with this path, expand directories, and get its index.
             struct menu_entry *found_entry = NULL;
             size_t found_index = 0;
-            find_entry_by_path(last_entry_path, menu_tree, 0, &found_entry, &found_index, true);
+            find_entry_by_path(path, menu_tree, 0, &found_entry, &found_index, true);
             if (found_entry != NULL) {
                 selected_entry = found_index;
+                has_entry = true;
             }
         }
     }
@@ -1230,13 +1267,29 @@ noreturn void _menu(bool first_run) {
     }
 
     size_t timeout = 5;
-    char *timeout_config = config_get_value(NULL, 0, "TIMEOUT");
-    if (timeout_config != NULL) {
-        if (!strcmp(timeout_config, "no"))
-            skip_timeout = true;
-        else
-            timeout = strtoui(timeout_config, NULL, 10);
+
+    bool has_timeout = false;
+
+#if defined (UEFI)
+    has_timeout = bli_update_oneshot_timeout(&timeout, &skip_timeout);
+#endif
+
+    if (!has_timeout) {
+        char *timeout_config = config_get_value(NULL, 0, "TIMEOUT");
+        if (timeout_config != NULL) {
+            has_timeout = true;
+            if (!strcmp(timeout_config, "no"))
+                skip_timeout = true;
+            else
+                timeout = strtoui(timeout_config, NULL, 10);
+        }
     }
+
+#if defined (UEFI)
+    if (!has_timeout) {
+        has_timeout = bli_update_timeout(&timeout, &skip_timeout);
+    }
+#endif
 
 #if defined(UEFI)
     bool reboot_to_firmware_supported = reboot_to_fw_ui_supported();
@@ -1508,6 +1561,7 @@ timeout_aborted:
                                  EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
                                  strlen(entry_path) + 1,
                                  entry_path);
+                bli_set_selected_entry(entry_path);
 #endif
 
                 boot(selected_menu_entry->body);
