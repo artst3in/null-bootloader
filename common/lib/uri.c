@@ -257,20 +257,13 @@ struct file_handle *uri_open(char *uri) {
     }
 
     if (hash != NULL && ret != NULL) {
-        uint8_t out_buf[BLAKE2B_OUT_BYTES];
-#if defined (UEFI) && defined (__x86_64__)
-        void *file_buf = freadall_mode(ret, MEMMAP_BOOTLOADER_RECLAIMABLE, true);
-#else
-        void *file_buf = freadall(ret, MEMMAP_BOOTLOADER_RECLAIMABLE);
-#endif
-        blake2b(out_buf, file_buf, ret->size);
         uint8_t hash_buf[BLAKE2B_OUT_BYTES];
 
         for (size_t i = 0; i < sizeof(hash_buf); i++) {
             hash_buf[i] = digit_to_int(hash[i * 2]) << 4 | digit_to_int(hash[i * 2 + 1]);
         }
 
-        if (memcmp(hash_buf, out_buf, sizeof(out_buf)) != 0) {
+        if (!blake2b_verify_file(ret, hash_buf)) {
             if (hash_mismatch_panic) {
                 panic(true, "Blake2b hash for URI `%#` does not match!", uri);
             } else {
