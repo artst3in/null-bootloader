@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <crypt/blake2b.h>
+#include <fs/file.h>
 #include <lib/libc.h>
 
 #define BLAKE2B_BLOCK_BYTES 128
@@ -217,4 +218,26 @@ void blake2b(void *out, const void *in, size_t in_len) {
     blake2b_init(&state);
     blake2b_update(&state, in, in_len);
     blake2b_final(&state, out);
+}
+
+bool blake2b_verify_file(struct file_handle *fd, const uint8_t expected[BLAKE2B_OUT_BYTES]) {
+    uint8_t out_buf[BLAKE2B_OUT_BYTES];
+
+    if (fd->is_memfile) {
+        blake2b(out_buf, fd->fd, fd->size);
+        return memcmp(out_buf, expected, BLAKE2B_OUT_BYTES) == 0;
+    }
+    
+    struct blake2b_state state;
+    blake2b_init(&state);
+    char chunk_buf[4096];
+    
+    for (uint64_t r = fd->size, off = 0, sz; r > 0; off += sz, r -= sz) {
+        fd->read(fd, chunk_buf, off, sz = r < 4096 ? r : 4096);
+        blake2b_update(&state, chunk_buf, sz);
+    }
+    
+    blake2b_final(&state, out_buf);
+
+    return memcmp(out_buf, expected, BLAKE2B_OUT_BYTES) == 0;
 }
