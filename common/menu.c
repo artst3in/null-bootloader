@@ -231,7 +231,7 @@ refresh:
         print("\n");
         if (menu_branding[0] != '\0') {
             terms[0]->get_cursor_pos(terms[0], &x, &y);
-            set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2, panic(false, "Alignment overflow")), y);
+            set_cursor_pos_helper((terms[0]->cols - strlen(menu_branding)) / 2, y);
             print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
             print("\n\n");
         }
@@ -259,7 +259,7 @@ refresh:
                     display_length = max_title;
                     truncated = true;
                 }
-                if (i == (terms[0]->cols / 2) - DIV_ROUNDUP(display_length, 2, panic(false, "Alignment overflow")) - 1 - 1) {
+                if (i == (terms[0]->cols - display_length - 4) / 2) {
                     if (truncated) {
                         print(serial ? "|%S...|" : "┤%S...├", title, (size_t)(display_length - 3));
                     } else {
@@ -445,7 +445,7 @@ tab_part:
                     // FALLTHRU
                 default:
                     if (overflow_msg != NULL
-                     && i == (terms[0]->cols / 2) - DIV_ROUNDUP(overflow_len, 2, panic(false, "Alignment overflow")) - 1 - 1) {
+                     && i == (terms[0]->cols - overflow_len - 4) / 2) {
                         print(serial ? "|" : "┤");
                         print("\e[31m%s\e[0m", overflow_msg);
                         print(serial ? "|" : "├");
@@ -1360,7 +1360,7 @@ refresh:
         print("\n");
         if (menu_branding[0] != '\0') {
             terms[0]->get_cursor_pos(terms[0], &x, &y);
-            set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2, panic(false, "Alignment overflow")), y);
+            set_cursor_pos_helper((terms[0]->cols - strlen(menu_branding)) / 2, y);
             print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
             print("\n\n\n\n");
         }
@@ -1377,7 +1377,7 @@ refresh:
         } else {
             msg = "[config file not found]";
         }
-        set_cursor_pos_helper(terms[0]->cols / 2 - strlen(msg) / 2, terms[0]->rows / 2);
+        set_cursor_pos_helper((terms[0]->cols - strlen(msg)) / 2, terms[0]->rows / 2);
         print("%s\n", msg);
     }
 
@@ -1386,9 +1386,7 @@ refresh:
                              &selected_menu_entry, &max_tree_len, &max_tree_height);
 
     if (max_entries != 0) {
-        size_t half_cols = terms[0]->cols / 2;
-        size_t half_tree = DIV_ROUNDUP(max_tree_len, 2, panic(false, "Alignment overflow"));
-        size_t tree_prefix_len = (half_cols > half_tree + 2) ? (half_cols - half_tree - 2) : 1;
+        size_t tree_prefix_len = (terms[0]->cols > max_tree_len + 2) ? (terms[0]->cols - max_tree_len - 2) / 2 : 1;
         char *tree_prefix = ext_mem_alloc(tree_prefix_len + 1);
         memset(tree_prefix, ' ', tree_prefix_len);
 
@@ -1414,12 +1412,12 @@ refresh:
 
         if (max_entries != 0) {
             if (tree_offset > 0) {
-                set_cursor_pos_helper(terms[0]->cols / 2 - 1, 3 + header_offset);
+                set_cursor_pos_helper((terms[0]->cols - 3) / 2, 3 + header_offset);
                 print(serial ? "^^^" : "↑↑↑");
             }
 
             if (tree_offset + (terms[0]->rows - 8 - header_offset) < max_entries) {
-                set_cursor_pos_helper(terms[0]->cols / 2 - 1, terms[0]->rows - 4);
+                set_cursor_pos_helper((terms[0]->cols - 3) / 2, terms[0]->rows - 4);
                 print(serial ? "vvv" : "↓↓↓");
             }
         }
