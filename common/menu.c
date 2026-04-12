@@ -231,8 +231,17 @@ refresh:
         print("\n");
         if (menu_branding[0] != '\0') {
             terms[0]->get_cursor_pos(terms[0], &x, &y);
-            set_cursor_pos_helper((terms[0]->cols - strlen(menu_branding)) / 2, y);
-            print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
+            {
+                size_t branding_len = strlen(menu_branding);
+                size_t max_len = terms[0]->cols - 2;
+                if (branding_len <= max_len) {
+                    set_cursor_pos_helper((terms[0]->cols - branding_len) / 2, y);
+                    print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
+                } else {
+                    set_cursor_pos_helper(1, y);
+                    print("\e[3%sm%S...\e[0m", menu_branding_colour, menu_branding, (size_t)(max_len - 3));
+                }
+            }
             print("\n\n");
         }
         terms[0]->get_cursor_pos(terms[0], &x, &y);
@@ -1360,8 +1369,17 @@ refresh:
         print("\n");
         if (menu_branding[0] != '\0') {
             terms[0]->get_cursor_pos(terms[0], &x, &y);
-            set_cursor_pos_helper((terms[0]->cols - strlen(menu_branding)) / 2, y);
-            print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
+            {
+                size_t branding_len = strlen(menu_branding);
+                size_t max_len = terms[0]->cols - 2;
+                if (branding_len <= max_len) {
+                    set_cursor_pos_helper((terms[0]->cols - branding_len) / 2, y);
+                    print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
+                } else {
+                    set_cursor_pos_helper(1, y);
+                    print("\e[3%sm%S...\e[0m", menu_branding_colour, menu_branding, (size_t)(max_len - 3));
+                }
+            }
             print("\n\n\n\n");
         }
     }
