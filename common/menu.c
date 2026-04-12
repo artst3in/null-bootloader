@@ -1114,12 +1114,14 @@ noreturn void _menu(bool first_run) {
         interface_help_colour_bright[3] = interface_help_colour_str[0];
     }
 
+    bool custom_branding = false;
     {
         char *tmp = config_get_value(NULL, 0, "INTERFACE_BRANDING");
         if (tmp != NULL) {
             size_t len = strlen(tmp) + 1;
             menu_branding = ext_mem_alloc(len);
             memcpy(menu_branding, tmp, len);
+            custom_branding = true;
         }
     }
     if (menu_branding == NULL) {
@@ -1158,7 +1160,7 @@ noreturn void _menu(bool first_run) {
 #endif
     }
 
-    if (secure_boot_active) {
+    if (secure_boot_active && !custom_branding) {
         const char *suffix = ", Secure Boot)";
         size_t suffix_len = strlen(suffix) + 1;
         size_t old_len = strlen(menu_branding);
