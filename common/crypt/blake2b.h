@@ -7,7 +7,4 @@
 
 void blake2b(void *out, const void *in, size_t in_len);
 
-struct file_handle;
-bool blake2b_verify_file(struct file_handle *fd, const uint8_t expected[BLAKE2B_OUT_BYTES]);
-
 #endif
