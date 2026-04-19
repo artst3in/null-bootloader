@@ -82,6 +82,13 @@ if ! test -f version; then
     cp cc-runtime/src/cc-runtime.c common/cc-runtime.s2.c
 
     clone_repo_commit \
+        https://github.com/iczelia/pdgzip.git \
+        pdgzip \
+        16c41d9af067c4185c136622c58ad4188609a3d1
+    cp pdgzip/pdgzip.c common/compress/pdgzip.c
+    cp pdgzip/pdgzip.h common/compress/pdgzip.h
+
+    clone_repo_commit \
         https://github.com/Limine-Bootloader/limine-protocol.git \
         limine-protocol \
         8d9a92abd953882aa9b08cdc002544b79d065925
