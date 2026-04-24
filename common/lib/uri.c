@@ -402,6 +402,36 @@ struct file_handle *uri_open(char *uri, uint32_t type, bool allow_high_mem
                 uint64_t new_cap = buf_cap < 0x4000000
                     ? buf_cap * 2
                     : buf_cap + 0x4000000;
+                uint64_t delta = new_cap - buf_cap;
+
+                // Try to extend in place by claiming the USABLE range
+                // immediately below the current buffer. The allocator is
+                // top-down, so above is already taken; below is the only
+                // direction that can be contiguous. On success we only
+                // pay delta extra bytes, not 2x peak.
+                if (buf_addr >= delta &&
+                    memmap_alloc_range(buf_addr - delta, delta, type,
+                                       MEMMAP_USABLE, false, false, false)) {
+                    uint64_t base = buf_addr - delta;
+                    // Move existing data down. dest < src, forward-safe.
+#if defined (__i386__)
+                    if (is_high) {
+                        for (uint64_t off = 0; off < buf_len; off += 0x100000) {
+                            size_t chunk = buf_len - off < 0x100000 ? (size_t)(buf_len - off) : 0x100000;
+                            memcpy_from_64(pool, buf_addr + off, chunk);
+                            memcpy_to_64(base + off, pool, chunk);
+                        }
+                    } else
+#endif
+                    {
+                        memmove((void *)(uintptr_t)base, buf_low, buf_len);
+                        buf_low = (void *)(uintptr_t)base;
+                    }
+                    buf_addr = base;
+                    buf_cap = new_cap;
+                    goto grew;
+                }
+
                 void *new_low = NULL;
                 uint64_t new_addr = 0;
                 uri_alloc(new_cap, type, allow_high_mem, &new_low, &new_addr);
@@ -447,6 +477,7 @@ struct file_handle *uri_open(char *uri, uint32_t type, bool allow_high_mem
                 }
                 is_high = new_is_high;
 #endif
+grew:;
             }
 
             uint64_t want = buf_cap - buf_len;
