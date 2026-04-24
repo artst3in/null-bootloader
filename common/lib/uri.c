@@ -497,6 +497,16 @@ grew:;
             buf_len += got;
         }
 
+        // Release the page-aligned tail past the actual data so we don't
+        // hand the OS up to 64 MiB of slack typed as `type`. Keep at least
+        // one page so the returned handle has a valid address.
+        uint64_t kept = ALIGN_UP(buf_len, 4096, panic(true, "uri: alignment overflow"));
+        if (kept == 0) kept = 4096;
+        if (kept < buf_cap) {
+            uri_release_range(buf_addr + kept, buf_cap - kept);
+            buf_cap = kept;
+        }
+
 #if defined (__i386__)
         if (pool != NULL) pmm_free(pool, 0x100000);
 #endif
