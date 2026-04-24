@@ -397,8 +397,11 @@ struct file_handle *uri_open(char *uri, uint32_t type, bool allow_high_mem
 
         for (;;) {
             if (buf_len == buf_cap) {
-                // Grow: new capacity = 2x (capped to prevent absurd jumps).
-                uint64_t new_cap = buf_cap * 2;
+                // Grow: double up to 64 MiB, then add 64 MiB per step.
+                // Doubling past that wastes too much memory on large files.
+                uint64_t new_cap = buf_cap < 0x4000000
+                    ? buf_cap * 2
+                    : buf_cap + 0x4000000;
                 void *new_low = NULL;
                 uint64_t new_addr = 0;
                 uri_alloc(new_cap, type, allow_high_mem, &new_low, &new_addr);
