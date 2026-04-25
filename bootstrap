@@ -72,7 +72,7 @@ if ! test -f version; then
     clone_repo_commit \
         https://github.com/Mintsuki/stbi-hardened.git \
         stbi-hardened \
-        2e3aa628141b579c20c1651cda6738ea3201dd11
+        b85b7e87f6f87300f32f7de3d94e1ed083a71263
     cp stbi-hardened/include/stb_image.h common/lib/stb_image.h
     patch -p0 < common/stb_image.patch
     rm -f common/lib/stb_image.h.orig
