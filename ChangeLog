@@ -7,12 +7,14 @@
     Breaking changes:
         - Re-introduce hash verification enforcement for files loaded under
           UEFI Secure Boot (originally shipped in 11.2.0 and reverted in 11.2.1
-          pending the next major version bump). When Secure Boot is active,
-          Limine now requires an enrolled config checksum, BLAKE2B hashes on
+          pending the next major version bump). When Secure Boot is active and
+          a config checksum is enrolled, Limine now requires BLAKE2B hashes on
           all loaded file paths (with EFI chainloads exempted, as they rely on
           firmware-side Secure Boot verification, and wallpaper and font files
           silently skipped on a missing hash), unconditionally disables the
-          config editor, and forces `hash_mismatch_panic` to `yes`.
+          config editor, and forces `hash_mismatch_panic` to `yes`. Enrolling
+          a config checksum is the explicit opt-in to this hardening; without
+          one, Secure Boot enforcement is not applied.
         - The `interface_branding_colour` and `interface_help_colour` config
           options now take an `RRGGBB` hexadecimal value instead of a 0-7
           colour index. A new `interface_help_colour_bright` option has been
