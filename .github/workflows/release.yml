@@ -86,18 +86,16 @@ jobs:
 
       - name: Create binary release zip and tarballs
         run: |
-          TARBALL_DIRNAME=$(echo ${TAG_NAME} | sed 's/^v//g')
-          mv build/bin ./limine-binary-${TARBALL_DIRNAME}
-          zip -r limine-binary-${TARBALL_DIRNAME}.zip limine-binary-${TARBALL_DIRNAME}
-          tar -cvf limine-binary-${TARBALL_DIRNAME}.tar limine-binary-${TARBALL_DIRNAME}
-          gzip < limine-binary-${TARBALL_DIRNAME}.tar > limine-binary-${TARBALL_DIRNAME}.tar.gz
-          xz < limine-binary-${TARBALL_DIRNAME}.tar > limine-binary-${TARBALL_DIRNAME}.tar.xz
-          rm limine-binary-${TARBALL_DIRNAME}.tar
-          rm -rf limine-binary-${TARBALL_DIRNAME}
+          mv build/bin ./limine-binary
+          zip -r limine-binary.zip limine-binary
+          tar -cvf limine-binary.tar limine-binary
+          gzip < limine-binary.tar > limine-binary.tar.gz
+          xz < limine-binary.tar > limine-binary.tar.xz
+          rm -rf limine-binary.tar limine-binary
 
       - name: Sign release tarballs
         run: |
-          for f in limine-*.tar.* limine-binary-*.zip; do
+          for f in limine-*.tar.* limine-binary.zip; do
             gpg --batch --default-key 05D29860D0A0668AAEFB9D691F3C021BECA23821 --detach-sign "$f"
           done
 
@@ -128,6 +126,6 @@ jobs:
           body_path: rel_notes.txt
           files: |
             limine-*.tar.*
-            limine-binary-*.zip*
+            limine-binary.zip*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
