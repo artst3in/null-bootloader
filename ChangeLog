@@ -1,3 +1,15 @@
+2026-04-26  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.0.2 ***
+
+    Noteworthy changes compared to the previous release, 12.0.1:
+
+    Bug fixes:
+        - Make centering bias consistently left and up across all UI elements.
+
+    Miscellaneous;
+        - Release binary tarballs without version suffixes.
+
 2026-04-25  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 12.0.1 ***
