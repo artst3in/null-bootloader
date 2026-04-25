@@ -1,5 +1,13 @@
 2026-04-25  Mintsuki  <mintsuki@protonmail.com>
 
+    *** Release 12.0.1 ***
+
+    Same as 12.0.0, but re-released due to a botched binary release whose
+    fixed assets that cannot be amended into 12.0.0 afterwards due to release
+    immutability.
+
+2026-04-25  Mintsuki  <mintsuki@protonmail.com>
+
     *** Release 12.0.0 ***
 
     Noteworthy changes compared to the previous release, 11.4.1:
