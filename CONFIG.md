@@ -347,6 +347,12 @@ When Secure Boot is active, all file paths **must** have a hash appended or
 Limine will panic (except for wallpapers and fonts, which are silently skipped
 instead, falling back to defaults).
 
+A gzip-compressed resource is indicated by inserting a dollar character (`$`)
+before the resource string. This allows for transparent decompression. For
+such resources, the hash covers the consumed compressed gzip member bytes,
+not the decompressed data and not trailing bytes outside the consumed member.
+The hash thus authenticates the on-disk payload bytes Limine uses.
+
 ## Macros
 
 Macros are strings that can be arbitrarily assigned to represent other strings.
