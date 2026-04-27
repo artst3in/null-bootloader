@@ -145,6 +145,12 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             dtb = dtb_file->fd;
             size = dtb_file->size;
             fclose(dtb_file);
+
+            ret = fdt_check_full(dtb, size);
+            if (ret != 0) {
+                panic(soft_panic, "dtb: Invalid device tree blob at `%#`: '%s'", dtb_path, fdt_strerror(ret));
+            }
+
             printv("dtb: loaded dtb at %p from file `%#`\n", dtb, dtb_path);
         }
     }
