@@ -287,8 +287,15 @@ static bool is_directory(size_t current_depth, size_t index) {
     }
 }
 
+#define MAX_MENU_NESTING 64
+
 static struct menu_entry *create_menu_tree(struct menu_entry *parent,
                                            size_t current_depth, size_t index) {
+    if (current_depth > MAX_MENU_NESTING) {
+        bad_config = true;
+        panic(true, "config: Menu nesting too deep (max %u)", MAX_MENU_NESTING);
+    }
+
     struct menu_entry *root = NULL, *prev = NULL;
 
     for (size_t i = index; ; i++) {
