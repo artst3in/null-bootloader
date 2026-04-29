@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <efi.h>
 #include <efi/protocol/efitcg2.h>
+#include <efi/protocol/eficc.h>
 #include <lib/tpm.h>
 #include <lib/misc.h>
 #include <lib/print.h>
@@ -47,59 +48,116 @@ struct tpm_pcr_event2_head {
 #define TCG_EV_NO_ACTION 3
 #define TCG_SPECID_SIG   "Spec ID Event03"
 
+// At most one of these is non-NULL after tpm_init. tcg2 takes precedence
+// since it's the more common case (real TPMs); the cc fallback is for
+// confidential-computing platforms (TDX, SEV-SNP) without a discrete TPM.
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
+static EFI_CC_MEASUREMENT_PROTOCOL *cc = NULL;
 
 void tpm_init(void) {
     EFI_GUID tcg2_guid = EFI_TCG2_PROTOCOL_GUID;
-    EFI_TCG2_PROTOCOL *proto = NULL;
-    EFI_STATUS status = gBS->LocateProtocol(&tcg2_guid, NULL, (void **)&proto);
-    if (status != EFI_SUCCESS || proto == NULL) {
-        return;
+    EFI_TCG2_PROTOCOL *tcg2_proto = NULL;
+    EFI_STATUS status = gBS->LocateProtocol(&tcg2_guid, NULL, (void **)&tcg2_proto);
+    if (status == EFI_SUCCESS && tcg2_proto != NULL) {
+        EFI_TCG2_BOOT_SERVICE_CAPABILITY cap;
+        memset(&cap, 0, sizeof(cap));
+        cap.Size = sizeof(cap);
+        status = tcg2_proto->GetCapability(tcg2_proto, &cap);
+        if (status == EFI_SUCCESS && cap.TPMPresentFlag) {
+            tcg2 = tcg2_proto;
+            printv("tpm: TCG2 protocol located, TPM present (active PCR banks: %x)\n",
+                   (uint32_t)cap.ActivePcrBanks);
+            return;
+        }
     }
 
-    EFI_TCG2_BOOT_SERVICE_CAPABILITY cap;
-    memset(&cap, 0, sizeof(cap));
-    cap.Size = sizeof(cap);
-    status = proto->GetCapability(proto, &cap);
-    if (status != EFI_SUCCESS || !cap.TPMPresentFlag) {
-        return;
+    // No TCG2/TPM 2.0; fall back to the CC measurement protocol.
+    EFI_GUID cc_guid = EFI_CC_MEASUREMENT_PROTOCOL_GUID;
+    EFI_CC_MEASUREMENT_PROTOCOL *cc_proto = NULL;
+    status = gBS->LocateProtocol(&cc_guid, NULL, (void **)&cc_proto);
+    if (status == EFI_SUCCESS && cc_proto != NULL) {
+        EFI_CC_BOOT_SERVICE_CAPABILITY cap;
+        memset(&cap, 0, sizeof(cap));
+        cap.Size = sizeof(cap);
+        status = cc_proto->GetCapability(cc_proto, &cap);
+        if (status == EFI_SUCCESS) {
+            cc = cc_proto;
+            const char *cc_name = "unknown";
+            switch (cap.CcType.Type) {
+                case EFI_CC_TYPE_AMD_SEV:   cc_name = "AMD SEV";   break;
+                case EFI_CC_TYPE_INTEL_TDX: cc_name = "Intel TDX"; break;
+            }
+            printv("tpm: CC measurement protocol located (type: %s)\n", cc_name);
+            return;
+        }
     }
-
-    tcg2 = proto;
-    printv("tpm: TCG2 protocol located, TPM present (active PCR banks: %x)\n",
-           (uint32_t)cap.ActivePcrBanks);
 }
 
 void tpm_measure(uint32_t pcr, uint32_t event_type,
                  const void *data, size_t data_size,
                  const char *description) {
-    if (tcg2 == NULL || data == NULL) {
+    if (data == NULL) {
         return;
     }
 
     size_t desc_len = description != NULL ? strlen(description) : 0;
-    size_t event_size = offsetof(EFI_TCG2_EVENT, Event) + desc_len;
 
-    EFI_TCG2_EVENT *event = ext_mem_alloc(event_size);
-    event->Size = (UINT32)event_size;
-    event->Header.HeaderSize = sizeof(EFI_TCG2_EVENT_HEADER);
-    event->Header.HeaderVersion = 1;
-    event->Header.PCRIndex = pcr;
-    event->Header.EventType = event_type;
-    if (desc_len > 0) {
-        memcpy(event->Event, description, desc_len);
+    if (tcg2 != NULL) {
+        size_t event_size = offsetof(EFI_TCG2_EVENT, Event) + desc_len;
+
+        EFI_TCG2_EVENT *event = ext_mem_alloc(event_size);
+        event->Size = (UINT32)event_size;
+        event->Header.HeaderSize = sizeof(EFI_TCG2_EVENT_HEADER);
+        event->Header.HeaderVersion = 1;
+        event->Header.PCRIndex = pcr;
+        event->Header.EventType = event_type;
+        if (desc_len > 0) {
+            memcpy(event->Event, description, desc_len);
+        }
+
+        EFI_STATUS status = tcg2->HashLogExtendEvent(
+            tcg2, 0,
+            (EFI_PHYSICAL_ADDRESS)(uintptr_t)data, (UINT64)data_size,
+            event);
+        if (status != EFI_SUCCESS) {
+            printv("tpm: HashLogExtendEvent for PCR %u failed: %X\n",
+                   pcr, (uint64_t)status);
+        }
+
+        pmm_free(event, event_size);
+    } else if (cc != NULL) {
+        // CC platforms expose Memory Reference (MR) registers rather than
+        // PCRs. The protocol provides a translation from a requested PCR
+        // index to the platform's corresponding MR index.
+        EFI_CC_MR_INDEX mr_index;
+        EFI_STATUS status = cc->MapPcrToMrIndex(cc, pcr, &mr_index);
+        if (status != EFI_SUCCESS) {
+            return;
+        }
+
+        size_t event_size = offsetof(EFI_CC_EVENT, Event) + desc_len;
+
+        EFI_CC_EVENT *event = ext_mem_alloc(event_size);
+        event->Size = (UINT32)event_size;
+        event->Header.HeaderSize = sizeof(EFI_CC_EVENT_HEADER);
+        event->Header.HeaderVersion = EFI_CC_EVENT_HEADER_VERSION;
+        event->Header.MrIndex = mr_index;
+        event->Header.EventType = event_type;
+        if (desc_len > 0) {
+            memcpy(event->Event, description, desc_len);
+        }
+
+        status = cc->HashLogExtendEvent(
+            cc, 0,
+            (EFI_PHYSICAL_ADDRESS)(uintptr_t)data, (UINT64)data_size,
+            event);
+        if (status != EFI_SUCCESS) {
+            printv("tpm: CC HashLogExtendEvent for PCR %u (MR %u) failed: %X\n",
+                   pcr, (uint32_t)mr_index, (uint64_t)status);
+        }
+
+        pmm_free(event, event_size);
     }
-
-    EFI_STATUS status = tcg2->HashLogExtendEvent(
-        tcg2, 0,
-        (EFI_PHYSICAL_ADDRESS)(uintptr_t)data, (UINT64)data_size,
-        event);
-    if (status != EFI_SUCCESS) {
-        printv("tpm: HashLogExtendEvent for PCR %u failed: %X\n",
-               pcr, (uint64_t)status);
-    }
-
-    pmm_free(event, event_size);
 }
 
 uint32_t tpm_calc_event_size(const void *event_p, const void *header_p) {
@@ -171,19 +229,30 @@ static bool tpm_capture_event_log(void) {
     }
     capture_attempted = true;
 
-    if (tcg2 == NULL) {
+    if (tcg2 == NULL && cc == NULL) {
         return false;
     }
 
     EFI_PHYSICAL_ADDRESS log_location = 0, log_last_entry = 0;
     BOOLEAN truncated = FALSE;
-
     uint32_t log_format = EFI_TCG2_EVENT_LOG_FORMAT_TCG_2;
-    EFI_STATUS status = tcg2->GetEventLog(tcg2, log_format,
-        &log_location, &log_last_entry, &truncated);
-    if (status != EFI_SUCCESS || log_location == 0) {
-        log_format = EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2;
+    EFI_STATUS status;
+
+    if (tcg2 != NULL) {
         status = tcg2->GetEventLog(tcg2, log_format,
+            &log_location, &log_last_entry, &truncated);
+        if (status != EFI_SUCCESS || log_location == 0) {
+            log_format = EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2;
+            status = tcg2->GetEventLog(tcg2, log_format,
+                &log_location, &log_last_entry, &truncated);
+            if (status != EFI_SUCCESS || log_location == 0) {
+                return false;
+            }
+        }
+    } else {
+        // CC measurement protocol. Only the TCG 2.0 log format is defined.
+        log_format = EFI_CC_EVENT_LOG_FORMAT_TCG_2;
+        status = cc->GetEventLog(cc, log_format,
             &log_location, &log_last_entry, &truncated);
         if (status != EFI_SUCCESS || log_location == 0) {
             return false;
