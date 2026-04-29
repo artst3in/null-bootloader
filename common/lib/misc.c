@@ -9,6 +9,7 @@
 #include <lib/config.h>
 #include <lib/uri.h>
 #include <lib/bli.h>
+#include <lib/rng_seed.h>
 #include <fs/file.h>
 #include <mm/pmm.h>
 #include <libfdt.h>
@@ -260,6 +261,10 @@ no_unwind bool efi_boot_services_exited = false;
 
 bool efi_exit_boot_services(void) {
     EFI_STATUS status;
+
+    // Pull entropy from EFI_RNG_PROTOCOL while it's still callable and
+    // publish it for the kernel to mix into its early RNG state.
+    rng_seed_install();
 
     EFI_MEMORY_DESCRIPTOR tmp_mmap[1];
     efi_mmap_size = sizeof(tmp_mmap);
