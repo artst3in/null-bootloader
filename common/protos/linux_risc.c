@@ -345,6 +345,7 @@ static void prepare_efi_tables(struct boot_param *p, char *config) {
         }
     }
 
+    linux_install_efi_tpm_event_log();
     efi_exit_boot_services();
 }
 

@@ -625,6 +625,7 @@ no_fb:;
     // UEFI
     ///////////////////////////////////////
 #if defined (UEFI)
+    linux_install_efi_tpm_event_log();
     efi_exit_boot_services();
 
 #if defined (__x86_64__)
