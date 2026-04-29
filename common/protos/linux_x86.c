@@ -12,6 +12,7 @@
 #include <lib/config.h>
 #include <lib/print.h>
 #include <lib/uri.h>
+#include <lib/tpm.h>
 #include <mm/pmm.h>
 #include <sys/idt.h>
 #include <lib/fb.h>
@@ -292,6 +293,13 @@ struct boot_params {
 noreturn void linux_load(char *config, char *cmdline) {
     struct file_handle *kernel_file;
 
+#if defined (UEFI)
+    if (cmdline != NULL) {
+        tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
+                    cmdline, strlen(cmdline), "Linux cmdline");
+    }
+#endif
+
     char *kernel_path = config_get_value(config, 0, "PATH");
     if (kernel_path == NULL) {
         kernel_path = config_get_value(config, 0, "KERNEL_PATH");
@@ -415,6 +423,11 @@ noreturn void linux_load(char *config, char *cmdline) {
 
     fread(kernel_file, (void *)kernel_load_addr, real_mode_code_size, kernel_file->size - real_mode_code_size);
 
+#if defined (UEFI)
+    tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                (void *)kernel_load_addr, kernel_data_size, "Linux kernel");
+#endif
+
     fclose(kernel_file);
 
     ///////////////////////////////////////
@@ -501,6 +514,11 @@ noreturn void linux_load(char *config, char *cmdline) {
             break;
 
         fread(modules[i], (void *)_modules_mem_base, 0, modules[i]->size);
+
+#if defined (UEFI)
+        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                    (void *)_modules_mem_base, modules[i]->size, "Linux initrd");
+#endif
 
         _modules_mem_base += modules[i]->size;
 

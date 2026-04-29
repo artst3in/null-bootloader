@@ -10,6 +10,7 @@
 #include <lib/print.h>
 #include <pxe/tftp.h>
 #include <crypt/blake2b.h>
+#include <lib/tpm.h>
 #include <sys/cpu.h>
 
 #define CONFIG_B2SUM_SIGNATURE "++CONFIG_B2SUM_SIGNATURE++"
@@ -383,6 +384,12 @@ int init_config(size_t config_size) {
             panic(false, "!!! CHECKSUM MISMATCH FOR CONFIG FILE !!!");
         }
     }
+
+#if defined (UEFI)
+    // Measure the on-disk config bytes before the in-place mutations below.
+    tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
+                config_addr, config_size - 2, "Limine config");
+#endif
 
     // add trailing newline if not present
     config_addr[config_size - 2] = '\n';

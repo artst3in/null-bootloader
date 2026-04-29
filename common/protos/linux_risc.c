@@ -11,6 +11,7 @@
 #include <lib/config.h>
 #include <lib/print.h>
 #include <lib/uri.h>
+#include <lib/tpm.h>
 #include <mm/pmm.h>
 #include <sys/idt.h>
 #include <lib/fb.h>
@@ -155,6 +156,9 @@ static void load_module(struct boot_param *p, char *config) {
         fread(modules[i], p->module_base + offset, 0, module_size);
         fclose(modules[i]);
 
+        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                    p->module_base + offset, module_size, "Linux initrd");
+
         char *module_path = config_get_value(config, i, "MODULE_PATH");
         printv("linux: loaded module `%s` at %p, size %U\n", module_path,
                p->module_base + offset, (uint64_t)module_size);
@@ -167,6 +171,11 @@ static void load_module(struct boot_param *p, char *config) {
 static void prepare_device_tree_blob(struct boot_param *p) {
     void *dtb = p->dtb;
     int ret;
+
+    // Measure the device tree as loaded, before applying our /chosen and
+    // memory-node fixups, so the resulting PCR is stable across boots.
+    tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                dtb, fdt_totalsize(dtb), "Linux DTB");
 
     // Delete all /memory@... nodes. Linux will use the given UEFI memory map
     // instead.
@@ -466,6 +475,11 @@ noreturn void linux_load(char *config, char *cmdline) {
     p.cmdline = cmdline;
     p.dtb = get_device_tree_blob(config, 0x1000);
 
+    if (cmdline != NULL) {
+        tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
+                    cmdline, strlen(cmdline), "Linux cmdline");
+    }
+
     struct file_handle *kernel_file;
 
     char *kernel_path = config_get_value(config, 0, "PATH");
@@ -514,6 +528,9 @@ noreturn void linux_load(char *config, char *cmdline) {
     fread(kernel_file, p.kernel_base, 0, p.kernel_size);
     fclose(kernel_file);
     printv("linux: loaded kernel `%s` at %p, size %U\n", kernel_path, p.kernel_base, (uint64_t)p.kernel_size);
+
+    tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                p.kernel_base, p.kernel_size, "Linux kernel");
 
     load_module(&p, config);
 

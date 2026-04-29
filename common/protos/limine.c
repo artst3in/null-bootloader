@@ -16,6 +16,7 @@
 #include <lib/fdt.h>
 #include <libfdt.h>
 #include <lib/uri.h>
+#include <lib/tpm.h>
 #include <sys/smp.h>
 #include <sys/cpu.h>
 #include <sys/gdt.h>
@@ -456,6 +457,13 @@ static void *_get_request(uint64_t id[4]) {
 #define FEAT_END } while (0);
 
 noreturn void limine_load(char *config, char *cmdline) {
+#if defined (UEFI)
+    if (cmdline != NULL) {
+        tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
+                    cmdline, strlen(cmdline), "Limine cmdline");
+    }
+#endif
+
 #if defined (__x86_64__) || defined (__i386__)
     uint32_t eax, ebx, ecx, edx;
 #endif
@@ -514,6 +522,11 @@ noreturn void limine_load(char *config, char *cmdline) {
     }
 
     uint8_t *kernel = kernel_file->fd;
+
+#if defined (UEFI)
+    tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                kernel, kernel_file->size, "Limine executable");
+#endif
 
     char *kaslr_s = config_get_value(config, 0, "KASLR");
     bool kaslr = false;
@@ -1323,6 +1336,13 @@ FEAT_START
 
         struct limine_file *l = &modules[final_module_count++];
         *l = get_file(f, module_cmdline);
+
+#if defined (UEFI)
+        if (!f->is_high_mem) {
+            tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                        f->fd, f->size, "Limine module");
+        }
+#endif
 
         fclose(f);
     }
