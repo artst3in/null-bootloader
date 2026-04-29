@@ -622,6 +622,8 @@ no_fb:;
     boot_params->efi_info.efi_memmap_size     = efi_mmap_size;
     boot_params->efi_info.efi_memdesc_size    = efi_desc_size;
     boot_params->efi_info.efi_memdesc_version = efi_desc_ver;
+
+    boot_params->secure_boot = secure_boot_active ? 3 : 2;
 #endif
 
     ///////////////////////////////////////

@@ -211,12 +211,9 @@ static void prepare_device_tree_blob(struct boot_param *p) {
         panic(true, "linux: failed to set UEFI system table pointer: '%s'", fdt_strerror(ret));
     }
 
-    // This property is not required by mainline Linux, but is required by
-    // Debian (and derivative) kernels, because Debian has a patch that adds
-    // this flag, and the existing logic that deals with it will just outright
-    // fail if any of the properties is missing.  We don't care about Debian's
-    // hardening or whatever, so just always report that secure boot is off.
-    ret = fdt_set_chosen_uint32(dtb, "linux,uefi-secure-boot", 0);
+    // Report UEFI Secure Boot state via the /chosen FDT property. Values
+    // match Linux's efi_secureboot_mode enum: 2 = disabled, 3 = enabled.
+    ret = fdt_set_chosen_uint32(dtb, "linux,uefi-secure-boot", secure_boot_active ? 3 : 2);
     if (ret < 0) {
         panic(true, "linux: failed to set UEFI secure boot state: '%s'", fdt_strerror(ret));
     }
