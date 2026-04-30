@@ -58,9 +58,9 @@ artifacts it loads. The allocation matches the systemd-boot convention:
 * **PCR 8** receives, in order, the on-disk `limine.conf` bytes (before any
   in-memory cleanup), and the kernel command line of the booted entry.
 * **PCR 9** receives, in load order, the kernel image as read from disk, each
-  module/initrd in the order they appear in the config, and, when booting
-  Linux on aarch64/riscv/loongarch, the device tree blob as loaded (taken
-  from `dtb_path`/`global_dtb` if set, otherwise from the firmware's
+  module/initrd in the order they appear in the config, and, when the booted
+  protocol consumes a device tree blob, the DTB as loaded (taken from
+  `dtb_path`/`global_dtb` if set, otherwise from the firmware's
   `EFI_DTB_TABLE_GUID` table) before Limine's `/chosen` and memory-node
   fixups.
 
