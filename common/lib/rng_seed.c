@@ -106,7 +106,11 @@ void rng_seed_install(void) {
         } else {
             // Read failed despite probe succeeding. Wipe the slot to avoid
             // publishing stale heap contents.
-            memset(seed->bits + offset, 0, nv_seed_size);
+            volatile uint8_t *p = (volatile uint8_t *)(seed->bits + offset);
+            for (size_t i = 0; i < nv_seed_size; i++) {
+                p[i] = 0;
+            }
+            asm volatile ("" ::: "memory");
         }
     }
 
@@ -117,6 +121,11 @@ void rng_seed_install(void) {
     }
 
     if (offset == 0) {
+        volatile uint8_t *p = (volatile uint8_t *)seed;
+        for (size_t i = 0; i < total_size; i++) {
+            p[i] = 0;
+        }
+        asm volatile ("" ::: "memory");
         gBS->FreePool(seed);
         return;
     }
@@ -126,12 +135,21 @@ void rng_seed_install(void) {
     status = gBS->InstallConfigurationTable(&rng_table_guid, seed);
     if (status != EFI_SUCCESS) {
         printv("rng: failed to install random seed table: %X\n", (uint64_t)status);
+        volatile uint8_t *p = (volatile uint8_t *)seed;
+        for (size_t i = 0; i < total_size; i++) {
+            p[i] = 0;
+        }
+        asm volatile ("" ::: "memory");
         gBS->FreePool(seed);
         return;
     }
 
     if (prev_seed_size > 0) {
-        memset(prev_seed->bits, 0, prev_seed_size);
+        volatile uint8_t *p = prev_seed->bits;
+        for (uint32_t i = 0; i < prev_seed_size; i++) {
+            p[i] = 0;
+        }
+        asm volatile ("" ::: "memory");
         gBS->FreePool(prev_seed);
     }
 
