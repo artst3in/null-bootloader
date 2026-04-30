@@ -1146,31 +1146,6 @@ FEAT_START
 
     est_request->response = reported_addr(est_response);
 FEAT_END
-
-    // TPM event log feature
-FEAT_START
-    struct limine_tpm_event_log_request *tpm_event_log_request = get_request(LIMINE_TPM_EVENT_LOG_REQUEST_ID);
-    if (tpm_event_log_request == NULL) {
-        break; // next feature
-    }
-
-    uint32_t tpm_event_log_format;
-    void *tpm_event_log_addr;
-    size_t tpm_event_log_size;
-    if (!tpm_get_event_log(&tpm_event_log_format, &tpm_event_log_addr, &tpm_event_log_size)) {
-        break; // no TPM or capture failed
-    }
-
-    struct limine_tpm_event_log_response *tpm_event_log_response =
-        ext_mem_alloc(sizeof(struct limine_tpm_event_log_response));
-
-    tpm_event_log_response->format = tpm_event_log_format;
-    tpm_event_log_response->size = tpm_event_log_size;
-    tpm_event_log_response->address = tpm_event_log_size > 0
-        ? reported_addr(tpm_event_log_addr) : 0;
-
-    tpm_event_log_request->response = reported_addr(tpm_event_log_response);
-FEAT_END
 #endif
 
     // Device tree blob feature
@@ -1712,6 +1687,33 @@ FEAT_START
 FEAT_END
 
 #if defined (UEFI)
+    // TPM event log feature. Processed last so GetEventLog snapshots a log
+    // containing all of Limine's extends; later extends would land in the
+    // final-events table instead.
+FEAT_START
+    struct limine_tpm_event_log_request *tpm_event_log_request = get_request(LIMINE_TPM_EVENT_LOG_REQUEST_ID);
+    if (tpm_event_log_request == NULL) {
+        break; // next feature
+    }
+
+    uint32_t tpm_event_log_format;
+    void *tpm_event_log_addr;
+    size_t tpm_event_log_size;
+    if (!tpm_get_event_log(&tpm_event_log_format, &tpm_event_log_addr, &tpm_event_log_size)) {
+        break; // no TPM or capture failed
+    }
+
+    struct limine_tpm_event_log_response *tpm_event_log_response =
+        ext_mem_alloc(sizeof(struct limine_tpm_event_log_response));
+
+    tpm_event_log_response->format = tpm_event_log_format;
+    tpm_event_log_response->size = tpm_event_log_size;
+    tpm_event_log_response->address = tpm_event_log_size > 0
+        ? reported_addr(tpm_event_log_addr) : 0;
+
+    tpm_event_log_request->response = reported_addr(tpm_event_log_response);
+FEAT_END
+
     efi_exit_boot_services();
 #endif
 
