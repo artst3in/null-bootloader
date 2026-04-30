@@ -34,19 +34,12 @@ void linux_install_efi_tpm_event_log(void) {
         return;
     }
 
-    // Walk the firmware's EFI_TCG2_FINAL_EVENTS_TABLE so the kernel can
-    // deduplicate any pre-boot events firmware migrated there.
+    // Walk the firmware's final-events table so the kernel can deduplicate
+    // any pre-boot events firmware migrated there. The table is selected
+    // by the active measurement protocol (TCG2 vs CC).
     uint32_t final_events_preboot_size = 0;
     if (format > EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2) {
-        EFI_TCG2_FINAL_EVENTS_TABLE *final_events = NULL;
-        EFI_GUID final_events_guid = EFI_TCG2_FINAL_EVENTS_TABLE_GUID;
-        for (UINTN i = 0; i < gST->NumberOfTableEntries; i++) {
-            if (memcmp(&gST->ConfigurationTable[i].VendorGuid,
-                       &final_events_guid, sizeof(EFI_GUID)) == 0) {
-                final_events = gST->ConfigurationTable[i].VendorTable;
-                break;
-            }
-        }
+        EFI_TCG2_FINAL_EVENTS_TABLE *final_events = tpm_get_final_events_table();
         if (final_events != NULL && final_events->NumberOfEvents > 0) {
             const uint8_t *base = final_events->Events;
             uint64_t remaining = final_events->NumberOfEvents;

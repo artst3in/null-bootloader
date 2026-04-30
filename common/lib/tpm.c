@@ -308,4 +308,25 @@ void tpm_release_event_log(void) {
     }
 }
 
+void *tpm_get_final_events_table(void) {
+    EFI_GUID guid;
+    if (tcg2 != NULL) {
+        EFI_GUID tcg2_guid = EFI_TCG2_FINAL_EVENTS_TABLE_GUID;
+        guid = tcg2_guid;
+    } else if (cc != NULL) {
+        EFI_GUID cc_guid = EFI_CC_FINAL_EVENTS_TABLE_GUID;
+        guid = cc_guid;
+    } else {
+        return NULL;
+    }
+
+    for (UINTN i = 0; i < gST->NumberOfTableEntries; i++) {
+        if (memcmp(&gST->ConfigurationTable[i].VendorGuid,
+                   &guid, sizeof(EFI_GUID)) == 0) {
+            return gST->ConfigurationTable[i].VendorTable;
+        }
+    }
+    return NULL;
+}
+
 #endif

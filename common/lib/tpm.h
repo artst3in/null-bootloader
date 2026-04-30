@@ -41,6 +41,13 @@ void tpm_release_event_log(void);
 // digest lists. Returns 0 on malformed input.
 uint32_t tpm_calc_event_size(const void *event, const void *header);
 
+// Locate the firmware's final-events table for the active measurement
+// protocol (EFI_TCG2_FINAL_EVENTS_TABLE_GUID for TCG2, or
+// EFI_CC_FINAL_EVENTS_TABLE_GUID for CC). Both tables share the same
+// {Version, NumberOfEvents, Events[]} layout. Returns NULL if no TPM/CC
+// interface is active or the table isn't present.
+void *tpm_get_final_events_table(void);
+
 #endif
 
 #endif
