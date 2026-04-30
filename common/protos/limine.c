@@ -524,6 +524,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     uint8_t *kernel = kernel_file->fd;
 
 #if defined (UEFI)
+    tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "path: ", kernel_path);
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
                 kernel, kernel_file->size, "path: ", kernel_path);
 #endif
@@ -1340,6 +1341,7 @@ FEAT_START
         *l = get_file(f, module_cmdline);
 
 #if defined (UEFI)
+        tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "module_path: ", module_path);
         tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
                     f->fd, f->size, "module_path: ", module_path);
 #endif

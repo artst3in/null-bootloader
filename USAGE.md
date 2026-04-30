@@ -56,11 +56,18 @@ When measured boot is active, Limine extends the platform PCRs with the
 artifacts it loads, following the GRUB convention from the
 [UAPI Linux TPM PCR Registry](https://uapi-group.org/specifications/specs/linux_tpm_pcr_registry/):
 
-* **PCR 8** receives, in order, the on-disk `limine.conf` bytes (before any
-  in-memory cleanup), and the kernel command line of the booted entry.
-* **PCR 9** receives, in load order, the kernel image as read from disk, each
-  module/initrd in the order they appear in the config, and, when the booted
-  protocol consumes a device tree blob, the DTB as loaded (taken from
+* **PCR 8** receives, in order, the kernel command line of the booted entry
+  (from its `cmdline` config option, exactly as Limine will hand it to the
+  kernel), the kernel image's path, each module/initrd's path in the order
+  they appear in the config, and the DTB's path when the booted protocol
+  consumes one specified via `dtb_path` or `global_dtb`. Any trailing
+  `#<hash>` integrity suffix is stripped before measurement so PCR 8 stays
+  stable across kernel/module/DTB updates; the `$` decompression prefix is
+  preserved as part of the policy.
+* **PCR 9** receives, in order, the on-disk `limine.conf` bytes (before any
+  in-memory cleanup), the kernel image as read from disk, each module/initrd
+  in the order they appear in the config, and, when the booted protocol
+  consumes a device tree blob, the DTB as loaded (taken from
   `dtb_path`/`global_dtb` if set, otherwise from the firmware's
   `EFI_DTB_TABLE_GUID` table) before Limine's `/chosen` and memory-node
   fixups.
@@ -93,10 +100,21 @@ handoff is consistent across attempts:
 ### Reproducing the digests
 For an external verifier to recompute a PCR extend, hash exactly these bytes:
 
+For PCR 8:
+
+* `cmdline: <cmdline>`: the kernel command line bytes, without trailing
+  NUL, i.e. `strlen(cmdline)` bytes.
+* `path: <kernel_path>`: the kernel image's path string with any trailing
+  `#<hash>` suffix stripped, without trailing NUL.
+* `module_path: <module_path>`: the module/initrd's path string with any
+  trailing `#<hash>` suffix stripped, without trailing NUL.
+* `dtb_path: <dtb_path>`: the DTB file's path string with any trailing
+  `#<hash>` suffix stripped, without trailing NUL.
+
+For PCR 9:
+
 * `limine_cfg`: the on-disk `limine.conf` file bytes verbatim (no trailing
   newline added, no NUL appended).
-* `cmdline: <cmdline>`: the kernel command line as a string, without its
-  terminating NUL, i.e. `strlen(cmdline)` bytes.
 * `path: <kernel_path>`: the full file bytes of the kernel image as opened
   by Limine (post-decompression for `$`-prefixed paths, after BLAKE2B hash
   verification when Secure Boot is active).

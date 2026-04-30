@@ -25,6 +25,13 @@ void tpm_measure(uint32_t pcr, uint32_t event_type,
                  const void *data, size_t data_size,
                  const char *desc_prefix, const char *desc_value);
 
+// Measure a config-supplied URI string into the given PCR with any trailing
+// `#<hash>` suffix stripped, so the digest captures only the policy-stable
+// portion (resource, root, path, and any `$` decompression marker). The
+// event description shows the same stripped string.
+void tpm_measure_path(uint32_t pcr, uint32_t event_type,
+                      const char *desc_prefix, const char *path);
+
 // Capture the firmware TCG2 event log into bootloader-reclaimable memory
 // and expose the raw event stream. `format` receives the TCG event log
 // format identifier (1 = TCG 1.2, 2 = TCG 2.0 crypto-agile). Returns false

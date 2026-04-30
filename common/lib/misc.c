@@ -156,6 +156,7 @@ void *get_device_tree_blob(const char *config, size_t extra_size,
 
 #if defined (UEFI)
             if (measure) {
+                tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "dtb_path: ", dtb_path);
                 tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
                             dtb, size, "dtb_path: ", dtb_path);
             }

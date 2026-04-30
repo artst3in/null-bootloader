@@ -172,6 +172,29 @@ void tpm_measure(uint32_t pcr, uint32_t event_type,
     }
 }
 
+void tpm_measure_path(uint32_t pcr, uint32_t event_type,
+                      const char *desc_prefix, const char *path) {
+    if (!measured_boot || path == NULL) {
+        return;
+    }
+
+    const char *hash_sep = strchr(path, '#');
+    size_t path_len = hash_sep != NULL
+        ? (size_t)(hash_sep - path)
+        : strlen(path);
+
+    // Static scratch matches uri.c's URI_BUF_SIZE; URIs longer than that
+    // already panic in uri_resolve(), so a too-long path here is a bug.
+    static char stripped[4096];
+    if (path_len >= sizeof(stripped)) {
+        return;
+    }
+    memcpy(stripped, path, path_len);
+    stripped[path_len] = '\0';
+
+    tpm_measure(pcr, event_type, stripped, path_len, desc_prefix, stripped);
+}
+
 uint32_t tpm_calc_event_size(const void *event_p, const void *header_p) {
     const struct tpm_pcr_event2_head *event = event_p;
     const struct tpm_pcr_event_v1_2 *event_header = header_p;

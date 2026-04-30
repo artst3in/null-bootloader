@@ -424,6 +424,7 @@ noreturn void linux_load(char *config, char *cmdline) {
     fread(kernel_file, (void *)kernel_load_addr, real_mode_code_size, kernel_file->size - real_mode_code_size);
 
 #if defined (UEFI)
+    tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "path: ", kernel_path);
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
                 kernel_file->fd, kernel_file->size, "path: ", kernel_path);
 #endif
@@ -516,6 +517,7 @@ noreturn void linux_load(char *config, char *cmdline) {
         fread(modules[i], (void *)_modules_mem_base, 0, modules[i]->size);
 
 #if defined (UEFI)
+        tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "module_path: ", module_path);
         tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
                     (void *)_modules_mem_base, modules[i]->size, "module_path: ", module_path);
 #endif
