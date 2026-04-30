@@ -117,6 +117,10 @@ Miscellaneous:
 * `hash_mismatch_panic` - If set to `no`, do not panic if there is a hash
   mismatch for a file, but print a warning instead. Forced to `yes` when
   Secure Boot is active.
+* `measured_boot` - If set to `yes`, opt in to measured boot. Forced to `yes`
+  when Secure Boot is active, and forced back to `no` if the firmware does
+  not expose a TPM 2.0/CC measurement interface. See
+  [USAGE.md](USAGE.md#measured-boot).
 
 Limine interface control options:
 

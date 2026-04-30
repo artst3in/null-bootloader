@@ -42,6 +42,51 @@ opt-in to Secure Boot enforcement; an unenrolled image can still be signed
 and booted under Secure Boot, but it provides no integrity guarantees beyond
 those of the firmware itself.
 
+## Measured Boot
+Measured boot is opt-in. Limine performs measurements only when the
+`measured_boot` config option is set to `yes` (also forced on under UEFI
+Secure Boot) **and** the firmware exposes `EFI_TCG2_PROTOCOL` (or
+`EFI_CC_MEASUREMENT_PROTOCOL` on confidential computing platforms such as
+Intel TDX and AMD SEV-SNP). With either condition unmet, no PCR is extended
+by the bootloader; firmware's pre-boot event log is still captured and
+relayed if a TPM is present, since it carries useful PCR 0-7 information
+regardless of what Limine does.
+
+When measured boot is active, Limine extends the platform PCRs with the
+artifacts it loads. The allocation matches the systemd-boot convention:
+
+* **PCR 8** receives, in order, the on-disk `limine.conf` bytes (before any
+  in-memory cleanup), and the kernel command line of the booted entry.
+* **PCR 9** receives, in load order, the kernel image as read from disk, each
+  module/initrd in the order they appear in the config, and, when booting
+  Linux on aarch64/riscv/loongarch, the device tree blob as loaded (taken
+  from `dtb_path`/`global_dtb` if set, otherwise from the firmware's
+  `EFI_DTB_TABLE_GUID` table) before Limine's `/chosen` and memory-node
+  fixups.
+
+All measurements use event type `EV_IPL` (`0x0000000d`). The event payload
+carries a short human-readable label (`"Limine config"`, `"Limine kernel"`,
+`"Linux initrd"`, and so on) for log-walking convenience; verifiers must
+not rely on it for hash reproduction.
+
+On confidential computing platforms each PCR index is translated to the
+corresponding Memory Reference (MR) register via
+`EFI_CC_MEASUREMENT_PROTOCOL.MapPcrToMrIndex`; the rest of the contract is
+unchanged.
+
+The captured TCG event log is published to the operating system via the
+`LINUX_EFI_TPM_EVENT_LOG` configuration table (for the Linux protocol), or
+via the TPM Event Log feature (for the Limine boot protocol).
+
+The following additional behaviours also apply, so that the PCR state at
+handoff is consistent across attempts:
+
+* Any panic halts the system unconditionally; there is no return to the menu,
+  so a partially-extended PCR chain cannot be re-extended on a second attempt.
+* On the IA-32 UEFI port, modules **must** fit below 4 GiB. Firmware's
+  `HashLogExtendEvent` cannot reach addresses above 4 GiB on a 32-bit
+  firmware, so an above-4-GiB allocation would result in an unmeasured module.
+
 ## BIOS/MBR
 In order to install Limine on a MBR device (which can just be a raw image
 file), run `limine bios-install` as such:
