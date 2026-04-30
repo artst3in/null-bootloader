@@ -47,6 +47,14 @@ void linux_install_efi_tpm_event_log(void) {
                 const void *header = base + final_events_preboot_size;
                 uint32_t ev_size = tpm_calc_event_size(header, log_addr);
                 if (ev_size == 0) {
+                    // Malformed entry: a partial sum would skip an arbitrary
+                    // prefix and leave the rest looking post-boot, which is
+                    // worse than disabling dedup. Hand the kernel 0 so it
+                    // processes every final-events entry; the worst case is
+                    // duplicate events in its log, not silent loss.
+                    printv("linux: malformed entry in TCG final events table; "
+                           "disabling preboot dedup\n");
+                    final_events_preboot_size = 0;
                     break;
                 }
                 final_events_preboot_size += ev_size;
