@@ -1341,12 +1341,15 @@ FEAT_START
         print("limine: Loading module `%#`...\n", module_path);
 
         struct file_handle *f;
-        // Refuse >4 GiB allocations under measured boot on IA-32: firmware's
+        // On IA-32 under measured boot, refuse >4 GiB allocations: firmware's
         // HashLogExtendEvent can't reach them, so we'd be unable to measure
-        // the module.
-        if ((f = uri_open(module_path, MEMMAP_KERNEL_AND_MODULES, !measured_boot
+        // the module. Elsewhere, the firmware can address all of physical
+        // memory and high allocations remain measurable.
+        if ((f = uri_open(module_path, MEMMAP_KERNEL_AND_MODULES,
 #if defined (__i386__)
-            , limine_memcpy_to_64, limine_memcpy_from_64
+            !measured_boot, limine_memcpy_to_64, limine_memcpy_from_64
+#else
+            true
 #endif
         )) == NULL) {
             if (module_required) {
