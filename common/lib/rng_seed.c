@@ -151,6 +151,7 @@ void rng_seed_install(void) {
             p[i] = 0;
         }
         asm volatile ("" ::: "memory");
+        // Assumes the prior publisher used AllocatePool.
         gBS->FreePool(prev_seed);
     }
 
