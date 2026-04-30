@@ -266,7 +266,10 @@ static bool tpm_capture_event_log(void) {
     uint32_t log_size = 0;
     if (log_last_entry != 0) {
         uint32_t last_entry_size = 0;
-        if (log_format > EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2) {
+        // The first entry of a TCG 2.0 log is itself a v1.2-format spec-ID
+        // event; only entries after it follow the crypto-agile layout.
+        if (log_format > EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2
+         && log_last_entry != log_location) {
             last_entry_size = tpm_calc_event_size(
                 (void *)(uintptr_t)log_last_entry,
                 (void *)(uintptr_t)log_location);
