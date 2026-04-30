@@ -425,7 +425,7 @@ noreturn void linux_load(char *config, char *cmdline) {
 
 #if defined (UEFI)
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                (void *)kernel_load_addr, kernel_data_size, "Linux kernel");
+                kernel_file->fd, kernel_file->size, "Linux kernel");
 #endif
 
     fclose(kernel_file);
