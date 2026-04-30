@@ -180,8 +180,7 @@ uint32_t tpm_calc_event_size(const void *event_p, const void *header_p) {
         (const struct tpm_specid_event_head *)event_header->event;
 
     if (memcmp(efispecid->signature, TCG_SPECID_SIG, sizeof(TCG_SPECID_SIG)) != 0
-     || efispecid->num_algs == 0
-     || event->count != efispecid->num_algs) {
+     || efispecid->num_algs == 0) {
         return 0;
     }
 
