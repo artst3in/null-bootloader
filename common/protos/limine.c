@@ -1149,42 +1149,6 @@ FEAT_START
 FEAT_END
 #endif
 
-    // Device tree blob feature
-FEAT_START
-    struct limine_dtb_request *dtb_request = get_request(LIMINE_DTB_REQUEST_ID);
-    if (dtb_request == NULL) {
-        break; // next feature
-    }
-
-    void *dtb = get_device_tree_blob(config, 0, true);
-
-    if (dtb) {
-        // Delete all /memory@... nodes.
-        // The executable must use the given UEFI memory map instead.
-        while (true) {
-            int offset = fdt_subnode_offset_namelen(dtb, 0, "memory@", 7);
-
-            if (offset == -FDT_ERR_NOTFOUND) {
-                break;
-            }
-
-            if (offset < 0) {
-                panic(true, "limine: failed to find node: '%s'", fdt_strerror(offset));
-            }
-
-            int ret = fdt_del_node(dtb, offset);
-            if (ret < 0) {
-                panic(true, "limine: failed to delete memory node: '%s'", fdt_strerror(ret));
-            }
-        }
-
-        struct limine_dtb_response *dtb_response =
-            ext_mem_alloc(sizeof(struct limine_dtb_response));
-        dtb_response->dtb_ptr = reported_addr(dtb);
-        dtb_request->response = reported_addr(dtb_response);
-    }
-FEAT_END
-
     // Stack size
     uint64_t stack_size = 65536;
 FEAT_START
@@ -1362,6 +1326,42 @@ FEAT_START
     module_response->modules = reported_addr(modules_list);
 
     module_request->response = reported_addr(module_response);
+FEAT_END
+
+    // Device tree blob feature
+FEAT_START
+    struct limine_dtb_request *dtb_request = get_request(LIMINE_DTB_REQUEST_ID);
+    if (dtb_request == NULL) {
+        break; // next feature
+    }
+
+    void *dtb = get_device_tree_blob(config, 0, true);
+
+    if (dtb) {
+        // Delete all /memory@... nodes.
+        // The executable must use the given UEFI memory map instead.
+        while (true) {
+            int offset = fdt_subnode_offset_namelen(dtb, 0, "memory@", 7);
+
+            if (offset == -FDT_ERR_NOTFOUND) {
+                break;
+            }
+
+            if (offset < 0) {
+                panic(true, "limine: failed to find node: '%s'", fdt_strerror(offset));
+            }
+
+            int ret = fdt_del_node(dtb, offset);
+            if (ret < 0) {
+                panic(true, "limine: failed to delete memory node: '%s'", fdt_strerror(ret));
+            }
+        }
+
+        struct limine_dtb_response *dtb_response =
+            ext_mem_alloc(sizeof(struct limine_dtb_response));
+        dtb_response->dtb_ptr = reported_addr(dtb);
+        dtb_request->response = reported_addr(dtb_response);
+    }
 FEAT_END
 
     size_t req_width = 0, req_height = 0, req_bpp = 0;

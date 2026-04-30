@@ -471,7 +471,6 @@ noreturn void linux_load(char *config, char *cmdline) {
     struct boot_param p;
     memset(&p, 0, sizeof(p));
     p.cmdline = cmdline;
-    p.dtb = get_device_tree_blob(config, 0x1000, true);
 
     if (cmdline != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
@@ -532,6 +531,8 @@ noreturn void linux_load(char *config, char *cmdline) {
                 p.kernel_base, p.kernel_size, "path: ", kernel_path);
 
     load_module(&p, config);
+
+    p.dtb = get_device_tree_blob(config, 0x1000, true);
 
     prepare_device_tree_blob(&p);
 
