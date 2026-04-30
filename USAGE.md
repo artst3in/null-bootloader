@@ -53,7 +53,8 @@ relayed if a TPM is present, since it carries useful PCR 0-7 information
 regardless of what Limine does.
 
 When measured boot is active, Limine extends the platform PCRs with the
-artifacts it loads. The allocation follows the GRUB convention:
+artifacts it loads, following the GRUB convention from the
+[UAPI Linux TPM PCR Registry](https://uapi-group.org/specifications/specs/linux_tpm_pcr_registry/):
 
 * **PCR 8** receives, in order, the on-disk `limine.conf` bytes (before any
   in-memory cleanup), and the kernel command line of the booted entry.
@@ -64,10 +65,12 @@ artifacts it loads. The allocation follows the GRUB convention:
   `EFI_DTB_TABLE_GUID` table) before Limine's `/chosen` and memory-node
   fixups.
 
-All measurements use event type `EV_IPL` (`0x0000000d`). The event payload
-carries a short human-readable label (`"Limine config"`, `"Limine kernel"`,
-`"Linux initrd"`, and so on) for log-walking convenience; verifiers must
-not rely on it for hash reproduction.
+All measurements use event type `EV_IPL` (`0x0000000d`). Each event's payload
+in the TCG log is the NUL-terminated description identifying what was
+measured: `cmdline: <cmdline>` for command lines, `path: <kernel_path>` for
+the kernel image, `module_path: <module_path>` for modules and initrds,
+`dtb_path: <dtb_path>` for a DTB loaded from a file, `efi_dtb` for the
+firmware-provided DTB, and `limine_cfg` for the `limine.conf` blob.
 
 On confidential computing platforms each PCR index is translated to the
 corresponding Memory Reference (MR) register via
@@ -86,6 +89,22 @@ handoff is consistent across attempts:
 * On the IA-32 UEFI port, modules **must** fit below 4 GiB. Firmware's
   `HashLogExtendEvent` cannot reach addresses above 4 GiB on a 32-bit
   firmware, so an above-4-GiB allocation would result in an unmeasured module.
+
+### Reproducing the digests
+For an external verifier to recompute a PCR extend, hash exactly these bytes:
+
+* `limine_cfg`: the on-disk `limine.conf` file bytes verbatim (no trailing
+  newline added, no NUL appended).
+* `cmdline: <cmdline>`: the kernel command line as a string, without its
+  terminating NUL, i.e. `strlen(cmdline)` bytes.
+* `path: <kernel_path>`: the full file bytes of the kernel image as opened
+  by Limine (post-decompression for `$`-prefixed paths, after BLAKE2B hash
+  verification when Secure Boot is active).
+* `module_path: <module_path>`: the full file bytes of the module/initrd as
+  loaded.
+* `dtb_path: <dtb_path>`/`efi_dtb`: the device tree blob bytes as loaded,
+  before Limine's `/chosen` and memory-node fixups (i.e. exactly the bytes
+  on disk or in the firmware's `EFI_DTB_TABLE_GUID` table).
 
 ## BIOS/MBR
 In order to install Limine on a MBR device (which can just be a raw image
