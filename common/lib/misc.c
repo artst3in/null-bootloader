@@ -10,6 +10,7 @@
 #include <lib/uri.h>
 #include <lib/bli.h>
 #include <lib/rng_seed.h>
+#include <lib/tpm.h>
 #include <fs/file.h>
 #include <mm/pmm.h>
 #include <libfdt.h>
@@ -117,7 +118,8 @@ size_t get_trailing_zeros(uint64_t val) {
     return 64;
 }
 
-void *get_device_tree_blob(const char *config, size_t extra_size) {
+void *get_device_tree_blob(const char *config, size_t extra_size,
+                           const char *measure_label) {
     int ret;
 
     size_t size = 0;
@@ -152,6 +154,13 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
                 panic(soft_panic, "dtb: Invalid device tree blob at `%#`: '%s'", dtb_path, fdt_strerror(ret));
             }
 
+#if defined (UEFI)
+            if (measure_label != NULL) {
+                tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                            dtb, size, measure_label);
+            }
+#endif
+
             printv("dtb: loaded dtb at %p from file `%#`\n", dtb, dtb_path);
         }
     }
@@ -164,6 +173,10 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             if (memcmp(&cur_table->VendorGuid, &dtb_guid, sizeof(EFI_GUID)))
                 continue;
             size = fdt_totalsize(cur_table->VendorTable);
+            if (measure_label != NULL) {
+                tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                            cur_table->VendorTable, size, measure_label);
+            }
             dtb = ext_mem_alloc(size);
             ret = fdt_open_into(cur_table->VendorTable, dtb, size);
             if (ret < 0) {
@@ -173,6 +186,8 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             break;
         }
     }
+#else
+    (void)measure_label;
 #endif
 
     if (extra_size == 0) {

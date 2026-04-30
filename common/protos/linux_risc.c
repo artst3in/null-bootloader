@@ -172,11 +172,6 @@ static void prepare_device_tree_blob(struct boot_param *p) {
     void *dtb = p->dtb;
     int ret;
 
-    // Measure the device tree as loaded, before applying our /chosen and
-    // memory-node fixups, so the resulting PCR is stable across boots.
-    tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                dtb, fdt_totalsize(dtb), "Linux DTB");
-
     // Delete all /memory@... nodes. Linux will use the given UEFI memory map
     // instead.
     while (true) {
@@ -474,7 +469,7 @@ noreturn void linux_load(char *config, char *cmdline) {
     struct boot_param p;
     memset(&p, 0, sizeof(p));
     p.cmdline = cmdline;
-    p.dtb = get_device_tree_blob(config, 0x1000);
+    p.dtb = get_device_tree_blob(config, 0x1000, "Linux DTB");
 
     if (cmdline != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,

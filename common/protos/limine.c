@@ -1180,16 +1180,9 @@ FEAT_START
         break; // next feature
     }
 
-    void *dtb = get_device_tree_blob(config, 0);
+    void *dtb = get_device_tree_blob(config, 0, "Limine DTB");
 
     if (dtb) {
-#if defined (UEFI)
-        // Measure the device tree as loaded, before applying our memory-node
-        // fixups below, so the resulting PCR is stable across boots.
-        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                    dtb, fdt_totalsize(dtb), "Limine DTB");
-#endif
-
         // Delete all /memory@... nodes.
         // The executable must use the given UEFI memory map instead.
         while (true) {
