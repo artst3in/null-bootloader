@@ -1341,7 +1341,10 @@ FEAT_START
         print("limine: Loading module `%#`...\n", module_path);
 
         struct file_handle *f;
-        if ((f = uri_open(module_path, MEMMAP_KERNEL_AND_MODULES, true
+        // Refuse >4 GiB allocations under measured boot on IA-32: firmware's
+        // HashLogExtendEvent can't reach them, so we'd be unable to measure
+        // the module.
+        if ((f = uri_open(module_path, MEMMAP_KERNEL_AND_MODULES, !measured_boot
 #if defined (__i386__)
             , limine_memcpy_to_64, limine_memcpy_from_64
 #endif
@@ -1363,10 +1366,8 @@ FEAT_START
         *l = get_file(f, module_cmdline);
 
 #if defined (UEFI)
-        if (!f->is_high_mem) {
-            tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                        f->fd, f->size, "Limine module");
-        }
+        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                    f->fd, f->size, "Limine module");
 #endif
 
         fclose(f);

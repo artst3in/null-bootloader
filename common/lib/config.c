@@ -29,6 +29,18 @@ no_unwind bool bad_config = false;
 static char *config_addr;
 
 #if defined (UEFI)
+// Snapshot of the on-disk config bytes, kept across the in-place mutations
+// in init_config so the menu can measure them once measured_boot is known.
+static char *config_raw_addr;
+static size_t config_raw_size;
+
+const char *config_get_raw(size_t *size_out) {
+    *size_out = config_raw_size;
+    return config_raw_addr;
+}
+#endif
+
+#if defined (UEFI)
 
 #define EFI_APP_PATH_LEN 128
 static char efi_app_path[128] = {0};
@@ -386,9 +398,11 @@ int init_config(size_t config_size) {
     }
 
 #if defined (UEFI)
-    // Measure the on-disk config bytes before the in-place mutations below.
-    tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
-                config_addr, config_size - 2, "Limine config");
+    // Snapshot the raw bytes; the menu measures them once measured_boot
+    // is final.
+    config_raw_size = config_size - 2;
+    config_raw_addr = ext_mem_alloc(config_raw_size);
+    memcpy(config_raw_addr, config_addr, config_raw_size);
 #endif
 
     // add trailing newline if not present

@@ -17,6 +17,10 @@
 #if defined (UEFI)
 
 void tpm_init(void);
+
+// True if a TCG2 or CC measurement protocol is available.
+bool tpm_present(void);
+
 void tpm_measure(uint32_t pcr, uint32_t event_type,
                  const void *data, size_t data_size,
                  const char *description);

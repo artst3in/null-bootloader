@@ -93,10 +93,14 @@ void tpm_init(void) {
     }
 }
 
+bool tpm_present(void) {
+    return tcg2 != NULL || cc != NULL;
+}
+
 void tpm_measure(uint32_t pcr, uint32_t event_type,
                  const void *data, size_t data_size,
                  const char *description) {
-    if (data == NULL) {
+    if (!measured_boot || data == NULL) {
         return;
     }
 
