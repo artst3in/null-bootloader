@@ -79,7 +79,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
 #if defined (UEFI)
     if (cmdline != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
-                    cmdline, strlen(cmdline), "Multiboot2 cmdline");
+                    cmdline, strlen(cmdline), "cmdline: ", cmdline);
     }
 #endif
 
@@ -106,7 +106,7 @@ noreturn void multiboot2_load(char *config, char* cmdline) {
 
 #if defined (UEFI)
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                kernel, kernel_file_size, "Multiboot2 kernel");
+                kernel, kernel_file_size, "path: ", kernel_path);
 #endif
 
     fclose(kernel_file);
@@ -667,7 +667,7 @@ reloc_fail:
 
 #if defined (UEFI)
         tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                    module_addr, f->size, "Multiboot2 module");
+                    module_addr, f->size, "module_path: ", module_path);
 #endif
 
         if (!elsewhere_append(true /* flexible target */,

@@ -23,7 +23,7 @@ bool tpm_present(void);
 
 void tpm_measure(uint32_t pcr, uint32_t event_type,
                  const void *data, size_t data_size,
-                 const char *description);
+                 const char *desc_prefix, const char *desc_value);
 
 // Capture the firmware TCG2 event log into bootloader-reclaimable memory
 // and expose the raw event stream. `format` receives the TCG event log

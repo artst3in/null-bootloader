@@ -460,7 +460,7 @@ noreturn void limine_load(char *config, char *cmdline) {
 #if defined (UEFI)
     if (cmdline != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
-                    cmdline, strlen(cmdline), "Limine cmdline");
+                    cmdline, strlen(cmdline), "cmdline: ", cmdline);
     }
 #endif
 
@@ -525,7 +525,7 @@ noreturn void limine_load(char *config, char *cmdline) {
 
 #if defined (UEFI)
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                kernel, kernel_file->size, "Limine executable");
+                kernel, kernel_file->size, "path: ", kernel_path);
 #endif
 
     char *kaslr_s = config_get_value(config, 0, "KASLR");
@@ -1180,7 +1180,7 @@ FEAT_START
         break; // next feature
     }
 
-    void *dtb = get_device_tree_blob(config, 0, "Limine DTB");
+    void *dtb = get_device_tree_blob(config, 0, true);
 
     if (dtb) {
         // Delete all /memory@... nodes.
@@ -1361,17 +1361,17 @@ FEAT_START
             }
             continue;
         }
-        if (module_path_allocated) {
-            pmm_free(module_path, 1024);
-        }
-
         struct limine_file *l = &modules[final_module_count++];
         *l = get_file(f, module_cmdline);
 
 #if defined (UEFI)
         tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                    f->fd, f->size, "Limine module");
+                    f->fd, f->size, "module_path: ", module_path);
 #endif
+
+        if (module_path_allocated) {
+            pmm_free(module_path, 1024);
+        }
 
         fclose(f);
     }

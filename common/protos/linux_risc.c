@@ -156,10 +156,11 @@ static void load_module(struct boot_param *p, char *config) {
         fread(modules[i], p->module_base + offset, 0, module_size);
         fclose(modules[i]);
 
-        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                    p->module_base + offset, module_size, "Linux initrd");
-
         char *module_path = config_get_value(config, i, "MODULE_PATH");
+
+        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                    p->module_base + offset, module_size, "module_path: ", module_path);
+
         printv("linux: loaded module `%s` at %p, size %U\n", module_path,
                p->module_base + offset, (uint64_t)module_size);
         offset += module_size;
@@ -469,11 +470,11 @@ noreturn void linux_load(char *config, char *cmdline) {
     struct boot_param p;
     memset(&p, 0, sizeof(p));
     p.cmdline = cmdline;
-    p.dtb = get_device_tree_blob(config, 0x1000, "Linux DTB");
+    p.dtb = get_device_tree_blob(config, 0x1000, true);
 
     if (cmdline != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
-                    cmdline, strlen(cmdline), "Linux cmdline");
+                    cmdline, strlen(cmdline), "cmdline: ", cmdline);
     }
 
     struct file_handle *kernel_file;
@@ -526,7 +527,7 @@ noreturn void linux_load(char *config, char *cmdline) {
     printv("linux: loaded kernel `%s` at %p, size %U\n", kernel_path, p.kernel_base, (uint64_t)p.kernel_size);
 
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                p.kernel_base, p.kernel_size, "Linux kernel");
+                p.kernel_base, p.kernel_size, "path: ", kernel_path);
 
     load_module(&p, config);
 

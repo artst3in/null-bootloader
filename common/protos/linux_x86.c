@@ -296,7 +296,7 @@ noreturn void linux_load(char *config, char *cmdline) {
 #if defined (UEFI)
     if (cmdline != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
-                    cmdline, strlen(cmdline), "Linux cmdline");
+                    cmdline, strlen(cmdline), "cmdline: ", cmdline);
     }
 #endif
 
@@ -425,7 +425,7 @@ noreturn void linux_load(char *config, char *cmdline) {
 
 #if defined (UEFI)
     tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                kernel_file->fd, kernel_file->size, "Linux kernel");
+                kernel_file->fd, kernel_file->size, "path: ", kernel_path);
 #endif
 
     fclose(kernel_file);
@@ -517,7 +517,7 @@ noreturn void linux_load(char *config, char *cmdline) {
 
 #if defined (UEFI)
         tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                    (void *)_modules_mem_base, modules[i]->size, "Linux initrd");
+                    (void *)_modules_mem_base, modules[i]->size, "module_path: ", module_path);
 #endif
 
         _modules_mem_base += modules[i]->size;

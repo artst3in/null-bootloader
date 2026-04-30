@@ -99,12 +99,14 @@ bool tpm_present(void) {
 
 void tpm_measure(uint32_t pcr, uint32_t event_type,
                  const void *data, size_t data_size,
-                 const char *description) {
+                 const char *desc_prefix, const char *desc_value) {
     if (!measured_boot || data == NULL) {
         return;
     }
 
-    size_t desc_len = description != NULL ? strlen(description) : 0;
+    size_t prefix_len = desc_prefix != NULL ? strlen(desc_prefix) : 0;
+    size_t value_len = desc_value != NULL ? strlen(desc_value) : 0;
+    size_t desc_len = prefix_len + value_len + 1;
 
     if (tcg2 != NULL) {
         size_t event_size = offsetof(EFI_TCG2_EVENT, Event) + desc_len;
@@ -115,8 +117,11 @@ void tpm_measure(uint32_t pcr, uint32_t event_type,
         event->Header.HeaderVersion = 1;
         event->Header.PCRIndex = pcr;
         event->Header.EventType = event_type;
-        if (desc_len > 0) {
-            memcpy(event->Event, description, desc_len);
+        if (prefix_len > 0) {
+            memcpy(event->Event, desc_prefix, prefix_len);
+        }
+        if (value_len > 0) {
+            memcpy(event->Event + prefix_len, desc_value, value_len);
         }
 
         EFI_STATUS status = tcg2->HashLogExtendEvent(
@@ -147,8 +152,11 @@ void tpm_measure(uint32_t pcr, uint32_t event_type,
         event->Header.HeaderVersion = EFI_CC_EVENT_HEADER_VERSION;
         event->Header.MrIndex = mr_index;
         event->Header.EventType = event_type;
-        if (desc_len > 0) {
-            memcpy(event->Event, description, desc_len);
+        if (prefix_len > 0) {
+            memcpy(event->Event, desc_prefix, prefix_len);
+        }
+        if (value_len > 0) {
+            memcpy(event->Event + prefix_len, desc_value, value_len);
         }
 
         status = cc->HashLogExtendEvent(

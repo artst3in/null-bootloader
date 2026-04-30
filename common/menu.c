@@ -1193,7 +1193,7 @@ noreturn void _menu(bool first_run) {
     const char *raw = config_get_raw(&raw_size);
     if (raw != NULL) {
         tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
-                    raw, raw_size, "Limine config");
+                    raw, raw_size, "limine_cfg", NULL);
     }
 #endif
 
