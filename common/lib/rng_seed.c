@@ -145,8 +145,9 @@ void rng_seed_install(void) {
     }
 
     if (prev_seed_size > 0) {
-        volatile uint8_t *p = prev_seed->bits;
-        for (uint32_t i = 0; i < prev_seed_size; i++) {
+        volatile uint8_t *p = (volatile uint8_t *)prev_seed;
+        size_t prev_total = sizeof(struct linux_efi_random_seed) + prev_seed_size;
+        for (size_t i = 0; i < prev_total; i++) {
             p[i] = 0;
         }
         asm volatile ("" ::: "memory");
