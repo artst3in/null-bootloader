@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// PCR allocation, matching systemd-boot conventions:
+// PCR allocation, following the GRUB convention:
 //   PCR 8: kernel command line and other authoritative strings
 //   PCR 9: kernel image, initrd, devicetree, and other binary blobs
 #define TPM_PCR_BOOT_AUTH       8

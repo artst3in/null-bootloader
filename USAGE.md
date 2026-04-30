@@ -53,7 +53,7 @@ relayed if a TPM is present, since it carries useful PCR 0-7 information
 regardless of what Limine does.
 
 When measured boot is active, Limine extends the platform PCRs with the
-artifacts it loads. The allocation matches the systemd-boot convention:
+artifacts it loads. The allocation follows the GRUB convention:
 
 * **PCR 8** receives, in order, the on-disk `limine.conf` bytes (before any
   in-memory cleanup), and the kernel command line of the booted entry.
