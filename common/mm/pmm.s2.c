@@ -179,12 +179,10 @@ del_mm0:
         }
     }
 
-    // Remove 0 length usable entries and usable entries below 0x1000
+    // Remove 0 length entries (any type) and clip usable entries below 0x1000
     for (size_t i = 0; i < count; i++) {
-        if (m[i].type != MEMMAP_USABLE)
-            continue;
-
-        if (!pmm_sanitiser_keep_first_page && m[i].base < 0x1000) {
+        if (m[i].type == MEMMAP_USABLE
+         && !pmm_sanitiser_keep_first_page && m[i].base < 0x1000) {
             uint64_t entry_top = CHECKED_ADD(m[i].base, m[i].length, goto del_mm1);
             if (entry_top <= 0x1000) {
                 goto del_mm1;
