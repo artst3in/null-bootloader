@@ -1409,7 +1409,8 @@ FEAT_END
         }
 
         for (size_t j = 0; j < memmap_entries; j++) {
-            if (j == i || memmap[j].length == 0) {
+            if (j == i || memmap[j].length == 0
+             || memmap[j].type == MEMMAP_FRAMEBUFFER) {
                 continue;
             }
 
