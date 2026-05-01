@@ -1421,12 +1421,15 @@ FEAT_END
                 continue;
             }
 
-            // There is a page-level overlap. Only USABLE regions can be trimmed.
-            if (memmap[j].type != MEMMAP_USABLE) {
+            // There is a page-level overlap. Only USABLE and RESERVED regions
+            // can be trimmed; everything else describes firmware- or
+            // kernel-asserted content that we must not silently shrink.
+            if (memmap[j].type != MEMMAP_USABLE
+             && memmap[j].type != MEMMAP_RESERVED) {
                 panic(false, "limine: Framebuffer page-level overlap with non-trimmable memory type %x", memmap[j].type);
             }
 
-            // Trim the usable region to not overlap with the framebuffer's
+            // Trim the region to not overlap with the framebuffer's
             // page-aligned extent.
             if (region_base < fb_aligned_base && region_top > fb_aligned_base) {
                 // Region extends before the framebuffer - trim end.
