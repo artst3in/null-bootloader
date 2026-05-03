@@ -99,6 +99,21 @@ bool volume_read(struct volume *volume, void *buffer, uint64_t loc, uint64_t cou
     return true;
 }
 
+static bool partition_range_valid(struct volume *volume,
+                                  uint64_t first_sect, uint64_t sect_count) {
+    if (sect_count == 0) {
+        return false;
+    }
+
+    uint64_t end_sect = CHECKED_ADD(first_sect, sect_count, return false);
+
+    if (volume->sect_count != (uint64_t)-1 && end_sect > volume->sect_count) {
+        return false;
+    }
+
+    return true;
+}
+
 struct gpt_table_header {
     // the head
     char     signature[8];
@@ -244,6 +259,10 @@ static int gpt_get_part(struct volume *ret, struct volume *volume, int partition
     }
     uint64_t partition_blocks = partition_size + 1;
     uint64_t sect_count_result = CHECKED_MUL(partition_blocks, sect_multiplier, return NO_PARTITION);
+
+    if (!partition_range_valid(volume, first_sect_result, sect_count_result)) {
+        return NO_PARTITION;
+    }
 
 #if defined (UEFI)
     ret->efi_handle  = volume->efi_handle;
@@ -405,10 +424,15 @@ static int mbr_get_logical_part(struct volume *ret, struct volume *extended_part
         return NO_PARTITION;
     }
 
-    // Check for overflow in first_sect calculation
-    uint64_t first_sect_64 = CHECKED_ADD(extended_part->first_sect, ebr_sector, return NO_PARTITION);
-    first_sect_64 = CHECKED_ADD(first_sect_64, entry.first_sect, return NO_PARTITION);
-    (void)CHECKED_ADD(first_sect_64, entry.sect_count, return NO_PARTITION);
+    uint64_t logical_rel_first = CHECKED_ADD(ebr_sector, entry.first_sect, return NO_PARTITION);
+    if (!partition_range_valid(extended_part, logical_rel_first, entry.sect_count)) {
+        return NO_PARTITION;
+    }
+
+    uint64_t first_sect_64 = CHECKED_ADD(extended_part->first_sect, logical_rel_first, return NO_PARTITION);
+    if (!partition_range_valid(extended_part->backing_dev, first_sect_64, entry.sect_count)) {
+        return NO_PARTITION;
+    }
 
 #if defined (UEFI)
     ret->efi_handle  = extended_part->efi_handle;
@@ -469,6 +493,10 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
                 continue;
             }
 
+            if (!partition_range_valid(volume, entry.first_sect, entry.sect_count)) {
+                continue;
+            }
+
             struct volume extended_part = {0};
 
 #if defined (UEFI)
@@ -503,6 +531,10 @@ static int mbr_get_part(struct volume *ret, struct volume *volume, int partition
 
     // Validate sect_count is non-zero
     if (entry.sect_count == 0) {
+        return NO_PARTITION;
+    }
+
+    if (!partition_range_valid(volume, entry.first_sect, entry.sect_count)) {
         return NO_PARTITION;
     }
 
