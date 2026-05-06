@@ -57,17 +57,21 @@ static bool find_boot_entry(CHAR16 *entry, uint16_t *out) {
 
         size_t buf_size = 0;
         /* Query for buf size */
-        gRT->GetVariable(var_name, &global_variable, NULL, &buf_size, NULL);
-        uint8_t *buf = ext_mem_alloc(buf_size);
+        if (gRT->GetVariable(var_name, &global_variable, NULL, &buf_size, NULL)
+                != EFI_BUFFER_TOO_SMALL) {
+            continue;
+        }
+        size_t buf_alloc = buf_size;
+        uint8_t *buf = ext_mem_alloc(buf_alloc);
         status = gRT->GetVariable(var_name, &global_variable, NULL, &buf_size, buf);
 
         if (EFI_ERROR(status)) {
-            pmm_free(buf, buf_size);
-            continue; 
+            pmm_free(buf, buf_alloc);
+            continue;
         }
         /* Get the description */
         if (buf_size < sizeof(uint32_t) + sizeof(uint16_t) + sizeof(CHAR16)) {
-            pmm_free(buf, buf_size);
+            pmm_free(buf, buf_alloc);
             continue;
         }
         size_t desc_offset = sizeof(uint32_t) + sizeof(uint16_t);
@@ -75,10 +79,10 @@ static bool find_boot_entry(CHAR16 *entry, uint16_t *out) {
         size_t desc_max_chars = (buf_size - desc_offset) / sizeof(CHAR16);
         if (uefi_string_matches(desc, desc_max_chars, entry)) {
             *out = boot_order[i];
-            pmm_free(buf, buf_size);
+            pmm_free(buf, buf_alloc);
             return true;
         }
-        pmm_free(buf, buf_size);
+        pmm_free(buf, buf_alloc);
     }
 
     return false;
