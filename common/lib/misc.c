@@ -250,7 +250,8 @@ RISCV_EFI_BOOT_PROTOCOL *get_riscv_boot_protocol(void) {
     if (gBS->LocateHandle(ByProtocol, &boot_proto_guid, NULL, &bufsz, NULL) != EFI_BUFFER_TOO_SMALL)
         return NULL;
 
-    EFI_HANDLE *handles_buf = ext_mem_alloc(bufsz);
+    UINTN handles_alloc = bufsz;
+    EFI_HANDLE *handles_buf = ext_mem_alloc(handles_alloc);
     if (handles_buf == NULL)
         return NULL;
 
@@ -263,11 +264,11 @@ RISCV_EFI_BOOT_PROTOCOL *get_riscv_boot_protocol(void) {
     if (gBS->HandleProtocol(handles_buf[0], &boot_proto_guid, (void **)&proto) != EFI_SUCCESS)
         goto error;
 
-    pmm_free(handles_buf, bufsz);
+    pmm_free(handles_buf, handles_alloc);
     return proto;
 
 error:
-    pmm_free(handles_buf, bufsz);
+    pmm_free(handles_buf, handles_alloc);
     return NULL;
 }
 
