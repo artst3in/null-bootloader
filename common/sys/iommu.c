@@ -102,6 +102,13 @@ static void vtd_disable_all(void) {
 #define AMDVI_CONTROL_GA_LOG  (1u << 28)
 #define AMDVI_CONTROL_GA_INT  (1u << 29)
 
+// AMD IOMMU status register (64-bit at offset 0x2020)
+#define AMDVI_STATUS_REG         0x2020
+#define AMDVI_STATUS_EVTLOG_RUN  (1u << 3)
+#define AMDVI_STATUS_CMDBUF_RUN  (1u << 4)
+#define AMDVI_STATUS_PPRLOG_RUN  (1u << 7)
+#define AMDVI_STATUS_GALOG_RUN   (1u << 8)
+
 static void amdvi_disable_unit(uintptr_t mmio_base) {
     // Read low 32 bits of the 64-bit control register
     uint32_t ctrl_lo = mmind(mmio_base + AMDVI_CONTROL_REG);
@@ -119,6 +126,14 @@ static void amdvi_disable_unit(uintptr_t mmio_base) {
                  AMDVI_CONTROL_PPR_LOG | AMDVI_CONTROL_PPR_INT |
                  AMDVI_CONTROL_PPR);
     mmoutd(mmio_base + AMDVI_CONTROL_REG, ctrl_lo);
+
+    // The *Run bits are level-sensitive and only drop to 0 once the engine
+    // has actually drained, so wait for them before continuing.
+    const uint32_t run_mask = AMDVI_STATUS_CMDBUF_RUN | AMDVI_STATUS_EVTLOG_RUN |
+                              AMDVI_STATUS_PPRLOG_RUN | AMDVI_STATUS_GALOG_RUN;
+    while (mmind(mmio_base + AMDVI_STATUS_REG) & run_mask) {
+        asm volatile ("pause");
+    }
 
     ctrl_lo &= ~AMDVI_CONTROL_EN;
     mmoutd(mmio_base + AMDVI_CONTROL_REG, ctrl_lo);
