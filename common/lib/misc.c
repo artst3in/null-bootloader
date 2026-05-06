@@ -282,50 +282,67 @@ bool efi_exit_boot_services(void) {
     // publish it for the kernel to mix into its early RNG state.
     rng_seed_install();
 
-    EFI_MEMORY_DESCRIPTOR tmp_mmap[1];
-    efi_mmap_size = sizeof(tmp_mmap);
-
-    gBS->GetMemoryMap(&efi_mmap_size, tmp_mmap, &efi_mmap_key, &efi_desc_size, &efi_desc_ver);
-
-    efi_mmap_size += 4096;
-
+    // Free the buffer init_memmap left us; the loop below manages
+    // allocation lifetime itself.
     status = gBS->FreePool(efi_mmap);
     if (status) {
         goto fail;
     }
+    efi_mmap = NULL;
 
-    status = gBS->AllocatePool(EfiLoaderData, efi_mmap_size, (void **)&efi_mmap);
-    if (status) {
-        goto fail;
-    }
-
-    EFI_MEMORY_DESCRIPTOR *efi_copy;
-    status = gBS->AllocatePool(EfiLoaderData, CHECKED_MUL(efi_mmap_size, (UINTN)2, goto fail), (void **)&efi_copy);
-    if (status) {
-        goto fail;
-    }
+    EFI_MEMORY_DESCRIPTOR *efi_copy = NULL;
+    UINTN efi_mmap_alloc = 0;
+    UINTN efi_copy_alloc = 0;
 
     bli_on_boot();
 
-    const size_t EFI_COPY_MAX_ENTRIES = (efi_mmap_size * 2) / efi_desc_size;
-
-    size_t retries = 0;
-
-retry:
-    status = gBS->GetMemoryMap(&efi_mmap_size, efi_mmap, &efi_mmap_key, &efi_desc_size, &efi_desc_ver);
-    if (retries == 0 && status) {
-        goto fail;
-    }
-
-    // Be gone, UEFI!
-    status = gBS->ExitBootServices(efi_image_handle, efi_mmap_key);
-    if (status) {
+    for (size_t retries = 0; ; retries++) {
         if (retries == 128) {
             goto fail;
         }
-        retries++;
-        goto retry;
+
+        efi_mmap_size = efi_mmap_alloc;
+        status = gBS->GetMemoryMap(&efi_mmap_size, efi_mmap, &efi_mmap_key,
+                                   &efi_desc_size, &efi_desc_ver);
+        if (status == EFI_BUFFER_TOO_SMALL) {
+            // Map grew (or first iteration). Free both buffers and
+            // reallocate, with slack for the descriptors AllocatePool
+            // itself may add.
+            if (efi_mmap != NULL) {
+                gBS->FreePool(efi_mmap);
+                efi_mmap = NULL;
+            }
+            if (efi_copy != NULL) {
+                gBS->FreePool(efi_copy);
+                efi_copy = NULL;
+            }
+            efi_mmap_alloc = efi_mmap_size + 4096;
+            status = gBS->AllocatePool(EfiLoaderData, efi_mmap_alloc,
+                                       (void **)&efi_mmap);
+            if (status) {
+                goto fail;
+            }
+            efi_copy_alloc = CHECKED_MUL(efi_mmap_alloc, (UINTN)2, goto fail);
+            status = gBS->AllocatePool(EfiLoaderData, efi_copy_alloc,
+                                       (void **)&efi_copy);
+            if (status) {
+                goto fail;
+            }
+            continue;
+        }
+        if (status) {
+            goto fail;
+        }
+
+        // Be gone, UEFI!
+        status = gBS->ExitBootServices(efi_image_handle, efi_mmap_key);
+        if (status == EFI_SUCCESS) {
+            break;
+        }
+        // Map key invalidated by an allocation - retry.
     }
+
+    const size_t EFI_COPY_MAX_ENTRIES = efi_copy_alloc / efi_desc_size;
 
 #if defined(__x86_64__) || defined(__i386__)
     asm volatile ("cli" ::: "memory");
