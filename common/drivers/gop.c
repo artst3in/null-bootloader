@@ -237,11 +237,12 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
         return;
     }
 
-    handles = ext_mem_alloc(handles_size);
+    UINTN handles_alloc = handles_size;
+    handles = ext_mem_alloc(handles_alloc);
 
     status = gBS->LocateHandle(ByProtocol, &gop_guid, NULL, &handles_size, handles);
     if (status != EFI_SUCCESS) {
-        pmm_free(handles, handles_size);
+        pmm_free(handles, handles_alloc);
         *_fbs_count = 0;
         return;
     }
@@ -371,7 +372,7 @@ success:;
         fbs_count++;
     }
 
-    pmm_free(handles, handles_size);
+    pmm_free(handles, handles_alloc);
 
     gop_force_16 = false;
 
