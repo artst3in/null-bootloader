@@ -91,19 +91,36 @@ static void vtd_disable_all(void) {
 }
 
 // AMD IOMMU control register (64-bit at offset 0x18)
-#define AMDVI_CONTROL_REG 0x18
+#define AMDVI_CONTROL_REG     0x18
+#define AMDVI_CONTROL_EN      (1u << 0)
+#define AMDVI_CONTROL_EVT_LOG (1u << 2)
+#define AMDVI_CONTROL_EVT_INT (1u << 3)
+#define AMDVI_CONTROL_CMDBUF  (1u << 12)
+#define AMDVI_CONTROL_PPR_LOG (1u << 13)
+#define AMDVI_CONTROL_PPR_INT (1u << 14)
+#define AMDVI_CONTROL_PPR     (1u << 15)
+#define AMDVI_CONTROL_GA_LOG  (1u << 28)
+#define AMDVI_CONTROL_GA_INT  (1u << 29)
 
 static void amdvi_disable_unit(uintptr_t mmio_base) {
     // Read low 32 bits of the 64-bit control register
     uint32_t ctrl_lo = mmind(mmio_base + AMDVI_CONTROL_REG);
 
-    if (!(ctrl_lo & (1u << 0))) {
+    if (!(ctrl_lo & AMDVI_CONTROL_EN)) {
         return; // IOMMU not enabled
     }
 
-    // Clear IommuEn (bit 0) — the master enable for all IOMMU functionality.
-    // Takes effect immediately, no polling needed (unlike Intel VT-d).
-    ctrl_lo &= ~(1u << 0);
+    // Disable command buffer, logs and their interrupts before the master
+    // enable. Clearing IommuEn while sub-features are still live can leave
+    // queued descriptors and in-flight DMA in an undefined state.
+    ctrl_lo &= ~(AMDVI_CONTROL_CMDBUF |
+                 AMDVI_CONTROL_EVT_LOG | AMDVI_CONTROL_EVT_INT |
+                 AMDVI_CONTROL_GA_LOG  | AMDVI_CONTROL_GA_INT  |
+                 AMDVI_CONTROL_PPR_LOG | AMDVI_CONTROL_PPR_INT |
+                 AMDVI_CONTROL_PPR);
+    mmoutd(mmio_base + AMDVI_CONTROL_REG, ctrl_lo);
+
+    ctrl_lo &= ~AMDVI_CONTROL_EN;
     mmoutd(mmio_base + AMDVI_CONTROL_REG, ctrl_lo);
 }
 
