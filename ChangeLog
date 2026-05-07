@@ -21,6 +21,9 @@
         - Reject PE images with `SectionAlignment` = 0 (found via fuzzing).
         - Miscellaneous bug fixes.
 
+    Miscellaneous:
+        - Update pdgzip subproject. Improves performance by ~25%.
+
 2026-05-01  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 12.1.0 ***
