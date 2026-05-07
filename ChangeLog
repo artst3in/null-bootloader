@@ -1,3 +1,26 @@
+2026-05-07  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.2.0 ***
+
+    Noteworthy changes compared to the previous release, 12.1.0:
+
+    New features:
+        - Add a hotkey to launch the UEFI Shell from the boot menu.
+
+    Bug fixes:
+        - Free UEFI buffers with their original allocation size after
+          LocateHandle to avoid pool corruption on strict firmwares.
+        - Reallocate the UEFI memory map buffer if it grows during the
+          ExitBootServices retry loop.
+        - Drop a redundant IER write in the serial driver that clobbered DLM at
+          low baud rates.
+        - Limine boot protocol: Allow trimming reserved entries that overlap
+          framebuffer pages.
+        - Harden the ELF loader against crafted RELR tables that overflow the
+          relocation count on 32-bit builds (found via fuzzing).
+        - Reject PE images with `SectionAlignment` = 0 (found via fuzzing).
+        - Miscellaneous bug fixes.
+
 2026-05-01  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 12.1.0 ***
