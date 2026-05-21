@@ -19,6 +19,9 @@
 
 </div>
 
+> **Part of [Project Aether](https://github.com/artst3in/LunaOS) — the unified consciousness ecosystem.**
+> LunaOS (brain) · Aegis (shield) · LCPFS (storage) · Null (boot)
+
 ---
 
 ## 🎯 What is Null?
