@@ -14,7 +14,7 @@ static uint16_t linear_masks_to_bpp(uint32_t red_mask, uint32_t green_mask,
                                     uint32_t blue_mask, uint32_t alpha_mask) {
     uint32_t compound_mask = red_mask | green_mask | blue_mask | alpha_mask;
     uint16_t ret = 32;
-    while ((compound_mask & (1 << 31)) == 0) {
+    while ((compound_mask & (1U << 31)) == 0) {
         ret--;
         compound_mask <<= 1;
     }
@@ -127,7 +127,7 @@ bool gop_force_16 = false;
 static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
                      size_t mode, uint64_t width, uint64_t height, int bpp,
                      struct fb_info *fbs, size_t fbs_count,
-                     bool *setmode_called) {
+                     bool preserve_screen) {
     EFI_STATUS status;
 
     if (!mode_to_fb_info(ret, gop, mode)) {
@@ -158,7 +158,7 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 
     printv("gop: Found matching mode %X, attempting to set...\n", (uint64_t)mode);
 
-    if (mode == gop->Mode->Mode && *setmode_called) {
+    if (mode == gop->Mode->Mode) {
         printv("gop: Mode was already set, perfect!\n");
     } else {
         status = gop->SetMode(gop, mode);
@@ -167,8 +167,6 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
             printv("gop: Failed to set video mode %X, moving on...\n", (uint64_t)mode);
             return false;
         }
-
-        *setmode_called = true;
     }
 
     // Recalculate pitch from gop->Mode->Info, as some firmware (e.g. Apple
@@ -181,7 +179,9 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 
     ret->framebuffer_addr = gop->Mode->FrameBufferBase;
 
-    fb_clear(ret);
+    if (!preserve_screen) {
+        fb_clear(ret);
+    }
 
     return true;
 }
@@ -189,7 +189,7 @@ static bool try_mode(struct fb_info *ret, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop) {
     UINTN modes_count = gop->Mode->MaxMode;
 
-    struct fb_info *ret = ext_mem_alloc(modes_count * sizeof(struct fb_info));
+    struct fb_info *ret = ext_mem_alloc_counted(modes_count, sizeof(struct fb_info));
 
     size_t actual_count = 0;
     for (size_t i = 0; i < modes_count; i++) {
@@ -198,7 +198,7 @@ static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL
         }
     }
 
-    struct fb_info *tmp = ext_mem_alloc(actual_count * sizeof(struct fb_info));
+    struct fb_info *tmp = ext_mem_alloc_counted(actual_count, sizeof(struct fb_info));
     memcpy(tmp, ret, actual_count * sizeof(struct fb_info));
 
     pmm_free(ret, modes_count * sizeof(struct fb_info));
@@ -210,15 +210,14 @@ static struct fb_info *get_mode_list(size_t *count, EFI_GRAPHICS_OUTPUT_PROTOCOL
 
 #define MAX_PRESET_MODES 128
 no_unwind static int preset_modes[MAX_PRESET_MODES];
-no_unwind static bool setmode_called[MAX_PRESET_MODES];
 no_unwind static bool preset_modes_initialised = false;
 
 void init_gop(struct fb_info **ret, size_t *_fbs_count,
-              uint64_t target_width, uint64_t target_height, uint16_t target_bpp) {
+              uint64_t target_width, uint64_t target_height, uint16_t target_bpp,
+              bool preserve_screen) {
     if (preset_modes_initialised == false) {
         for (size_t i = 0; i < MAX_PRESET_MODES; i++) {
             preset_modes[i] = -1;
-            setmode_called[i] = false;
         }
         preset_modes_initialised = true;
     }
@@ -238,18 +237,19 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
         return;
     }
 
-    handles = ext_mem_alloc(handles_size);
+    UINTN handles_alloc = handles_size;
+    handles = ext_mem_alloc(handles_alloc);
 
     status = gBS->LocateHandle(ByProtocol, &gop_guid, NULL, &handles_size, handles);
     if (status != EFI_SUCCESS) {
-        pmm_free(handles, handles_size);
+        pmm_free(handles, handles_alloc);
         *_fbs_count = 0;
         return;
     }
 
     size_t handles_count = handles_size / sizeof(EFI_HANDLE);
 
-    *ret = ext_mem_alloc(handles_count * sizeof(struct fb_info));
+    *ret = ext_mem_alloc_counted(handles_count, sizeof(struct fb_info));
 
     const struct resolution fallback_resolutions[] = {
         { 0,    0,   0  },   // Overridden by EDID
@@ -287,11 +287,13 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
                                 &mode_info_size, &mode_info);
 
         if (status == EFI_NOT_STARTED) {
+            if (fbs_count > 0) {
+                continue;
+            }
             status = gop->SetMode(gop, 0);
             if (status) {
                 continue;
             }
-            setmode_called[i] = true;
             status = gop->QueryMode(gop, gop->Mode == NULL ? 0 : gop->Mode->Mode,
                                     &mode_info_size, &mode_info);
         }
@@ -319,7 +321,7 @@ void init_gop(struct fb_info **ret, size_t *_fbs_count,
 
 retry:
         for (size_t j = 0; j < modes_count; j++) {
-            if (try_mode(fb, gop, j, _target_width, _target_height, _target_bpp, *ret, fbs_count, &setmode_called[i])) {
+            if (try_mode(fb, gop, j, _target_width, _target_height, _target_bpp, *ret, fbs_count, preserve_screen)) {
                 goto success;
             }
         }
@@ -346,7 +348,7 @@ fallback:
         if (current_fallback == 1) {
             current_fallback++;
 
-            if (try_mode(fb, gop, preset_modes[i], 0, 0, 0, *ret, fbs_count, &setmode_called[i])) {
+            if (try_mode(fb, gop, preset_modes[i], 0, 0, 0, *ret, fbs_count, preserve_screen)) {
                 goto success;
             }
         }
@@ -370,7 +372,7 @@ success:;
         fbs_count++;
     }
 
-    pmm_free(handles, handles_size);
+    pmm_free(handles, handles_alloc);
 
     gop_force_16 = false;
 

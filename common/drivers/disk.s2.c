@@ -266,6 +266,13 @@ void disk_create_index(void) {
         bool is_atapi = (dpte != NULL && (dpte->flags & (1 << 6)));
         block->is_optical = is_atapi || (block->sector_size == 2048 && is_removable);
 
+        // Ugly workaround for VMware, because it puts the optical drive at 0x9f but does
+        // not expose DPTE.
+        if (drive == 0x9f && block->sector_size == 2048) {
+            is_removable = true;
+            block->is_optical = true;
+        }
+
         if (!is_removable && !block->is_optical) {
             if (consumed_bda_disks == bda_disk_count) {
                 pmm_free(block, sizeof(struct volume));
@@ -620,12 +627,15 @@ struct volume *disk_volume_from_efi_handle(EFI_HANDLE efi_handle) {
     // Fallback to unique sector matching
     uint64_t bdev_size = ((uint64_t)block_io->Media->LastBlock + 1) * (uint64_t)block_io->Media->BlockSize;
     if (bdev_size >= UNIQUE_SECTOR_POOL_SIZE) {
+        // Pre-calculate unique sectors before reading query data into
+        // the pool, since find_unique_sectors() uses the same buffer.
+        find_unique_sectors();
+
         status = block_io->ReadBlocks(block_io, block_io->Media->MediaId,
                                       0,
                                       UNIQUE_SECTOR_POOL_SIZE,
                                       unique_sector_pool);
         if (status == 0) {
-            find_unique_sectors();
 
             uint8_t b2b[BLAKE2B_OUT_BYTES];
             blake2b(b2b, unique_sector_pool, UNIQUE_SECTOR_POOL_SIZE);

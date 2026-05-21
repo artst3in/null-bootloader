@@ -7,6 +7,7 @@ bool verbose = false;
 bool quiet = false;
 bool serial = false;
 bool hash_mismatch_panic = false;
+bool measured_boot = false;
 
 uint8_t bcd_to_int(uint8_t val) {
     return (val & 0x0f) + ((val & 0xf0) >> 4) * 10;
@@ -38,17 +39,16 @@ uint64_t strtoui(const char *s, const char **end, int base) {
                 *end = &s[i];
             break;
         }
-        uint64_t mul_result;
-        if (__builtin_mul_overflow(n, (uint64_t)base, &mul_result)) {
+        uint64_t mul_result = CHECKED_MUL(n, base, ({
             if (end != NULL)
                 *end = &s[i];
             return UINT64_MAX;
-        }
-        if (__builtin_add_overflow(mul_result, (uint64_t)d, &n)) {
+        }));
+        n = CHECKED_ADD(mul_result, d, ({
             if (end != NULL)
                 *end = &s[i];
             return UINT64_MAX;
-        }
+        }));
     }
     return n;
 }
@@ -91,12 +91,12 @@ first_run:
                 }
                 if ((!strncmp(path, "..\0", 3))
                 ||  (!strncmp(path, "../\0", 4))) {
-                    while (*path_ptr != '/') path_ptr--;
+                    while (path_ptr > orig_ptr && *path_ptr != '/') path_ptr--;
                     if (path_ptr == orig_ptr) path_ptr++;
                     goto term;
                 }
                 if (!strncmp(path, "../", 3)) {
-                    while (*path_ptr != '/') path_ptr--;
+                    while (path_ptr > orig_ptr && *path_ptr != '/') path_ptr--;
                     if (path_ptr == orig_ptr) path_ptr++;
                     path += 2;
                     *path_ptr = 0;
@@ -106,7 +106,7 @@ first_run:
                     path += 1;
                     continue;
                 }
-                if (((path_ptr - 1) != orig_ptr) && (*(path_ptr - 1) != '/')) {
+                if (path_ptr > orig_ptr && ((path_ptr - 1) != orig_ptr) && (*(path_ptr - 1) != '/')) {
                     if (path_ptr >= end_ptr) return false;
                     *path_ptr = '/';
                     path_ptr++;
@@ -114,7 +114,7 @@ first_run:
                 continue;
             case '\0':
 term:
-                if ((*(path_ptr - 1) == '/') && ((path_ptr - 1) != orig_ptr))
+                if (path_ptr > orig_ptr && (*(path_ptr - 1) == '/') && ((path_ptr - 1) != orig_ptr))
                     path_ptr--;
                 *path_ptr = 0;
                 return true;
