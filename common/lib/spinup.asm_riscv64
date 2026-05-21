@@ -4,8 +4,7 @@
 .global riscv_spinup
 riscv_spinup:
 .option norelax
-        li      t0, (2 << 32)
-        csrw    sstatus, t0
+        csrci   sstatus, 0x2
         csrw    sie, zero
 
         lla     t0, 0f

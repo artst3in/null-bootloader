@@ -30,7 +30,7 @@ bool efi_exit_boot_services(void);
 bool is_efi_serial_present(void);
 #endif
 
-void *get_device_tree_blob(const char *config, size_t extra_size, bool measure);
+void *get_device_tree_blob(const char *config, size_t extra_size);
 
 extern struct volume *boot_volume;
 
@@ -38,7 +38,7 @@ extern struct volume *boot_volume;
 extern bool stage3_loaded;
 #endif
 
-extern bool quiet, serial, editor_enabled, help_hidden, hash_mismatch_panic, secure_boot_active, measured_boot;
+extern bool quiet, serial, editor_enabled, help_hidden, hash_mismatch_panic;
 
 extern uint64_t usec_at_bootloader_entry;
 
@@ -71,36 +71,16 @@ uint64_t strtoui(const char *s, const char **end, int base);
     MAX_a > MAX_b ? MAX_a : MAX_b; \
 })
 
-#define CHECKED_ADD(a, b, onerror) ({ \
-    __auto_type CHECKED_ADD_a = (a); \
-    __auto_type CHECKED_ADD_b = (b); \
-    typeof(CHECKED_ADD_a + CHECKED_ADD_b) CHECKED_ADD_res; \
-    if (__builtin_add_overflow(CHECKED_ADD_a, CHECKED_ADD_b, &CHECKED_ADD_res)) { \
-        onerror; \
-    } \
-    CHECKED_ADD_res; \
-})
-
-#define CHECKED_MUL(a, b, onerror) ({ \
-    __auto_type CHECKED_MUL_a = (a); \
-    __auto_type CHECKED_MUL_b = (b); \
-    typeof(CHECKED_MUL_a * CHECKED_MUL_b) CHECKED_MUL_res; \
-    if (__builtin_mul_overflow(CHECKED_MUL_a, CHECKED_MUL_b, &CHECKED_MUL_res)) { \
-        onerror; \
-    } \
-    CHECKED_MUL_res; \
-})
-
-#define DIV_ROUNDUP(a, b, onerror) ({ \
+#define DIV_ROUNDUP(a, b) ({ \
     __auto_type DIV_ROUNDUP_a = (a); \
     __auto_type DIV_ROUNDUP_b = (b); \
-    CHECKED_ADD(DIV_ROUNDUP_a, DIV_ROUNDUP_b - 1, onerror) / DIV_ROUNDUP_b; \
+    (DIV_ROUNDUP_a + (DIV_ROUNDUP_b - 1)) / DIV_ROUNDUP_b; \
 })
 
-#define ALIGN_UP(x, a, onerror) ({ \
+#define ALIGN_UP(x, a) ({ \
     __auto_type ALIGN_UP_value = (x); \
     __auto_type ALIGN_UP_align = (a); \
-    ALIGN_UP_value = DIV_ROUNDUP(ALIGN_UP_value, ALIGN_UP_align, onerror) * ALIGN_UP_align; \
+    ALIGN_UP_value = DIV_ROUNDUP(ALIGN_UP_value, ALIGN_UP_align) * ALIGN_UP_align; \
     ALIGN_UP_value; \
 })
 
@@ -121,9 +101,6 @@ noreturn void stage3_common(void);
 noreturn void common_spinup(void *fnptr, int args, ...);
 #elif defined (__aarch64__)
 noreturn void enter_in_el1(uint64_t entry, uint64_t sp, uint64_t sctlr,
-                           uint64_t mair, uint64_t tcr, uint64_t ttbr0,
-                           uint64_t ttbr1, uint64_t target_x0);
-noreturn void enter_in_el2(uint64_t entry, uint64_t sp, uint64_t sctlr,
                            uint64_t mair, uint64_t tcr, uint64_t ttbr0,
                            uint64_t ttbr1, uint64_t target_x0);
 #elif defined (__riscv)
@@ -149,15 +126,5 @@ struct mem_range {
     uint64_t length;
     uint64_t permissions;
 };
-
-static inline const char *current_firmware(void) {
-#if defined (UEFI)
-    return "UEFI";
-#elif defined (BIOS)
-    return "BIOS";
-#else
-#error "Unspecified firmware type"
-#endif
-}
 
 #endif

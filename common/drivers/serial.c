@@ -23,6 +23,7 @@ static void serial_initialise(void) {
     outb(0x3f8 + 0, divisor & 0xff);
     outb(0x3f8 + 1, (divisor >> 8) & 0xff);
 
+    outb(0x3f8 + 1, 0x00);
     outb(0x3f8 + 3, 0x03);
     outb(0x3f8 + 2, 0xc7);
     outb(0x3f8 + 4, 0x0b);

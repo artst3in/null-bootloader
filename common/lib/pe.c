@@ -183,10 +183,6 @@ static void pe64_validate(uint8_t *image, size_t file_size) {
         panic(true, "pe: Not a valid PE32+ file");
     }
 
-    if (nt_hdrs->FileHeader.SizeOfOptionalHeader < sizeof(IMAGE_OPTIONAL_HEADER64)) {
-        panic(true, "pe: SizeOfOptionalHeader too small");
-    }
-
 #if defined(__x86_64__) || defined(__i386__)
     if (nt_hdrs->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) {
         panic(true, "pe: Not an x86-64 PE file");
@@ -253,8 +249,8 @@ bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t
     IMAGE_NT_HEADERS64 *nt_hdrs = (IMAGE_NT_HEADERS64 *)(image + dos_hdr->e_lfanew);
 
     // Validate SizeOfOptionalHeader doesn't cause sections pointer to go out of bounds
-    uint64_t sections_offset = (uint64_t)dos_hdr->e_lfanew + sizeof(uint32_t) + sizeof(IMAGE_FILE_HEADER) + nt_hdrs->FileHeader.SizeOfOptionalHeader;
-    uint64_t sections_end = sections_offset + (uint64_t)nt_hdrs->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
+    size_t sections_offset = dos_hdr->e_lfanew + sizeof(uint32_t) + sizeof(IMAGE_FILE_HEADER) + nt_hdrs->FileHeader.SizeOfOptionalHeader;
+    size_t sections_end = sections_offset + (size_t)nt_hdrs->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
     if (sections_end > file_size) {
         panic(true, "pe: Section headers extend beyond file bounds");
     }
@@ -274,10 +270,6 @@ bool pe64_load(uint8_t *image, size_t file_size, uint64_t *entry_point, uint64_t
     uint64_t image_base = nt_hdrs->OptionalHeader.ImageBase;
     uint64_t image_size = nt_hdrs->OptionalHeader.SizeOfImage;
     uint64_t alignment = nt_hdrs->OptionalHeader.SectionAlignment;
-
-    if (alignment == 0) {
-        panic(true, "pe: SectionAlignment is zero");
-    }
 
     if (alignment > 1 && (alignment & (alignment - 1)) != 0) {
         panic(true, "pe: SectionAlignment is not a power of 2");
@@ -463,7 +455,7 @@ again:
             range_count++;
         }
 
-        struct mem_range *ranges = ext_mem_alloc_counted(range_count, sizeof(struct mem_range));
+        struct mem_range *ranges = ext_mem_alloc(range_count * sizeof(struct mem_range));
 
         *_ranges = ranges;
         *_ranges_count = range_count;
@@ -473,7 +465,7 @@ again:
         if (!headers_within_section) {
             struct mem_range *range = &ranges[range_index++];
             range->base = *virtual_base;
-            range->length = ALIGN_UP(nt_hdrs->OptionalHeader.SizeOfHeaders, 0x1000, panic(true, "pe: Alignment overflow"));
+            range->length = ALIGN_UP(nt_hdrs->OptionalHeader.SizeOfHeaders, 0x1000);
             range->permissions = MEM_RANGE_R;
         }
 
@@ -484,7 +476,7 @@ again:
 
             struct mem_range *range = &ranges[range_index++];
             range->base = *virtual_base + ALIGN_DOWN(section->VirtualAddress, alignment);
-            range->length = ALIGN_UP(section->VirtualSize + misalign, alignment, panic(true, "pe: Alignment overflow"));
+            range->length = ALIGN_UP(section->VirtualSize + misalign, alignment);
 
             if (section->Characteristics & IMAGE_SCN_MEM_EXECUTE) {
                 range->permissions |= MEM_RANGE_X;

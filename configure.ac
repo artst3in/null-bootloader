@@ -1,9 +1,8 @@
-AC_INIT([Limine], [m4_esyscmd([./version.sh])], [https://github.com/Limine-Bootloader/Limine/issues], [limine], [https://limine-bootloader.org/])
+AC_INIT([Null], [m4_esyscmd([./version.sh])], [https://github.com/artst3in/null-bootloader/issues], [null], [https://github.com/artst3in/null-bootloader])
 
 AC_PREREQ([2.69])
 
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_MACRO_DIRS([m4])
 
 SRCDIR="$(cd "$srcdir" && pwd -P)"
 BUILDDIR="$(pwd -P)"
@@ -18,7 +17,6 @@ AC_SUBST([SOURCE_DATE_EPOCH])
 AC_SUBST([SOURCE_DATE_EPOCH_TOUCH])
 
 AC_CANONICAL_HOST
-AC_CANONICAL_BUILD
 
 # Portably convert relative paths into absolute paths.
 rel2abs() {
@@ -53,9 +51,6 @@ test "x${CFLAGS+set}" = "x" && CFLAGS='-g -O2 -pipe'
 AC_LANG([C])
 AC_PROG_CC
 CC="$(rel2abs "$CC")"
-
-AX_PROG_CC_FOR_BUILD
-CC_FOR_BUILD="$(rel2abs "$CC_FOR_BUILD")"
 
 werror_state="no"
 AC_ARG_ENABLE([werror],
@@ -137,9 +132,9 @@ GET_PROG([STRIP], [strip], [tool])
 AC_CHECK_HEADERS([stdio.h stdlib.h stdint.h stddef.h stdbool.h stdarg.h string.h errno.h inttypes.h limits.h time.h],
     [], [AC_MSG_ERROR([required header not found])])
 
-AC_ARG_VAR([TOOLCHAIN_FOR_TARGET], [alternative toolchain prefix for Limine])
+AC_ARG_VAR([TOOLCHAIN_FOR_TARGET], [alternative toolchain prefix for Null])
 
-AC_ARG_VAR([CC_FOR_TARGET], [C compiler command for Limine])
+AC_ARG_VAR([CC_FOR_TARGET], [C compiler command for Null])
 if test "x${CC_FOR_TARGET+set}" = "x"; then
     if test "x${TOOLCHAIN_FOR_TARGET+set}" = "x"; then
         CC_FOR_TARGET="clang"
@@ -147,7 +142,7 @@ if test "x${CC_FOR_TARGET+set}" = "x"; then
         CC_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}gcc"
     fi
 fi
-AC_ARG_VAR([LD_FOR_TARGET], [linker command for Limine])
+AC_ARG_VAR([LD_FOR_TARGET], [linker command for Null])
 if test "x${LD_FOR_TARGET+set}" = "x"; then
     if test "x${TOOLCHAIN_FOR_TARGET+set}" = "x"; then
         LD_FOR_TARGET="ld.lld"
@@ -158,11 +153,11 @@ fi
 
 test "x${TOOLCHAIN_FOR_TARGET+set}" = "x" && TOOLCHAIN_FOR_TARGET=llvm-
 
-AC_ARG_VAR([OBJCOPY_FOR_TARGET], [objcopy command for Limine])
+AC_ARG_VAR([OBJCOPY_FOR_TARGET], [objcopy command for Null])
 test "x${OBJCOPY_FOR_TARGET+set}" = "x" && OBJCOPY_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}objcopy"
-AC_ARG_VAR([OBJDUMP_FOR_TARGET], [objdump command for Limine])
+AC_ARG_VAR([OBJDUMP_FOR_TARGET], [objdump command for Null])
 test "x${OBJDUMP_FOR_TARGET+set}" = "x" && OBJDUMP_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}objdump"
-AC_ARG_VAR([READELF_FOR_TARGET], [readelf command for Limine])
+AC_ARG_VAR([READELF_FOR_TARGET], [readelf command for Null])
 test "x${READELF_FOR_TARGET+set}" = "x" && READELF_FOR_TARGET="${TOOLCHAIN_FOR_TARGET}readelf"
 
 GET_PROG([CC_FOR_TARGET])
@@ -213,6 +208,7 @@ if test "x$BUILD_BIOS" = "xno"; then
 else
     BUILD_BIOS="limine-bios"
     NEED_NASM=yes
+    NEED_GZIP=yes
 fi
 
 AC_SUBST([BUILD_BIOS])
@@ -315,6 +311,12 @@ if test "x$NEED_NASM" = "xyes"; then
     fi
 fi
 
+if test "x$NEED_GZIP" = "xyes"; then
+    AC_CHECK_PROG([GZIP_FOUND], [gzip], [yes])
+    if ! test "x$GZIP_FOUND" = "xyes"; then
+        AC_MSG_ERROR([gzip not found, please install gzip before configuring])
+    fi
+fi
 
 BORROWED_CFLAGS=""
 for cflag in $CFLAGS; do
@@ -325,20 +327,20 @@ for cflag in $CFLAGS; do
     esac
 done
 
-AC_ARG_VAR([CFLAGS_FOR_TARGET], [C flags for Limine])
+AC_ARG_VAR([CFLAGS_FOR_TARGET], [C flags for Null])
 test "x${CFLAGS_FOR_TARGET+set}" = "x" && CFLAGS_FOR_TARGET="$BORROWED_CFLAGS"
 
-AC_ARG_VAR([CPPFLAGS_FOR_TARGET], [C preprocessor flags for Limine])
+AC_ARG_VAR([CPPFLAGS_FOR_TARGET], [C preprocessor flags for Null])
 test "x${CPPFLAGS_FOR_TARGET+set}" = "x" && CPPFLAGS_FOR_TARGET=""
 
-AC_ARG_VAR([LDFLAGS_FOR_TARGET], [linker flags for Limine])
+AC_ARG_VAR([LDFLAGS_FOR_TARGET], [linker flags for Null])
 test "x${LDFLAGS_FOR_TARGET+set}" = "x" && LDFLAGS_FOR_TARGET=""
 
-AC_ARG_VAR([NASMFLAGS_FOR_TARGET], [nasm flags for Limine])
+AC_ARG_VAR([NASMFLAGS_FOR_TARGET], [nasm flags for Null])
 test "x${NASMFLAGS_FOR_TARGET+set}" = "x" && NASMFLAGS_FOR_TARGET="-g"
 
-LIMINE_COPYRIGHT=$($GREP Copyright "$SRCDIR/COPYING")
-AC_SUBST([LIMINE_COPYRIGHT])
+NULL_COPYRIGHT=$($GREP Copyright "$SRCDIR/COPYING")
+AC_SUBST([NULL_COPYRIGHT])
 
 AC_PREFIX_DEFAULT([/usr/local])
 

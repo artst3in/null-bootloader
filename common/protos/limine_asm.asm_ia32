@@ -50,14 +50,10 @@ old_pagemap:
 
 section .text
 
-; void limine_memcpy_64_asm(int paging_mode, void *pagemap, uint64_t dst, uint64_t src, size_t count);
-;
-; Both endpoints are 64-bit-wide. Low-memory callers cast pointers
-; through (uint64_t)(uintptr_t). Identity mapping makes low addresses
-; valid as 64-bit virtual addresses inside the long-mode copy.
+; void limine_memcpy_to_64_asm(int paging_mode, void *pagemap, uint64_t dst, void *src, size_t count);
 
-global limine_memcpy_64_asm
-limine_memcpy_64_asm:
+global limine_memcpy_to_64_asm
+limine_memcpy_to_64_asm:
     push ebp
     mov ebp, esp
 
@@ -181,8 +177,8 @@ bits 64
     mov ss, eax
 
     mov rdi, qword [rbp+16]
-    mov rsi, qword [rbp+24]
-    mov ecx, dword [rbp+32]
+    mov esi, dword [rbp+24]
+    mov ecx, dword [rbp+28]
 
     rep movsb
 

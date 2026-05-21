@@ -6,7 +6,6 @@
 #include <lib/misc.h>
 #include <lib/fb.h>
 #include <mm/pmm.h>
-#include <mm/mtrr.h>
 #include <drivers/vga_textmode.h>
 #include <flanterm_backends/fb.h>
 
@@ -20,10 +19,6 @@ size_t terms_i = 0;
 int term_backend = _NOT_READY;
 
 void term_notready(void) {
-#if defined (__i386__) || defined (__x86_64__)
-    mtrr_wc_clear_fb_ranges();
-#endif
-
     for (size_t i = 0; i < terms_i; i++) {
         struct flanterm_context *term = terms[i];
 
@@ -230,10 +225,6 @@ static bool dummy_handle(void) {
 }
 
 void term_fallback(void) {
-#if defined (UEFI)
-    int prev_backend = term_backend;
-#endif
-
     term_notready();
 
     terms = ext_mem_alloc(sizeof(void *));
@@ -245,14 +236,9 @@ void term_fallback(void) {
 
 #if defined (UEFI)
     if (!efi_boot_services_exited) {
-        if (prev_backend != FALLBACK && prev_backend != _NOT_READY) {
-            gST->ConOut->Reset(gST->ConOut, true);
-        }
 #endif
 
-        // XXX: Ideally we clear the screen, but that gets rid of the BGRT boot logo
-        // and is slow, so...
-        //fallback_clear(NULL, true);
+        fallback_clear(NULL, true);
 
         term->set_text_fg = (void *)dummy_handle;
         term->set_text_bg = (void *)dummy_handle;
@@ -281,10 +267,6 @@ void term_fallback(void) {
         term_backend = FALLBACK;
         flanterm_context_reinit(term);
 #if defined (UEFI)
-
-        cursor_x = 0;
-        cursor_y = 0;
-        gST->ConOut->SetCursorPosition(gST->ConOut, 0, 0);
 
         term->set_text_fg = fallback_set_text_fg;
         term->set_text_bg = fallback_set_text_bg;
@@ -316,8 +298,6 @@ void term_fallback(void) {
             0,
             FLANTERM_FB_ROTATE_0
         );
-
-        flanterm_fb_set_flush_callback(terms[0], (void *)fb_flush);
     }
 
     return;

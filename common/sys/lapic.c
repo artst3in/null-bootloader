@@ -51,8 +51,7 @@ void lapic_prep_lint(struct madt *madt, uint32_t acpi_uid, bool x2apic) {
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0
-         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
+        if (*(madt_ptr + 1) == 0) {
             break;
         }
         switch (*madt_ptr) {
@@ -64,9 +63,8 @@ void lapic_prep_lint(struct madt *madt, uint32_t acpi_uid, bool x2apic) {
 
                 struct madt_lapic_nmi *nmi = (void *)madt_ptr;
 
-                // Match all processors (0xff) or specific UID.
-                if (nmi->acpi_processor_uid != 0xff
-                 && (acpi_uid > 0xfe || nmi->acpi_processor_uid != acpi_uid)) {
+                // Match all processors (0xff) or specific UID
+                if (nmi->acpi_processor_uid != 0xff && nmi->acpi_processor_uid != (uint8_t)acpi_uid) {
                     continue;
                 }
 
@@ -229,8 +227,7 @@ void lapic_configure_bsp(void) {
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0
-         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
+        if (*(madt_ptr + 1) == 0) {
             break;
         }
         switch (*madt_ptr) {
@@ -287,12 +284,12 @@ bool lapic_check(void) {
 }
 
 uint32_t lapic_read(uint32_t reg) {
-    size_t lapic_mmio_base = (size_t)(rdmsr(0x1b) & 0xfffffffffffff000);
+    size_t lapic_mmio_base = (size_t)(rdmsr(0x1b) & 0xfffff000);
     return mmind(lapic_mmio_base + reg);
 }
 
 void lapic_write(uint32_t reg, uint32_t data) {
-    size_t lapic_mmio_base = (size_t)(rdmsr(0x1b) & 0xfffffffffffff000);
+    size_t lapic_mmio_base = (size_t)(rdmsr(0x1b) & 0xfffff000);
     mmoutd(lapic_mmio_base + reg, data);
 }
 
@@ -431,8 +428,7 @@ void init_io_apics(void) {
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0
-         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
+        if (*(madt_ptr + 1) == 0) {
             break;
         }
         switch (*madt_ptr) {
@@ -445,14 +441,13 @@ void init_io_apics(void) {
         }
     }
 
-    io_apics = ext_mem_alloc_counted(max_io_apics, sizeof(struct madt_io_apic *));
+    io_apics = ext_mem_alloc(max_io_apics * sizeof(struct madt_io_apic *));
     max_io_apics = 0;
 
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0
-         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
+        if (*(madt_ptr + 1) == 0) {
             break;
         }
         switch (*madt_ptr) {

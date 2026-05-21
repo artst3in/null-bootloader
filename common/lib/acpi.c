@@ -260,11 +260,11 @@ static bool acpi_padding_is_safe(uint64_t base, uint64_t length) {
         return true;
     }
 
-    uint64_t top = CHECKED_ADD(base, length, return false);
+    uint64_t top = base + length;
 
     for (size_t i = 0; i < memmap_entries; i++) {
         uint64_t entry_base = memmap[i].base;
-        uint64_t entry_top  = CHECKED_ADD(entry_base, memmap[i].length, continue);
+        uint64_t entry_top  = entry_base + memmap[i].length;
 
         if (entry_base >= top || entry_top <= base) {
             continue;
@@ -289,7 +289,7 @@ static void map_single_table(uint64_t addr, uint32_t len) {
     uint32_t length = len != (uint32_t)-1 ? len : *(uint32_t *)(uintptr_t)(addr + 4);
 
     uint64_t aligned_base = ALIGN_DOWN(addr, 4096);
-    uint64_t aligned_top  = ALIGN_UP(addr + length, 4096, panic(false, "acpi: Alignment overflow"));
+    uint64_t aligned_top  = ALIGN_UP(addr + length, 4096);
 
     if (!acpi_padding_is_safe(aligned_base, addr - aligned_base)) {
         aligned_base = addr;
@@ -436,7 +436,10 @@ void efi_map_runtime_entries(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length = CHECKED_MUL(entry->NumberOfPages, 4096, continue);
+        uint64_t length;
+        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
+            continue;
+        }
 
         memmap_alloc_range(base, length, MEMMAP_RESERVED_MAPPED, 0, true, false, true);
     }
@@ -452,12 +455,12 @@ void efi_map_runtime_entries(void) {
     }
 
     if (gST->ConfigurationTable != NULL && gST->NumberOfTableEntries > 0) {
-        uint64_t ct_size = CHECKED_MUL(gST->NumberOfTableEntries,
-                (uint64_t)sizeof(EFI_CONFIGURATION_TABLE), goto skip_ct);
-        if (ct_size <= UINT32_MAX) {
+        uint64_t ct_size;
+        if (!__builtin_mul_overflow(gST->NumberOfTableEntries,
+                (uint64_t)sizeof(EFI_CONFIGURATION_TABLE), &ct_size)
+         && ct_size <= UINT32_MAX) {
             map_single_table((uintptr_t)gST->ConfigurationTable, (uint32_t)ct_size);
         }
-skip_ct:;
     }
 
     if (gST->FirmwareVendor != NULL) {

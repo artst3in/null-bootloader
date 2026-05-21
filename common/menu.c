@@ -4,14 +4,10 @@
 #include <stdnoreturn.h>
 #include <config.h>
 #include <menu.h>
-#include <lib/bli.h>
 #include <lib/print.h>
 #include <lib/misc.h>
 #include <lib/libc.h>
 #include <lib/config.h>
-#if defined (UEFI)
-#  include <lib/tpm.h>
-#endif
 #include <lib/term.h>
 #include <lib/gterm.h>
 #include <lib/getchar.h>
@@ -19,12 +15,6 @@
 #include <mm/pmm.h>
 #include <drivers/vbe.h>
 #include <drivers/vga_textmode.h>
-#include <drivers/serial.h>
-#include <protos/linux.h>
-#include <protos/chainload.h>
-#include <protos/multiboot1.h>
-#include <protos/multiboot2.h>
-#include <protos/efi_boot_entry.h>
 #include <protos/limine.h>
 #include <sys/cpu.h>
 #include <lib/misc.h>
@@ -41,132 +31,15 @@ EFI_GUID limine_efi_vendor_guid =
 #define TOK_BADKEY 3
 #define TOK_COMMENT 4
 
-static char interface_help_colour[24] = "\e[38;2;0;170;0m";
-static char interface_help_colour_bright[24] = "\e[38;2;85;255;85m";
-static char menu_branding_colour[24] = "\e[38;2;0;170;170m";
+static char interface_help_colour[] = "\e[32m";
+static char interface_help_colour_bright[] = "\e[92m";
 
 static char *menu_branding = NULL;
-
-static char *write_uint8_dec(char *p, uint8_t v) {
-    if (v >= 100) {
-        *p++ = '0' + v / 100;
-        *p++ = '0' + (v / 10) % 10;
-        *p++ = '0' + v % 10;
-    } else if (v >= 10) {
-        *p++ = '0' + v / 10;
-        *p++ = '0' + v % 10;
-    } else {
-        *p++ = '0' + v;
-    }
-    return p;
-}
-
-static void format_fg_rgb_escape(char *buf, uint32_t rgb) {
-    char *p = buf;
-    *p++ = '\e'; *p++ = '['; *p++ = '3'; *p++ = '8'; *p++ = ';';
-    *p++ = '2'; *p++ = ';';
-    p = write_uint8_dec(p, (rgb >> 16) & 0xff);
-    *p++ = ';';
-    p = write_uint8_dec(p, (rgb >> 8) & 0xff);
-    *p++ = ';';
-    p = write_uint8_dec(p, rgb & 0xff);
-    *p++ = 'm';
-    *p = '\0';
-}
-
-static size_t help_action_len(const char *label) {
-    return 2 + strlen(label);
-}
-
-static void add_help_action_len(size_t *len, size_t *count, const char *label) {
-    *len += help_action_len(label);
-    if ((*count)++ != 0) {
-        *len += 4;
-    }
-}
-
-static void print_help_action(const char *key, const char *label, bool *need_separator) {
-    if (*need_separator) {
-        print("    ");
-    }
-    *need_separator = true;
-    print("%s%s\e[0m %s", interface_help_colour, key, label);
-}
-
-static void print_secondary_help(size_t row, bool firmware_setup, bool uefi_shell, bool blank_entry) {
-    const char *firmware_setup_label = "Firmware Setup";
-    const char *uefi_shell_label = "UEFI Shell";
-    const char *blank_entry_label = "Blank Entry";
-
-    size_t len = 0;
-    size_t count = 0;
-
-    if (firmware_setup) {
-        add_help_action_len(&len, &count, firmware_setup_label);
-    }
-    if (uefi_shell) {
-        add_help_action_len(&len, &count, uefi_shell_label);
-    }
-    if (blank_entry) {
-        add_help_action_len(&len, &count, blank_entry_label);
-    }
-
-    if (len > terms[0]->cols) {
-        firmware_setup_label = "Setup";
-        uefi_shell_label = "Shell";
-        blank_entry_label = "Blank";
-
-        len = 0;
-        count = 0;
-        if (firmware_setup) {
-            add_help_action_len(&len, &count, firmware_setup_label);
-        }
-        if (uefi_shell) {
-            add_help_action_len(&len, &count, uefi_shell_label);
-        }
-        if (blank_entry) {
-            add_help_action_len(&len, &count, blank_entry_label);
-        }
-    }
-
-    set_cursor_pos_helper((terms[0]->cols > len) ? (terms[0]->cols - len) / 2 : 0, row);
-
-    bool need_separator = false;
-    if (firmware_setup) {
-        print_help_action("S", firmware_setup_label, &need_separator);
-    }
-    if (uefi_shell) {
-        print_help_action("U", uefi_shell_label, &need_separator);
-    }
-    if (blank_entry) {
-        print_help_action("B", blank_entry_label, &need_separator);
-    }
-}
-
-static bool parse_rgb_colour_value(const char *str, uint32_t *out) {
-    const char *end;
-    uint32_t v = strtoui(str, &end, 16);
-    if (end == str) {
-        return false;
-    }
-    *out = v & 0xffffff;
-    return true;
-}
-
-static uint32_t brighten_rgb(uint32_t rgb) {
-    uint32_t r = (rgb >> 16) & 0xff;
-    uint32_t g = (rgb >> 8) & 0xff;
-    uint32_t b = rgb & 0xff;
-    r = r + 0x55 > 0xff ? 0xff : r + 0x55;
-    g = g + 0x55 > 0xff ? 0xff : g + 0x55;
-    b = b + 0x55 > 0xff ? 0xff : b + 0x55;
-    return (r << 16) | (g << 8) | b;
-}
-
+static char *menu_branding_colour = NULL;
 no_unwind bool booting_from_editor = false;
 static no_unwind bool booting_from_blank = false;
 static no_unwind char saved_orig_entry[EDITOR_MAX_BUFFER_SIZE];
-static no_unwind char saved_title[256];
+static no_unwind char saved_title[64];
 
 static size_t get_line_offset(size_t *displacement, size_t index, const char *buffer) {
     size_t offset = 0;
@@ -244,13 +117,11 @@ static const char *VALID_KEYS[] = {
     "GPT_UUID",
     "IMAGE_PATH",
 	"DTB_PATH",
-    "ENTRY",
-    "IF_FW_TYPE",
-    "IF_ARCH",
     NULL
 };
 
 static bool validation_enabled = true;
+static bool invalid_syntax = false;
 
 static int validate_line(const char *buffer) {
     if (!validation_enabled) return TOK_KEY;
@@ -265,6 +136,7 @@ static int validate_line(const char *buffer) {
 fail:
     if (i < 64) keybuf[i] = 0;
     if (keybuf[0] == '\n' || (!keybuf[0] && buffer[0] != ':')) return TOK_KEY; // blank line is valid
+    invalid_syntax = true;
     return TOK_BADKEY;
 found_equals:
     if (i < 64) keybuf[i] = 0;
@@ -300,6 +172,10 @@ static void putchar_tokencol(int type, char c) {
 static bool editor_no_term_reset = false;
 
 char *config_entry_editor(const char *title, const char *orig_entry) {
+    if (terms[0]->cols < 40 || terms[0]->rows < 16) {
+        return NULL;
+    }
+
     FOR_TERM(TERM->autoflush = false);
 
     FOR_TERM(TERM->cursor_enabled = true);
@@ -313,9 +189,11 @@ char *config_entry_editor(const char *title, const char *orig_entry) {
 
     size_t cursor_offset  = 0;
     size_t entry_size     = strlen(orig_entry);
-    size_t _window_size   = terms[0]->rows - 7 + (menu_branding[0] == '\0' ? 2 : 0);
+    size_t _window_size   = terms[0]->rows - 8;
     size_t window_offset  = 0;
     size_t line_size      = terms[0]->cols - 2;
+
+    bool display_overflow_error = false;
 
     // Skip leading newlines
     while (*orig_entry == '\n') {
@@ -346,31 +224,20 @@ char *config_entry_editor(const char *title, const char *orig_entry) {
     buffer[entry_size] = 0;
 
 refresh:
+    invalid_syntax = false;
+
     print("\e[2J\e[H");
     FOR_TERM(TERM->cursor_enabled = false);
     {
         size_t x, y;
         print("\n");
-        if (menu_branding[0] != '\0') {
-            terms[0]->get_cursor_pos(terms[0], &x, &y);
-            {
-                size_t branding_len = strlen(menu_branding);
-                size_t max_len = terms[0]->cols - 2;
-                if (branding_len <= max_len) {
-                    set_cursor_pos_helper((terms[0]->cols - branding_len) / 2, y);
-                    print("%s%s\e[0m", menu_branding_colour, menu_branding);
-                } else {
-                    set_cursor_pos_helper(1, y);
-                    print("%s%S...\e[0m", menu_branding_colour, menu_branding, (size_t)(max_len - 3));
-                }
-            }
-            print("\n\n");
-        }
         terms[0]->get_cursor_pos(terms[0], &x, &y);
-        set_cursor_pos_helper((terms[0]->cols - 32) / 2, y);
-        print("%sESC\e[0m Discard and Exit    %sF10\e[0m Boot", interface_help_colour, interface_help_colour);
+        set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2), y);
+        print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
         print("\n\n");
     }
+
+    print("    %sESC\e[0m Discard and Exit    %sF10\e[0m Boot\n\n", interface_help_colour, interface_help_colour);
 
     print(serial ? "/" : "┌");
     for (size_t i = 0; i < terms[0]->cols - 2; i++) {
@@ -383,20 +250,9 @@ refresh:
                 // FALLTHRU
             default: {
                 size_t title_length = strlen(title);
-                size_t max_title = terms[0]->cols - 4;
-                size_t display_length = title_length;
-                bool truncated = false;
-                if (display_length > max_title && max_title > 3) {
-                    display_length = max_title;
-                    truncated = true;
-                }
-                if (i == (terms[0]->cols - display_length - 4) / 2) {
-                    if (truncated) {
-                        print(serial ? "|%S...|" : "┤%S...├", title, (size_t)(display_length - 3));
-                    } else {
-                        print(serial ? "|%s|" : "┤%s├", title);
-                    }
-                    i += (display_length + 2) - 1;
+                if (i == (terms[0]->cols / 2) - DIV_ROUNDUP(title_length, 2) - 1 - 1) {
+                    print(serial ? "|%s|" : "┤%s├", title);
+                    i += (title_length + 2) - 1;
                 } else {
                     print(serial ? "-" : "─");
                 }
@@ -474,7 +330,7 @@ tab_part:
                 printed_early = true;
                 size_t x, y;
                 terms[0]->get_cursor_pos(terms[0], &x, &y);
-                if (y >= terms[0]->rows - 2) {
+                if (y == terms[0]->rows - 3) {
                     print(serial ? ">" : "→");
                     set_cursor_pos_helper(0, y + 1);
                     print(serial ? "\\" : "└");
@@ -546,6 +402,21 @@ tab_part:
         }
     }
 
+    // syntax error alert
+    if (validation_enabled) {
+        size_t x, y;
+        terms[0]->get_cursor_pos(terms[0], &x, &y);
+        set_cursor_pos_helper(0, terms[0]->rows - 1);
+        FOR_TERM(TERM->scroll_enabled = false);
+        if (invalid_syntax) {
+            print("\e[31mConfiguration is INVALID.\e[0m");
+        } else {
+            print("\e[32mConfiguration is valid.\e[0m");
+        }
+        FOR_TERM(TERM->scroll_enabled = true);
+        set_cursor_pos_helper(x, y);
+    }
+
     if (current_line - window_offset < window_size) {
         size_t x, y;
         for (size_t i = 0; i < (window_size - (current_line - window_offset)) - 1; i++) {
@@ -562,33 +433,28 @@ tab_part:
         print(serial ? "\\" : "└");
     }
 
-    {
-        const char *overflow_msg = (strlen(buffer) >= EDITOR_MAX_BUFFER_SIZE - 1) ? "Buffer full" : NULL;
-        size_t overflow_len = overflow_msg ? strlen(overflow_msg) : 0;
-
-        for (size_t i = 0; i < terms[0]->cols - 2; i++) {
-            switch (i) {
-                case 1: case 2: case 3:
-                    if (current_line - window_offset >= window_size) {
-                        print(serial ? "v" : "↓");
-                        break;
-                    }
-                    // FALLTHRU
-                default:
-                    if (overflow_msg != NULL
-                     && i == (terms[0]->cols - overflow_len - 4) / 2) {
-                        print(serial ? "|" : "┤");
-                        print("\e[31m%s\e[0m", overflow_msg);
-                        print(serial ? "|" : "├");
-                        i += (overflow_len + 2) - 1;
-                    } else {
-                        print(serial ? "-" : "─");
-                    }
-            }
+    for (size_t i = 0; i < terms[0]->cols - 2; i++) {
+        switch (i) {
+            case 1: case 2: case 3:
+                if (current_line - window_offset >= window_size) {
+                    print(serial ? "v" : "↓");
+                    break;
+                }
+                // FALLTHRU
+            default:
+                print(serial ? "-" : "─");
         }
     }
     terms[0]->get_cursor_pos(terms[0], &tmpx, &tmpy);
     print(serial ? "/" : "┘");
+    set_cursor_pos_helper(0, tmpy + 1);
+
+    if (display_overflow_error) {
+        FOR_TERM(TERM->scroll_enabled = false);
+        print("\e[31mText buffer not big enough, delete something instead.");
+        FOR_TERM(TERM->scroll_enabled = true);
+        display_overflow_error = false;
+    }
 
     // Hack to redraw the cursor
     set_cursor_pos_helper(cursor_x, cursor_y);
@@ -641,13 +507,10 @@ tab_part:
             saved_orig_entry[buffer_len] = 0;
             size_t title_len = strlen(title);
             if (title_len >= sizeof(saved_title)) {
-                title_len = sizeof(saved_title) - 4;
-                memcpy(saved_title, title, title_len);
-                memcpy(saved_title + title_len, "...", 4);
-            } else {
-                memcpy(saved_title, title, title_len);
-                saved_title[title_len] = 0;
+                title_len = sizeof(saved_title) - 1;
             }
+            memcpy(saved_title, title, title_len);
+            saved_title[title_len] = 0;
             editor_no_term_reset ? editor_no_term_reset = false : reset_term();
             booting_from_editor = true;
             return buffer;
@@ -666,290 +529,13 @@ tab_part:
                     }
                     buffer[cursor_offset++] = c;
                 }
+            } else {
+                display_overflow_error = true;
             }
             break;
     }
 
     goto refresh;
-}
-
-static inline bool should_skip_entry(struct menu_entry *entry) {
-    if (entry->sub != NULL) {
-        return false;
-    }
-    char *cur_entry_protocol = config_get_value(entry->body, 0, "PROTOCOL");
-    if (cur_entry_protocol) {
-#if defined (UEFI)
-        if (strcmp(cur_entry_protocol, "bios") == 0
-         || strcmp(cur_entry_protocol, "bios_chainload") == 0) {
-#elif defined (BIOS)
-        if (strcmp(cur_entry_protocol, "efi") == 0
-         || strcmp(cur_entry_protocol, "uefi") == 0
-         || strcmp(cur_entry_protocol, "efi_chainload") == 0
-         || strcmp(cur_entry_protocol, "efi_boot_entry") == 0) {
-#endif
-            return true;
-        }
-    }
-    char *cur_entry_if_fw_type = config_get_value(entry->body, 0, "IF_FW_TYPE");
-    if (cur_entry_if_fw_type) {
-        if (strcasecmp(cur_entry_if_fw_type, current_firmware()) != 0) {
-            return true;
-        }
-    }
-    char *cur_entry_if_arch = config_get_value(entry->body, 0, "IF_ARCH");
-    if (cur_entry_if_arch) {
-        const char *arch = current_arch();
-        char *cur_arch = cur_entry_if_arch;
-        bool skip = true;
-        while (*cur_arch) {
-            char *cur_arch_end = cur_arch;
-            while (*cur_arch_end && !isspace(*cur_arch_end)) {
-                ++cur_arch_end;
-            }
-            if (cur_arch == cur_arch_end) {
-                ++cur_arch;
-                continue;
-            }
-            char buf[16];
-            if (cur_arch_end - cur_arch >= 16) {
-                cur_arch = cur_arch_end;
-                continue;
-            }
-            memcpy(buf, cur_arch, cur_arch_end - cur_arch);
-            buf[cur_arch_end - cur_arch] = '\0';
-            if (strcasecmp(buf, arch) == 0) {
-                skip = false;
-                break;
-            }
-            cur_arch = cur_arch_end;
-        }
-        if (skip) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Count visible (non-skipped) entries in a subtree, respecting expansion state.
-static size_t count_visible_entries(struct menu_entry *entry) {
-    size_t count = 0;
-    while (entry != NULL) {
-        if (should_skip_entry(entry)) {
-            entry = entry->next;
-            continue;
-        }
-        count++;
-        if (entry->sub && entry->expanded) {
-            count += count_visible_entries(entry->sub);
-        }
-        entry = entry->next;
-    }
-    return count;
-}
-
-#if defined(UEFI)
-// Count same-named non-skipped siblings preceding this entry (for #N suffix).
-static size_t get_sibling_dup_index(struct menu_entry *entry) {
-    struct menu_entry *first = entry->parent != NULL ? entry->parent->sub : menu_tree;
-    size_t index = 0;
-    for (struct menu_entry *e = first; e != entry; e = e->next) {
-        if (should_skip_entry(e)) {
-            continue;
-        }
-        if (strcmp(e->name, entry->name) == 0) {
-            index++;
-        }
-    }
-    return index;
-}
-
-// Write a name into buf, escaping \, / and # characters.
-// Returns number of bytes written (not counting NUL terminator).
-static size_t escape_name(const char *name, char *buf, size_t buf_size) {
-    if (buf_size == 0) {
-        return 0;
-    }
-    size_t j = 0;
-    for (size_t i = 0; name[i] != '\0'; i++) {
-        if (name[i] == '\\' || name[i] == '/' || name[i] == '#') {
-            if (j + 2 < buf_size) {
-                buf[j++] = '\\';
-                buf[j++] = name[i];
-            } else {
-                break;
-            }
-        } else {
-            if (j + 1 < buf_size) {
-                buf[j++] = name[i];
-            } else {
-                break;
-            }
-        }
-    }
-    buf[j] = '\0';
-    return j;
-}
-
-static void get_entry_path(struct menu_entry *entry, char *buf, size_t buf_size, size_t *pos) {
-    if (entry == NULL || buf_size == 0) {
-        return;
-    }
-
-    if (entry->parent != NULL) {
-        get_entry_path(entry->parent, buf, buf_size, pos);
-        if (*pos < buf_size - 1) {
-            buf[(*pos)++] = '/';
-        }
-    }
-
-    size_t remaining = *pos < buf_size ? buf_size - *pos : 0;
-    *pos += escape_name(entry->name, buf + *pos, remaining);
-
-    size_t dup_index = get_sibling_dup_index(entry);
-    if (dup_index > 0 && *pos < buf_size - 1) {
-        buf[(*pos)++] = '#';
-        char digits[16];
-        size_t ndigits = 0;
-        size_t val = dup_index;
-        do {
-            digits[ndigits++] = '0' + (val % 10);
-            val /= 10;
-        } while (val > 0);
-        for (size_t i = ndigits; i > 0 && *pos < buf_size - 1; i--) {
-            buf[(*pos)++] = digits[i - 1];
-        }
-    }
-
-    if (*pos < buf_size) {
-        buf[*pos] = '\0';
-    }
-}
-#endif
-
-// Parse one component from an escaped path string.
-// Writes the unescaped name into name_buf and the duplicate index into *dup_index.
-// Returns a pointer to the remainder of the path (past the separator).
-static const char *parse_path_component(const char *path, char **name_out, size_t *dup_index) {
-    *dup_index = 0;
-    const char *p = path;
-
-    // First pass: measure the component length
-    size_t len = 0;
-    const char *scan = path;
-    while (*scan != '\0' && *scan != '/') {
-        if (*scan == '\\' && scan[1] != '\0') {
-            len++;
-            scan += 2;
-            continue;
-        }
-        if (*scan == '#') {
-            const char *q = scan + 1;
-            if (*q >= '0' && *q <= '9') {
-                while (*q >= '0' && *q <= '9') {
-                    q++;
-                }
-                if (*q == '\0' || *q == '/') {
-                    break;
-                }
-            }
-        }
-        len++;
-        scan++;
-    }
-
-    // Allocate and fill
-    char *name_buf = ext_mem_alloc(len + 1);
-    size_t j = 0;
-
-    while (*p != '\0' && *p != '/') {
-        if (*p == '\\' && p[1] != '\0') {
-            name_buf[j++] = p[1];
-            p += 2;
-            continue;
-        }
-        if (*p == '#') {
-            const char *q = p + 1;
-            if (*q >= '0' && *q <= '9') {
-                const char *start = q;
-                while (*q >= '0' && *q <= '9') {
-                    q++;
-                }
-                if (*q == '\0' || *q == '/') {
-                    *dup_index = strtoui(start, NULL, 10);
-                    p = q;
-                    break;
-                }
-            }
-        }
-        name_buf[j++] = *p;
-        p++;
-    }
-
-    name_buf[j] = '\0';
-    *name_out = name_buf;
-
-    if (*p == '/') {
-        p++;
-    }
-    return p;
-}
-
-// Find an entry by its escaped path string. If expand_dirs is true, directories on the
-// path to the target are expanded. Returns true if found, writing the entry and its
-// visible index to *found_entry and *found_index.
-static bool find_entry_by_path(const char *path, struct menu_entry *current_entry,
-                                size_t base_index, struct menu_entry **found_entry,
-                                size_t *found_index, bool expand_dirs) {
-    char *comp_name;
-    size_t dup_index = 0;
-    const char *rest = parse_path_component(path, &comp_name, &dup_index);
-    bool is_last = (*rest == '\0');
-
-    size_t idx = base_index;
-    size_t same_name_count = 0;
-    bool ret = false;
-
-    while (current_entry != NULL) {
-        if (should_skip_entry(current_entry)) {
-            current_entry = current_entry->next;
-            continue;
-        }
-
-        bool name_matches = (strcmp(current_entry->name, comp_name) == 0);
-
-        if (name_matches && same_name_count == dup_index) {
-            if (is_last && current_entry->sub == NULL) {
-                *found_entry = current_entry;
-                if (found_index != NULL) {
-                    *found_index = idx;
-                }
-                ret = true;
-                break;
-            } else if (!is_last && current_entry->sub != NULL) {
-                if (expand_dirs) {
-                    current_entry->expanded = true;
-                }
-                ret = find_entry_by_path(rest, current_entry->sub,
-                                         idx + 1, found_entry, found_index, expand_dirs);
-                break;
-            }
-        }
-
-        if (name_matches) {
-            same_name_count++;
-        }
-
-        idx++;
-        if (current_entry->sub && current_entry->expanded) {
-            idx += count_visible_entries(current_entry->sub);
-        }
-
-        current_entry = current_entry->next;
-    }
-
-    pmm_free(comp_name, strlen(comp_name) + 1);
-    return ret;
 }
 
 static size_t print_tree(size_t offset, size_t window, const char *shift, size_t level, size_t base_index, size_t selected_entry,
@@ -979,9 +565,25 @@ static size_t print_tree(size_t offset, size_t window, const char *shift, size_t
         size_t cur_len = 0;
         if (current_entry == NULL)
             break;
-        if (should_skip_entry(current_entry)) {
-            current_entry = current_entry->next;
-            continue;
+        if (current_entry->sub == NULL) {
+            bool skip_entry = false;
+            char *cur_entry_protocol = config_get_value(current_entry->body, 0, "PROTOCOL");
+            if (cur_entry_protocol) {
+#if defined (UEFI)
+                if (strcmp(cur_entry_protocol, "bios") == 0
+                 || strcmp(cur_entry_protocol, "bios_chainload") == 0) {
+#elif defined (BIOS)
+                if (strcmp(cur_entry_protocol, "efi") == 0
+                 || strcmp(cur_entry_protocol, "uefi") == 0
+                 || strcmp(cur_entry_protocol, "efi_chainload") == 0) {
+#endif
+                    skip_entry = true;
+                }
+                if (skip_entry) {
+                    current_entry = current_entry->next;
+                    continue;
+                }
+            }
         }
         if (!no_print && base_index + max_entries < offset) {
             goto skip_line;
@@ -1021,21 +623,9 @@ static size_t print_tree(size_t offset, size_t window, const char *shift, size_t
             *selected_menu_entry = current_entry;
             if (!no_print) print("\e[7m");
         }
-        {
-            size_t name_len = strlen(current_entry->name);
-            if (!no_print) {
-                size_t prefix_len = shift ? strlen(shift) : 0;
-                size_t used = prefix_len + cur_len + 1 + 1; // shift + decorations + space before + space after
-                size_t max_name = (terms[0]->cols > used) ? terms[0]->cols - used : 0;
-                if (name_len > max_name && max_name > 3) {
-                    print(" %S...\e[27m\n", current_entry->name, (size_t)(max_name - 3));
-                } else {
-                    print(" %s \e[27m\n", current_entry->name);
-                }
-            }
-            (*max_height)++;
-            cur_len += 1 + name_len + 1;
-        }
+        if (!no_print) print(" %s \e[27m\n", current_entry->name);
+        (*max_height)++;
+        cur_len += 1 + strlen(current_entry->name) + 1;
 skip_line:
         if (current_entry->sub && current_entry->expanded) {
             max_entries += print_tree(offset, window, shift, level + 1, base_index + max_entries + 1,
@@ -1103,87 +693,6 @@ static void menu_init_term(void) {
 }
 
 #if defined(UEFI)
-static struct volume *uefi_shell_volume = NULL;
-
-static char *append_string(char *p, const char *s) {
-    while (*s != '\0') {
-        *p++ = *s++;
-    }
-    *p = '\0';
-    return p;
-}
-
-static char *append_uint_dec(char *p, uint64_t val) {
-    char buf[20];
-    size_t i = 0;
-
-    do {
-        buf[i++] = '0' + (val % 10);
-        val /= 10;
-    } while (val != 0);
-
-    while (i != 0) {
-        *p++ = buf[--i];
-    }
-    *p = '\0';
-    return p;
-}
-
-static const char *uefi_shell_filename(void) {
-#if defined (__x86_64__)
-    return "shellx64.efi";
-#elif defined (__i386__)
-    return "shellia32.efi";
-#elif defined (__aarch64__)
-    return "shellaa64.efi";
-#elif defined (__riscv)
-    return "shellriscv64.efi";
-#elif defined (__loongarch64)
-    return "shellloongarch64.efi";
-#else
-#error Unknown UEFI architecture
-#endif
-}
-
-static bool uefi_shell_available(void) {
-    if (uefi_shell_volume == NULL || uefi_shell_volume->pxe) {
-        return false;
-    }
-
-    bool old_cif = case_insensitive_fopen;
-    case_insensitive_fopen = true;
-    struct file_handle *f = fopen(uefi_shell_volume, uefi_shell_filename());
-    case_insensitive_fopen = old_cif;
-
-    if (f == NULL) {
-        return false;
-    }
-
-    fclose(f);
-    return true;
-}
-
-noreturn static void boot_uefi_shell(void) {
-    char shell_entry[160];
-    char *p = shell_entry;
-
-    p = append_string(p, "PROTOCOL: efi\nPATH: ");
-    p = append_string(p, uefi_shell_volume->is_optical ? "odd" : "hdd");
-    *p++ = '(';
-    p = append_uint_dec(p, uefi_shell_volume->index);
-    *p++ = ':';
-    p = append_uint_dec(p, uefi_shell_volume->partition);
-    p = append_string(p, "):/");
-    p = append_string(p, uefi_shell_filename());
-    *p++ = '\n';
-    *p = '\0';
-
-    if (!quiet) {
-        reset_term();
-    }
-    boot(shell_entry);
-}
-
 bool reboot_to_fw_ui_supported(void) {
     uint64_t os_indications_supported;
     UINTN size = sizeof(os_indications_supported);
@@ -1234,10 +743,6 @@ noreturn void _menu(bool first_run) {
     size_t bss_size = (uintptr_t)bss_end - (uintptr_t)bss_begin;
 #endif
 
-#if defined (UEFI)
-    uefi_shell_volume = boot_volume;
-#endif
-
     if (rewound_memmap != NULL) {
         memcpy(data_begin, rewound_data, data_size);
 #if defined (BIOS)
@@ -1253,7 +758,7 @@ noreturn void _menu(bool first_run) {
         rewound_bss = ext_mem_alloc(bss_size);
 #endif
         /* addition due to allocation potentially adding new memory map entries */
-        rewound_memmap = ext_mem_alloc_counted(memmap_entries + 16, sizeof(struct memmap_entry));
+        rewound_memmap = ext_mem_alloc((memmap_entries + 16) * sizeof(struct memmap_entry));
         memcpy(rewound_memmap, memmap, memmap_entries * sizeof(struct memmap_entry));
         rewound_memmap_entries = memmap_entries;
         memcpy(rewound_data, data_begin, data_size);
@@ -1300,15 +805,6 @@ noreturn void _menu(bool first_run) {
 #endif
         serial_str != NULL && strcmp(serial_str, "yes") == 0;
 
-#if defined (UEFI)
-    if (!serial) {
-        char *graphics_str = config_get_value(NULL, 0, "GRAPHICS");
-        if (graphics_str != NULL && strcmp(graphics_str, "no") == 0) {
-            serial = true;
-        }
-    }
-#endif
-
 #if defined (BIOS)
     if (serial) {
         char *baudrate_s = config_get_value(NULL, 0, "SERIAL_BAUDRATE");
@@ -1326,31 +822,6 @@ noreturn void _menu(bool first_run) {
     char *hash_mismatch_panic_str = config_get_value(NULL, 0, "HASH_MISMATCH_PANIC");
     hash_mismatch_panic = hash_mismatch_panic_str == NULL || strcmp(hash_mismatch_panic_str, "yes") == 0;
 
-    if (secure_boot_active) {
-        hash_mismatch_panic = true;
-        editor_enabled = false;
-    }
-
-#if defined (UEFI)
-    char *measured_boot_str = config_get_value(NULL, 0, "MEASURED_BOOT");
-    measured_boot = measured_boot_str != NULL && strcmp(measured_boot_str, "yes") == 0;
-    if (secure_boot_active) {
-        measured_boot = true;
-    }
-    // Cannot do measured boot without a TPM/CC interface.
-    if (!tpm_present()) {
-        measured_boot = false;
-    }
-
-    // Measure the on-disk config bytes now that measured_boot is final.
-    size_t raw_size;
-    const char *raw = config_get_raw(&raw_size);
-    if (raw != NULL) {
-        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
-                    raw, raw_size, "limine_cfg", NULL);
-    }
-#endif
-
     char *randomise_mem_str = config_get_value(NULL, 0, "RANDOMISE_MEMORY");
     if (randomise_mem_str == NULL)
         randomise_mem_str = config_get_value(NULL, 0, "RANDOMIZE_MEMORY");
@@ -1360,7 +831,7 @@ noreturn void _menu(bool first_run) {
     }
 
     char *editor_enabled_str = config_get_value(NULL, 0, "EDITOR_ENABLED");
-    if (editor_enabled_str != NULL && !secure_boot_active) {
+    if (editor_enabled_str != NULL) {
         editor_enabled = strcmp(editor_enabled_str, "yes") == 0;
     }
 
@@ -1369,34 +840,21 @@ noreturn void _menu(bool first_run) {
         help_hidden = strcmp(help_hidden_str, "yes") == 0;
     }
 
-    uint32_t help_rgb = 0x00aa00;
     char *interface_help_colour_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOUR");
     if (interface_help_colour_str == NULL) {
         interface_help_colour_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOR");
     }
-    if (interface_help_colour_str != NULL) {
-        parse_rgb_colour_value(interface_help_colour_str, &help_rgb);
+    if (interface_help_colour_str != NULL && interface_help_colour_str[0] != '\0') {
+        interface_help_colour[3] = interface_help_colour_str[0];
+        interface_help_colour_bright[3] = interface_help_colour_str[0];
     }
-    format_fg_rgb_escape(interface_help_colour, help_rgb);
 
-    uint32_t help_bright_rgb = brighten_rgb(help_rgb);
-    char *interface_help_colour_bright_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOUR_BRIGHT");
-    if (interface_help_colour_bright_str == NULL) {
-        interface_help_colour_bright_str = config_get_value(NULL, 0, "INTERFACE_HELP_COLOR_BRIGHT");
-    }
-    if (interface_help_colour_bright_str != NULL) {
-        parse_rgb_colour_value(interface_help_colour_bright_str, &help_bright_rgb);
-    }
-    format_fg_rgb_escape(interface_help_colour_bright, help_bright_rgb);
-
-    bool custom_branding = false;
     {
         char *tmp = config_get_value(NULL, 0, "INTERFACE_BRANDING");
         if (tmp != NULL) {
             size_t len = strlen(tmp) + 1;
             menu_branding = ext_mem_alloc(len);
             memcpy(menu_branding, tmp, len);
-            custom_branding = true;
         }
     }
     if (menu_branding == NULL) {
@@ -1404,9 +862,9 @@ noreturn void _menu(bool first_run) {
         {
             uint32_t eax, ebx, ecx, edx;
             if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (ia-32, BIOS)");
+                menu_branding = "Null " LIMINE_VERSION " (ia-32, BIOS)";
             } else {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (x86-64, BIOS)");
+                menu_branding = "Null " LIMINE_VERSION " (x86-64, BIOS)";
             }
         }
 #elif defined (UEFI)
@@ -1414,15 +872,15 @@ noreturn void _menu(bool first_run) {
         {
             uint32_t eax, ebx, ecx, edx;
             if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (ia-32, UEFI32)");
+                menu_branding = "Null " LIMINE_VERSION " (ia-32, UEFI32)";
             } else {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (x86-64, UEFI32)");
+                menu_branding = "Null " LIMINE_VERSION " (x86-64, UEFI32)";
             }
         }
 #else
-        menu_branding = strdup("Limine " LIMINE_VERSION " ("
+        menu_branding = "Null " LIMINE_VERSION " ("
 #if defined (__x86_64__)
-            "x86-64"
+            "x64"
 #elif defined (__riscv)
             "riscv64"
 #elif defined (__aarch64__)
@@ -1430,17 +888,9 @@ noreturn void _menu(bool first_run) {
 #elif defined (__loongarch64)
             "loongarch64"
 #endif
-            ", UEFI)");
+            ", UEFI)";
 #endif
 #endif
-    }
-
-    if (secure_boot_active && !custom_branding) {
-        const char *suffix = ", Secure Boot)";
-        size_t suffix_len = strlen(suffix) + 1;
-        size_t old_len = strlen(menu_branding);
-        menu_branding = pmm_realloc(menu_branding, old_len + 1, old_len + suffix_len);
-        memcpy(menu_branding + old_len - 1, suffix, suffix_len);
     }
 
     {
@@ -1448,10 +898,11 @@ noreturn void _menu(bool first_run) {
         if (tmp == NULL)
             tmp = config_get_value(NULL, 0, "INTERFACE_BRANDING_COLOR");
         if (tmp != NULL) {
-            uint32_t rgb;
-            if (parse_rgb_colour_value(tmp, &rgb)) {
-                format_fg_rgb_escape(menu_branding_colour, rgb);
-            }
+            size_t len = strlen(tmp) + 1;
+            menu_branding_colour = ext_mem_alloc(len);
+            memcpy(menu_branding_colour, tmp, len);
+        } else {
+            menu_branding_colour = "6";
         }
     }
 
@@ -1460,93 +911,24 @@ noreturn void _menu(bool first_run) {
 
     size_t selected_entry = 0;
 
-    bool has_entry = false;
-
-#if defined (UEFI)
-    {
-        char path[MENU_PATH_MAX];
-        if (bli_get_oneshot_entry(path, MENU_PATH_MAX)) {
-            // Find the entry with this path, expand directories, and get its index.
-            struct menu_entry *found_entry = NULL;
-            size_t found_index = 0;
-            find_entry_by_path(path, menu_tree, 0, &found_entry, &found_index, true);
-            if (found_entry != NULL) {
-                selected_entry = found_index;
-                has_entry = true;
-            }
-        }
-    }
-#endif
-
-    if (!has_entry) {
-        char *default_entry = config_get_value(NULL, 0, "DEFAULT_ENTRY");
-        if (default_entry != NULL) {
-            bool is_index = true;
-            for (const char *p = default_entry; *p != '\0'; p++) {
-                if (*p < '0' || *p > '9') {
-                    is_index = false;
-                    break;
-                }
-            }
-            if (is_index) {
-                selected_entry = strtoui(default_entry, NULL, 10);
-                if (selected_entry)
-                    selected_entry--;
-            } else {
-                // Copy the path since find_entry_by_path calls config_get_value
-                // internally (via should_skip_entry), which clobbers the static buffer.
-                char default_entry_path[MENU_PATH_MAX];
-                size_t len = strlen(default_entry);
-                if (len >= sizeof(default_entry_path)) {
-                    len = sizeof(default_entry_path) - 1;
-                }
-                memcpy(default_entry_path, default_entry, len);
-                default_entry_path[len] = '\0';
-                struct menu_entry *found_entry = NULL;
-                size_t found_index = 0;
-                find_entry_by_path(default_entry_path, menu_tree, 0, &found_entry, &found_index, true);
-                if (found_entry != NULL) {
-                    selected_entry = found_index;
-                }
-            }
-        }
+    char *default_entry = config_get_value(NULL, 0, "DEFAULT_ENTRY");
+    if (default_entry != NULL) {
+        selected_entry = strtoui(default_entry, NULL, 10);
+        if (selected_entry)
+            selected_entry--;
     }
 
 #if defined (UEFI)
-    if (!has_entry) {
-        char *remember_last = config_get_value(NULL, 0, "REMEMBER_LAST_ENTRY");
-        if (remember_last != NULL && strcasecmp(remember_last, "yes") == 0) {
-            char last_entry_path[MENU_PATH_MAX];
-            UINTN getvar_size = sizeof(last_entry_path);
-            if (gRT->GetVariable(L"LimineLastBootedEntry",
-                                 &limine_efi_vendor_guid,
-                                 NULL,
-                                 &getvar_size,
-                                 last_entry_path) == 0 && getvar_size > 0) {
-                // Ensure NUL termination
-                last_entry_path[getvar_size < sizeof(last_entry_path) ? getvar_size : sizeof(last_entry_path) - 1] = '\0';
-                // Find the entry with this path, expand directories, and get its index.
-                struct menu_entry *found_entry = NULL;
-                size_t found_index = 0;
-                find_entry_by_path(last_entry_path, menu_tree, 0, &found_entry, &found_index, true);
-                if (found_entry != NULL) {
-                    selected_entry = found_index;
-                    has_entry = true;
-                }
-            }
-        }
-    }
-    if (!has_entry) {
-        char path[MENU_PATH_MAX];
-        if (bli_get_default_entry(path, MENU_PATH_MAX)) {
-            // Find the entry with this path, expand directories, and get its index.
-            struct menu_entry *found_entry = NULL;
-            size_t found_index = 0;
-            find_entry_by_path(path, menu_tree, 0, &found_entry, &found_index, true);
-            if (found_entry != NULL) {
-                selected_entry = found_index;
-                has_entry = true;
-            }
+    char *remember_last = config_get_value(NULL, 0, "REMEMBER_LAST_ENTRY");
+    if (remember_last != NULL && strcasecmp(remember_last, "yes") == 0) {
+        UINTN getvar_size = sizeof(size_t);
+        size_t last;
+        if (gRT->GetVariable(L"LimineLastBootedEntry",
+                             &limine_efi_vendor_guid,
+                             NULL,
+                             &getvar_size,
+                             &last) == 0 && getvar_size == sizeof(size_t)) {
+            selected_entry = last;
         }
     }
 #endif
@@ -1559,36 +941,16 @@ noreturn void _menu(bool first_run) {
     }
 
     size_t timeout = 5;
-
-    bool has_timeout = false;
-
-#if defined (UEFI)
-    has_timeout = bli_update_oneshot_timeout(&timeout, &skip_timeout);
-#endif
-
-    if (!has_timeout) {
-        char *timeout_config = config_get_value(NULL, 0, "TIMEOUT");
-        if (timeout_config != NULL) {
-            has_timeout = true;
-            if (!strcmp(timeout_config, "no"))
-                skip_timeout = true;
-            else
-                timeout = strtoui(timeout_config, NULL, 10);
-        }
+    char *timeout_config = config_get_value(NULL, 0, "TIMEOUT");
+    if (timeout_config != NULL) {
+        if (!strcmp(timeout_config, "no"))
+            skip_timeout = true;
+        else
+            timeout = strtoui(timeout_config, NULL, 10);
     }
-
-#if defined (UEFI)
-    if (!has_timeout) {
-        has_timeout = bli_update_timeout(&timeout, &skip_timeout);
-    }
-#endif
-
-    if (timeout > 9999)
-        timeout = 9999;
 
 #if defined(UEFI)
     bool reboot_to_firmware_supported = reboot_to_fw_ui_supported();
-    bool uefi_shell_supported = uefi_shell_available();
 #endif
 
     if (!first_run) {
@@ -1597,7 +959,7 @@ noreturn void _menu(bool first_run) {
     }
 
     if (!skip_timeout && !timeout) {
-        if (max_entries == 0 || selected_menu_entry == NULL || selected_menu_entry->sub != NULL) {
+        if (max_entries == 0 || selected_menu_entry->sub != NULL) {
             quiet = false;
             print("Default entry is not valid or directory, booting to menu.\n");
             skip_timeout = true;
@@ -1619,18 +981,10 @@ noreturn void _menu(bool first_run) {
     }
 
     size_t tree_offset = 0;
-    size_t header_offset = (menu_branding[0] != '\0') ? 2 : 0;
-    bool has_secondary_help = editor_enabled;
-#if defined(UEFI)
-    has_secondary_help = has_secondary_help || reboot_to_firmware_supported || uefi_shell_supported;
-#endif
-    if (has_secondary_help) {
-        header_offset += 2;
-    }
 
 refresh:
-    if (selected_entry >= tree_offset + terms[0]->rows - 8 - header_offset) {
-        tree_offset = selected_entry - (terms[0]->rows - 9 - header_offset);
+    if (selected_entry >= tree_offset + terms[0]->rows - 8) {
+        tree_offset = selected_entry - (terms[0]->rows - 9);
     }
     if (selected_entry < tree_offset) {
         tree_offset = selected_entry;
@@ -1644,21 +998,10 @@ refresh:
     {
         size_t x, y;
         print("\n");
-        if (menu_branding[0] != '\0') {
-            terms[0]->get_cursor_pos(terms[0], &x, &y);
-            {
-                size_t branding_len = strlen(menu_branding);
-                size_t max_len = terms[0]->cols - 2;
-                if (branding_len <= max_len) {
-                    set_cursor_pos_helper((terms[0]->cols - branding_len) / 2, y);
-                    print("%s%s\e[0m", menu_branding_colour, menu_branding);
-                } else {
-                    set_cursor_pos_helper(1, y);
-                    print("%s%S...\e[0m", menu_branding_colour, menu_branding, (size_t)(max_len - 3));
-                }
-            }
-            print("\n\n\n\n");
-        }
+        terms[0]->get_cursor_pos(terms[0], &x, &y);
+        set_cursor_pos_helper(terms[0]->cols / 2 - DIV_ROUNDUP(strlen(menu_branding), 2), y);
+        print("\e[3%sm%s\e[0m", menu_branding_colour, menu_branding);
+        print("\n\n\n\n");
     }
 
     if (max_entries == 0) {
@@ -1672,30 +1015,28 @@ refresh:
         } else {
             msg = "[config file not found]";
         }
-        set_cursor_pos_helper((terms[0]->cols - strlen(msg)) / 2, (terms[0]->rows - 1) / 2);
+        set_cursor_pos_helper(terms[0]->cols / 2 - strlen(msg) / 2, terms[0]->rows / 2);
         print("%s\n", msg);
     }
 
     size_t max_tree_len, max_tree_height;
-    max_entries = print_tree(tree_offset, terms[0]->rows - 8 - header_offset, NULL, 0, 0, selected_entry, menu_tree,
+    max_entries = print_tree(tree_offset, terms[0]->rows - 8, NULL, 0, 0, selected_entry, menu_tree,
                              &selected_menu_entry, &max_tree_len, &max_tree_height);
 
     if (max_entries != 0) {
-        size_t tree_prefix_len = (terms[0]->cols > max_tree_len + 3) ? (terms[0]->cols - max_tree_len - 3) / 2 : 1;
+        size_t half_cols = terms[0]->cols / 2;
+        size_t half_tree = DIV_ROUNDUP(max_tree_len, 2);
+        size_t tree_prefix_len = (half_cols > half_tree + 2) ? (half_cols - half_tree - 2) : 0;
         char *tree_prefix = ext_mem_alloc(tree_prefix_len + 1);
         memset(tree_prefix, ' ', tree_prefix_len);
 
-        if (max_tree_height > terms[0]->rows - 8 - header_offset) {
-            max_tree_height = terms[0]->rows - 8 - header_offset;
+        if (max_tree_height > terms[0]->rows - 10) {
+            max_tree_height = terms[0]->rows - 10;
         }
 
-        size_t tree_start = (terms[0]->rows - max_tree_height) / 2;
-        if (tree_start < 4 + header_offset) {
-            tree_start = 4 + header_offset;
-        }
-        set_cursor_pos_helper(0, tree_start);
+        set_cursor_pos_helper(0, terms[0]->rows / 2 - max_tree_height / 2);
 
-        max_entries = print_tree(tree_offset, terms[0]->rows - 8 - header_offset, tree_prefix, 0, 0, selected_entry, menu_tree,
+        max_entries = print_tree(tree_offset, terms[0]->rows - 8, tree_prefix, 0, 0, selected_entry, menu_tree,
                                  &selected_menu_entry, NULL, NULL);
 
         pmm_free(tree_prefix, tree_prefix_len + 1);
@@ -1707,44 +1048,38 @@ refresh:
 
         if (max_entries != 0) {
             if (tree_offset > 0) {
-                set_cursor_pos_helper((terms[0]->cols - 3) / 2, 3 + header_offset);
+                set_cursor_pos_helper(terms[0]->cols / 2 - 1, 4);
                 print(serial ? "^^^" : "↑↑↑");
             }
 
-            if (tree_offset + (terms[0]->rows - 8 - header_offset) < max_entries) {
-                set_cursor_pos_helper((terms[0]->cols - 3) / 2, terms[0]->rows - 4);
+            if (tree_offset + (terms[0]->rows - 8) < max_entries) {
+                set_cursor_pos_helper(terms[0]->cols / 2 - 1, terms[0]->rows - 3);
                 print(serial ? "vvv" : "↓↓↓");
             }
         }
 
         if (!help_hidden) {
+            set_cursor_pos_helper(0, 3);
             if (max_entries != 0) {
-                size_t primary_row = 1 + header_offset - (has_secondary_help ? 2 : 0);
                 if (selected_menu_entry->sub == NULL) {
-                    if (editor_enabled) {
-                        set_cursor_pos_helper((terms[0]->cols - 37) / 2, primary_row);
-                        print("%sARROWS\e[0m Select    %sENTER\e[0m Boot    %sE\e[0m Edit",
-                              interface_help_colour, interface_help_colour, interface_help_colour);
-                    } else {
-                        set_cursor_pos_helper((terms[0]->cols - 27) / 2, primary_row);
-                        print("%sARROWS\e[0m Select    %sENTER\e[0m Boot",
-                              interface_help_colour, interface_help_colour);
-                    }
+                    print("    %sARROWS\e[0m Select    %sENTER\e[0m Boot    %s%s",
+                          interface_help_colour, interface_help_colour, interface_help_colour,
+                          editor_enabled ? "E\e[0m Edit" : "\e[0m");
                 } else {
-                    const char *action = selected_menu_entry->expanded ? "Collapse" : "Expand";
-                    size_t len = 23 + strlen(action);
-                    set_cursor_pos_helper((terms[0]->cols - len) / 2, primary_row);
-                    print("%sARROWS\e[0m Select    %sENTER\e[0m %s",
-                          interface_help_colour, interface_help_colour, action);
+                    print("    %sARROWS\e[0m Select    %sENTER\e[0m %s",
+                          interface_help_colour, interface_help_colour,
+                          selected_menu_entry->expanded ? "Collapse" : "Expand");
                 }
             }
-            if (has_secondary_help) {
-                size_t secondary_row = 1 + header_offset;
 #if defined(UEFI)
-                print_secondary_help(secondary_row, reboot_to_firmware_supported, uefi_shell_supported, editor_enabled);
-#else
-                print_secondary_help(secondary_row, false, false, editor_enabled);
+            if (reboot_to_firmware_supported) {
+                set_cursor_pos_helper(terms[0]->cols - (editor_enabled ? 37 : 20), 3);
+                print("%sS\e[0m Firmware Setup", interface_help_colour);
+            }
 #endif
+            if (editor_enabled) {
+                set_cursor_pos_helper(terms[0]->cols - 17, 3);
+                print("%sB\e[0m Blank Entry", interface_help_colour);
             }
         }
         set_cursor_pos_helper(x, y);
@@ -1758,12 +1093,9 @@ refresh:
     if (skip_timeout == false) {
         print("\n\n");
         for (size_t i = timeout; i; i--) {
-            size_t ndigits = 1;
-            for (size_t tmp = i / 10; tmp > 0; tmp /= 10) ndigits++;
-            size_t msg_len = 28 + ndigits;
-            set_cursor_pos_helper((terms[0]->cols - msg_len) / 2, terms[0]->rows - 2);
+            set_cursor_pos_helper(0, terms[0]->rows - 1);
             FOR_TERM(TERM->scroll_enabled = false);
-            print("\e[2K%sBooting automatically in %s%U%s...\e[0m",
+            print("\e[2K%sBooting automatically in %s%U%s, press any key to stop the countdown...\e[0m",
                   interface_help_colour, interface_help_colour_bright, (uint64_t)i, interface_help_colour);
             FOR_TERM(TERM->scroll_enabled = true);
             FOR_TERM(TERM->double_buffer_flush(TERM));
@@ -1782,17 +1114,10 @@ refresh:
         goto autoboot;
     }
 
+    set_cursor_pos_helper(0, terms[0]->rows - 1);
     if (max_entries != 0 && selected_menu_entry->comment != NULL) {
-        size_t comment_len = strlen(selected_menu_entry->comment);
-        size_t max_len = terms[0]->cols - 2;
         FOR_TERM(TERM->scroll_enabled = false);
-        if (comment_len <= max_len) {
-            set_cursor_pos_helper((terms[0]->cols - comment_len) / 2, terms[0]->rows - 2);
-            print("\e[36m%s\e[0m", selected_menu_entry->comment);
-        } else {
-            set_cursor_pos_helper(1, terms[0]->rows - 2);
-            print("\e[36m%S...\e[0m", selected_menu_entry->comment, (size_t)(max_len - 3));
-        }
+        print("\e[36m%s\e[0m", selected_menu_entry->comment);
         FOR_TERM(TERM->scroll_enabled = true);
     }
 
@@ -1810,7 +1135,7 @@ refresh:
 timeout_aborted:
         if (max_entries == 0) {
             switch (c) {
-                case 'b': case 'B': case 's': case 'S': case 'u': case 'U':
+                case 'b': case 'B': case 's': case 'S':
                     break;
                 default:
                     continue;
@@ -1872,16 +1197,11 @@ timeout_aborted:
                 }
 
 #if defined (UEFI)
-                // Save the entry's path so it can persist between boots.
-                char entry_path[MENU_PATH_MAX];
-                size_t pos = 0;
-                get_entry_path(selected_menu_entry, entry_path, sizeof(entry_path), &pos);
                 gRT->SetVariable(L"LimineLastBootedEntry",
                                  &limine_efi_vendor_guid,
                                  EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
-                                 strlen(entry_path) + 1,
-                                 entry_path);
-                bli_set_selected_entry(entry_path);
+                                 sizeof(size_t),
+                                 &selected_entry);
 #endif
 
                 boot(selected_menu_entry->body);
@@ -1906,13 +1226,6 @@ timeout_aborted:
             case 'S': {
                 if (reboot_to_firmware_supported) {
                     reboot_to_fw_ui();
-                }
-                break;
-            }
-            case 'u':
-            case 'U': {
-                if (uefi_shell_supported) {
-                    boot_uefi_shell();
                 }
                 break;
             }
@@ -1961,39 +1274,11 @@ noreturn void boot(char *config) {
         panic(true, "Boot protocol not specified for this entry");
     }
 
+    // Null bootloader: Limine protocol only
+    // Removed protocols: multiboot1, multiboot2, linux, chainload
     if (!strcmp(proto, "limine")) {
         limine_load(config, cmdline);
-    } else if (!strcmp(proto, "linux")) {
-        linux_load(config, cmdline);
-    } else if (!strcmp(proto, "multiboot1") || !strcmp(proto, "multiboot")) {
-#if defined (__x86_64__) || defined (__i386__)
-        multiboot1_load(config, cmdline);
-#else
-        quiet = false;
-        print("Multiboot 1 is not available on non-x86 architectures.\n\n");
-#endif
-    } else if (!strcmp(proto, "multiboot2")) {
-#if defined (__x86_64__) || defined (__i386__)
-        multiboot2_load(config, cmdline);
-#else
-        quiet = false;
-        print("Multiboot 2 is not available on non-x86 architectures.\n\n");
-#endif
-#if defined (BIOS)
-    } else if (!strcmp(proto, "bios_chainload")
-            || !strcmp(proto, "bios")) {
-#elif defined (UEFI)
-    } else if (!strcmp(proto, "efi_chainload")
-            || !strcmp(proto, "efi")
-            || !strcmp(proto, "uefi")) {
-#endif
-        chainload(config, cmdline);
     }
-#if defined (UEFI)
-    else if (!strcmp(proto, "efi_boot_entry")) {
-        efi_boot_entry(config);
-    }
-#endif
 
-    panic(true, "Unsupported protocol specified.");
+    panic(true, "Unsupported protocol specified. Null bootloader only supports 'limine' protocol.");
 }

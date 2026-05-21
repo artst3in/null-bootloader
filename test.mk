@@ -251,7 +251,7 @@ uefi-loongarch64-test:
 	sudo umount test_image/
 	sudo losetup -d `cat loopback_dev`
 	rm -rf test_image loopback_dev
-	qemu-system-loongarch64 -m 1G -net none -M virt -cpu la464 -smp 4 -device ramfb -device qemu-xhci -device usb-kbd -drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-loongarch64.fd,readonly=on -hda test.hdd -serial stdio
+	qemu-system-loongarch64 -m 1G -net none -M virt -cpu la464 -device ramfb -device qemu-xhci -device usb-kbd -drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-loongarch64.fd,readonly=on -hda test.hdd -serial stdio
 
 .PHONY: uefi-ia32-test
 uefi-ia32-test:

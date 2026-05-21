@@ -25,7 +25,7 @@ void *conv_mem_alloc(uint64_t count) {
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
 
-    count = ALIGN_UP(count, 4096, panic(false, "Alignment overflow"));
+    count = ALIGN_UP(count, 4096);
 
     for (;;) {
         if (base + count > 0x100000)
@@ -106,7 +106,7 @@ static bool align_entry(uint64_t *base, uint64_t *length) {
 
     uint64_t orig_base = *base;
 
-    *base = ALIGN_UP(*base, PAGE_SIZE, return false);
+    *base = ALIGN_UP(*base, PAGE_SIZE);
 
     *length -= (*base - orig_base);
     *length =  ALIGN_DOWN(*length, PAGE_SIZE);
@@ -137,11 +137,11 @@ void pmm_sanitise_entries(struct memmap_entry *m, size_t *_count, bool align_ent
 
             uint64_t base   = m[i].base;
             uint64_t length = m[i].length;
-            uint64_t top    = CHECKED_ADD(base, length, goto del_mm0);
+            uint64_t top    = base + length;
 
             uint64_t res_base   = m[j].base;
             uint64_t res_length = m[j].length;
-            uint64_t res_top    = CHECKED_ADD(res_base, res_length, continue);
+            uint64_t res_top    = res_base + res_length;
 
             // Non-usable entry fully contains usable entry
             if (res_base <= base && res_top >= top) {
@@ -170,21 +170,23 @@ void pmm_sanitise_entries(struct memmap_entry *m, size_t *_count, bool align_ent
 
         if (!m[i].length
          || (align_entries && !align_entry(&m[i].base, &m[i].length))) {
-del_mm0:
             // Remove i from memmap
             if (i < count - 1) {
                 m[i] = m[count - 1];
             }
-            count--; i = (size_t)-1; // restart outer loop
+            count--; i--;
         }
     }
 
-    // Remove 0 length entries (any type) and clip usable entries below 0x1000
+    // Remove 0 length usable entries and usable entries below 0x1000
     for (size_t i = 0; i < count; i++) {
-        if (m[i].type == MEMMAP_USABLE
-         && !pmm_sanitiser_keep_first_page && m[i].base < 0x1000) {
-            uint64_t entry_top = CHECKED_ADD(m[i].base, m[i].length, goto del_mm1);
-            if (entry_top <= 0x1000) {
+        if (m[i].type != MEMMAP_USABLE)
+            continue;
+
+        if (!pmm_sanitiser_keep_first_page && m[i].base < 0x1000) {
+            uint64_t entry_top;
+            if (__builtin_add_overflow(m[i].base, m[i].length, &entry_top) ||
+                entry_top <= 0x1000) {
                 goto del_mm1;
             }
 
@@ -224,10 +226,9 @@ del_mm1:
          && m[i].type != MEMMAP_USABLE)
             continue;
 
-        uint64_t merge_top = CHECKED_ADD(m[i].base, m[i].length, continue);
         if (m[i+1].type == m[i].type
-         && m[i+1].base == merge_top) {
-            m[i].length = CHECKED_ADD(m[i].length, m[i+1].length, continue);
+         && m[i+1].base == m[i].base + m[i].length) {
+            m[i].length += m[i+1].length;
 
             // Eradicate from memmap
             for (size_t j = i + 2; j < count; j++) {
@@ -272,7 +273,7 @@ void init_memmap(void) {
 
         memmap[memmap_entries] = e820_map[i];
 
-        uint64_t top = CHECKED_ADD(memmap[memmap_entries].base, memmap[memmap_entries].length, continue);
+        uint64_t top = memmap[memmap_entries].base + memmap[memmap_entries].length;
 
         if (memmap[memmap_entries].type == MEMMAP_USABLE) {
             if (memmap[memmap_entries].base >= EBDA && memmap[memmap_entries].base < 0x100000) {
@@ -295,7 +296,7 @@ void init_memmap(void) {
 
     // Allocate bootloader itself
     memmap_alloc_range(4096,
-        ALIGN_UP((uintptr_t)bss_end, 4096, panic(false, "Alignment overflow")) - 4096, MEMMAP_BOOTLOADER_RECLAIMABLE, 0, true, false, false);
+        ALIGN_UP((uintptr_t)bss_end, 4096) - 4096, MEMMAP_BOOTLOADER_RECLAIMABLE, 0, true, false, false);
 
     pmm_sanitise_entries(memmap, &memmap_entries, false);
 
@@ -326,15 +327,13 @@ void init_memmap(void) {
         goto fail;
     }
 
-    size_t memmap_alloc_size = CHECKED_MUL(memmap_max_entries, sizeof(struct memmap_entry), goto fail);
-
-    status = gBS->AllocatePool(EfiLoaderData, memmap_alloc_size, (void **)&memmap);
+    status = gBS->AllocatePool(EfiLoaderData, memmap_max_entries * sizeof(struct memmap_entry), (void **)&memmap);
     if (status) {
         gBS->FreePool(efi_mmap);
         goto fail;
     }
 
-    status = gBS->AllocatePool(EfiLoaderData, memmap_alloc_size, (void **)&untouched_memmap);
+    status = gBS->AllocatePool(EfiLoaderData, memmap_max_entries * sizeof(struct memmap_entry), (void **)&untouched_memmap);
     if (status) {
         gBS->FreePool(efi_mmap);
         gBS->FreePool(memmap);
@@ -383,10 +382,9 @@ void init_memmap(void) {
         }
 
         uint64_t base = entry->PhysicalStart;
-        uint64_t length = CHECKED_MUL(entry->NumberOfPages, 4096, continue);
-
-        if (memmap_entries == memmap_max_entries) {
-            panic(false, "Memory map exhausted.");
+        uint64_t length;
+        if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &length)) {
+            continue;
         }
 
         memmap[memmap_entries].base = base;
@@ -416,7 +414,7 @@ void init_memmap(void) {
         EFI_PHYSICAL_ADDRESS base = untouched_memmap[i].base;
 
 #if defined (__i386__)
-        if (CHECKED_ADD(untouched_memmap[i].base, untouched_memmap[i].length, continue) > 0x100000000) {
+        if (untouched_memmap[i].base + untouched_memmap[i].length > 0x100000000) {
             continue;
         }
 #endif
@@ -439,14 +437,14 @@ void init_memmap(void) {
     untouched_memmap_entries = memmap_entries;
 
     // Allocate bootloader itself
-    size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096, panic(false, "Alignment overflow"));
+    size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096);
 
     memmap_alloc_range((uintptr_t)__slide, (uintptr_t)image_size,
                        MEMMAP_BOOTLOADER_RECLAIMABLE, 0, true, false, true);
 
     pmm_sanitise_entries(memmap, &memmap_entries, false);
 
-    recl = ext_mem_alloc_counted(1024, sizeof(struct memmap_entry));
+    recl = ext_mem_alloc(1024 * sizeof(struct memmap_entry));
 
     return;
 
@@ -461,9 +459,6 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
 
     for (size_t i = 0; i < count; i++) {
         if (m[i].type == MEMMAP_EFI_RECLAIMABLE) {
-            if (recl_i >= 1024) {
-                panic(false, "pmm: Too many EFI reclaimable entries");
-            }
             recl[recl_i++] = m[i];
         }
     }
@@ -478,9 +473,12 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
             EFI_MEMORY_DESCRIPTOR *entry = (void *)efi_mmap + i * efi_desc_size;
 
             uint64_t base = r->base;
-            uint64_t top = CHECKED_ADD(base, r->length, continue);
+            uint64_t top = base + r->length;
             uint64_t efi_base = entry->PhysicalStart;
-            uint64_t efi_size = CHECKED_MUL(entry->NumberOfPages, 4096, continue);
+            uint64_t efi_size;
+            if (__builtin_mul_overflow(entry->NumberOfPages, (uint64_t)4096, &efi_size)) {
+                continue;  // Skip malformed entry
+            }
 
             if (efi_base < base) {
                 if (efi_size <= base - efi_base)
@@ -489,7 +487,7 @@ static void pmm_reclaim_uefi_mem(struct memmap_entry *m, size_t *_count, bool ra
                 efi_base = base;
             }
 
-            uint64_t efi_top = CHECKED_ADD(efi_base, efi_size, continue);
+            uint64_t efi_top = efi_base + efi_size;
 
             if (efi_top > top) {
                 if (efi_size <= efi_top - top)
@@ -584,9 +582,7 @@ void pmm_free_size_t(void *ptr, size_t length) {
 }
 
 void pmm_free(void *ptr, uint64_t count) {
-    if ((uintptr_t)ptr % 4096 != 0)
-        panic(false, "pmm_free: Unaligned pointer %p", ptr);
-    count = ALIGN_UP(count, 4096, panic(false, "Alignment overflow"));
+    count = ALIGN_UP(count, 4096);
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
     memmap_alloc_range((uintptr_t)ptr, count, MEMMAP_USABLE, 0, false, false, true);
@@ -620,11 +616,6 @@ void *ext_mem_alloc(uint64_t count) {
     return ext_mem_alloc_type(count, MEMMAP_BOOTLOADER_RECLAIMABLE);
 }
 
-void *ext_mem_alloc_counted(uint64_t count, uint64_t elem_size) {
-    return ext_mem_alloc(CHECKED_MUL(count, elem_size,
-        panic(false, "ext_mem_alloc_counted: allocation size overflow")));
-}
-
 void *ext_mem_alloc_type(uint64_t count, uint32_t type) {
     return ext_mem_alloc_type_aligned(count, type, 4096);
 }
@@ -639,9 +630,7 @@ void *ext_mem_alloc_type_aligned_mode(uint64_t count, uint32_t type, size_t alig
     (void)allow_high_allocs;
 #endif
 
-    count = CHECKED_ADD(count, alignment - 1,
-        panic(false, "ext_mem_alloc: count overflows when aligning"));
-    count = ALIGN_DOWN(count, alignment);
+    count = ALIGN_UP(count, alignment);
 
     if (allocations_disallowed)
         panic(false, "Memory allocations disallowed");
@@ -660,27 +649,24 @@ again:
         if (memmap[i].type != 1)
             continue;
 
-        uint64_t entry_base = memmap[i].base;
-        uint64_t entry_top  = CHECKED_ADD(memmap[i].base, memmap[i].length, continue);
+        int64_t entry_base = (int64_t)(memmap[i].base);
+        int64_t entry_top  = (int64_t)(memmap[i].base + memmap[i].length);
 
-        if (entry_top > limit) {
-            entry_top = limit;
+        if ((uint64_t)entry_top > limit) {
+            entry_top = (int64_t)limit;
             if (entry_base >= entry_top)
                 continue;
         }
 
-        // Check if entry is too small before subtracting.
-        if (entry_top - entry_base < count)
-            continue;
+        int64_t alloc_base = ALIGN_DOWN(entry_top - (int64_t)count, alignment);
 
-        uint64_t alloc_base = ALIGN_DOWN(entry_top - count, alignment);
-
+        // This entry is too small for us.
         if (alloc_base < entry_base)
             continue;
 
         // We now reserve the range we need.
-        uint64_t aligned_length = entry_top - alloc_base;
-        memmap_alloc_range(alloc_base, aligned_length, type, MEMMAP_USABLE, true, false, false);
+        int64_t aligned_length = entry_top - alloc_base;
+        memmap_alloc_range((uint64_t)alloc_base, (uint64_t)aligned_length, type, MEMMAP_USABLE, true, false, false);
 
         void *ret;
 
@@ -731,7 +717,7 @@ struct meminfo mmap_get_info(size_t mmap_count, struct memmap_entry *mmap) {
             if (mmap[i].type != MEMMAP_USABLE)
                 continue;
             uint64_t base = mmap[i].base;
-            uint64_t top = CHECKED_ADD(base, mmap[i].length, continue);
+            uint64_t top = base + mmap[i].length;
             if (base <= lower_end && top > lower_end) {
                 lower_end = top;
                 progress = true;
@@ -756,12 +742,18 @@ static bool pmm_new_entry(struct memmap_entry *m, size_t *_count,
                           uint64_t base, uint64_t length, uint32_t type) {
     size_t count = *_count;
 
-    uint64_t top = CHECKED_ADD(base, length, panic(false, "pmm: Integer overflow in memory range calculation"));
+    uint64_t top;
+    if (__builtin_add_overflow(base, length, &top)) {
+        panic(false, "pmm: Integer overflow in memory range calculation");
+    }
 
     // Handle overlapping new entries.
     for (size_t i = 0; i < count; i++) {
         uint64_t entry_base = m[i].base;
-        uint64_t entry_top = CHECKED_ADD(m[i].base, m[i].length, continue);
+        uint64_t entry_top;
+        if (__builtin_add_overflow(m[i].base, m[i].length, &entry_top)) {
+            continue; // Skip malformed entries
+        }
 
         // Full overlap
         if (base <= entry_base && top >= entry_top) {
@@ -824,7 +816,7 @@ static bool pmm_new_entry(struct memmap_entry *m, size_t *_count,
 uint64_t pmm_check_type(uint64_t addr) {
     for (size_t i = 0; i < memmap_entries; i++) {
         uint64_t entry_base = memmap[i].base;
-        uint64_t entry_top  = CHECKED_ADD(memmap[i].base, memmap[i].length, continue);
+        uint64_t entry_top  = memmap[i].base + memmap[i].length;
 
         if (addr >= entry_base && addr < entry_top) {
             return memmap[i].type;
@@ -845,18 +837,21 @@ bool memmap_alloc_range_in(struct memmap_entry *m, size_t *_count,
         return true;
     }
 
-    uint64_t top = CHECKED_ADD(base, length, ({
+    uint64_t top;
+    if (__builtin_add_overflow(base, length, &top)) {
         if (do_panic)
             panic(false, "Memory allocation overflow.");
         return false;
-    }));
+    }
 
     for (size_t i = 0; i < count; i++) {
         if (overlay_type != 0 && m[i].type != overlay_type)
             continue;
 
         uint64_t entry_base = m[i].base;
-        uint64_t entry_top = CHECKED_ADD(m[i].base, m[i].length, continue);
+        uint64_t entry_top;
+        if (__builtin_add_overflow(m[i].base, m[i].length, &entry_top))
+            continue;
 
         if (base >= entry_base && base < entry_top && top <= entry_top) {
             if (simulation)

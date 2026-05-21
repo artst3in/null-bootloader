@@ -54,8 +54,6 @@ AWK := @AWK@
 export AWK
 
 CC := @CC@
-CC_FOR_BUILD := @CC_FOR_BUILD@
-CFLAGS_FOR_BUILD := @CFLAGS_FOR_BUILD@
 
 CPPFLAGS := @CPPFLAGS@
 CFLAGS := @CFLAGS@
@@ -114,16 +112,17 @@ $(call MKESCAPE,$(BINDIR))/limine: $(call MKESCAPE,$(BINDIR))/Makefile $(call MK
 		LDFLAGS="$(LDFLAGS)" \
 		LIBS="$(LIBS)"
 
-$(call MKESCAPE,$(BINDIR))/Makefile: $(call MKESCAPE,$(SRCDIR))/host/host.mk
+$(call MKESCAPE,$(BINDIR))/Makefile: $(call MKESCAPE,$(SRCDIR))/host/host.mk $(call MKESCAPE,$(SRCDIR))/host/.gitignore
 	mkdir -p '$(call SHESCAPE,$(BINDIR))'
 	cp '$(call SHESCAPE,$(SRCDIR))/host/host.mk' '$(call SHESCAPE,$(BINDIR))/Makefile'
+	cp '$(call SHESCAPE,$(SRCDIR))/host/.gitignore' '$(call SHESCAPE,$(BINDIR))/'
 
 .PHONY: limine
 limine:
 	$(MAKE) '$(call SHESCAPE,$(BINDIR))/limine'
 
 .PHONY: clean
-clean: tools-clean limine-bios-clean limine-uefi-ia32-clean limine-uefi-x86-64-clean limine-uefi-aarch64-clean limine-uefi-riscv64-clean limine-uefi-loongarch64-clean
+clean: limine-bios-clean limine-uefi-ia32-clean limine-uefi-x86-64-clean limine-uefi-aarch64-clean limine-uefi-riscv64-clean limine-uefi-loongarch64-clean
 	rm -rf '$(call SHESCAPE,$(BINDIR))' '$(call SHESCAPE,$(BUILDDIR))/stage1.stamp'
 
 .PHONY: install
@@ -186,9 +185,7 @@ uninstall:
 	rm -f '$(call SHESCAPE,$(DESTDIR)$(bindir))/limine'
 	rm -rf '$(call SHESCAPE,$(DESTDIR)$(datarootdir))/limine'
 
-$(call MKESCAPE,$(BUILDDIR))/stage1.stamp: $(STAGE1_FILES) $(call MKESCAPE,$(BUILDDIR))/common-bios/stage2.bin.limlz
-	$(MKDIR_P) '$(call SHESCAPE,$(BUILDDIR))/decompressor-build'
-	cd '$(call SHESCAPE,$(SRCDIR))/stage1' && nasm decompressor.asm -Wall -w-unknown-warning -w-reloc $(WERROR_FLAG) -fbin -o '$(call SHESCAPE,$(BUILDDIR))/decompressor-build/decompressor.bin'
+$(call MKESCAPE,$(BUILDDIR))/stage1.stamp: $(STAGE1_FILES) $(call MKESCAPE,$(BUILDDIR))/decompressor-build/decompressor.bin $(call MKESCAPE,$(BUILDDIR))/common-bios/stage2.bin.gz
 	$(MKDIR_P) '$(call SHESCAPE,$(BINDIR))'
 	cd '$(call SHESCAPE,$(SRCDIR))/stage1/hdd' && nasm bootsect.asm -Wall -w-unknown-warning -w-reloc $(WERROR_FLAG) -fbin -DBUILDDIR="'"'$(call NASMESCAPE,$(BUILDDIR))'"'" -o '$(call SHESCAPE,$(BINDIR))/limine-bios-hdd.bin'
 ifneq ($(BUILD_BIOS_CD),no)
@@ -201,15 +198,15 @@ endif
 	touch '$(call SHESCAPE,$(BUILDDIR))/stage1.stamp'
 
 .PHONY: limine-bios
-limine-bios: common-bios
+limine-bios: common-bios decompressor
 	$(MAKE) '$(call SHESCAPE,$(BUILDDIR))/stage1.stamp'
 
 $(call MKESCAPE,$(BINDIR))/limine-uefi-cd.bin: $(if $(BUILD_UEFI_IA32),$(call MKESCAPE,$(BUILDDIR))/common-uefi-ia32/BOOTIA32.EFI) $(if $(BUILD_UEFI_X86_64),$(call MKESCAPE,$(BUILDDIR))/common-uefi-x86-64/BOOTX64.EFI) $(if $(BUILD_UEFI_AARCH64),$(call MKESCAPE,$(BUILDDIR))/common-uefi-aarch64/BOOTAA64.EFI) $(if $(BUILD_UEFI_RISCV64),$(call MKESCAPE,$(BUILDDIR))/common-uefi-riscv64/BOOTRISCV64.EFI) $(if $(BUILD_UEFI_LOONGARCH64),$(call MKESCAPE,$(BUILDDIR))/common-uefi-loongarch64/BOOTLOONGARCH64.EFI)
 ifneq ($(BUILD_UEFI_CD),no)
 	$(MKDIR_P) '$(call SHESCAPE,$(BINDIR))'
 	rm -f '$(call SHESCAPE,$(BINDIR))/limine-uefi-cd.bin'
-	dd if=/dev/zero of='$(call SHESCAPE,$(BINDIR))/limine-uefi-cd.bin' bs=512 count=32768 2>/dev/null
-	mformat -i '$(call SHESCAPE,$(BINDIR))/limine-uefi-cd.bin' -h 64 -t 32 -s 16 -N 12345678 ::
+	dd if=/dev/zero of='$(call SHESCAPE,$(BINDIR))/limine-uefi-cd.bin' bs=512 count=5760 2>/dev/null
+	mformat -i '$(call SHESCAPE,$(BINDIR))/limine-uefi-cd.bin' -f 2880 -N 12345678 ::
 	LIMINE_UEFI_CD_TMP="$$(mktemp -d)"; \
 		mkdir -p "$$LIMINE_UEFI_CD_TMP"/EFI/BOOT; \
 		cp '$(call SHESCAPE,$(BUILDDIR))/common-uefi-aarch64/BOOTAA64.EFI' "$$LIMINE_UEFI_CD_TMP"/EFI/BOOT/ 2>/dev/null; \
@@ -296,7 +293,6 @@ dist:
 	cp -r '$(call SHESCAPE,$(SRCDIR))'/.git '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)"/
 	cd '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)" && git checkout .
 	cd '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)" && ./bootstrap
-	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/contrib"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/flanterm/.git"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/flanterm/.gitignore"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/freestnd-c-hdrs/.git"
@@ -305,11 +301,11 @@ dist:
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/picoefi/.gitignore"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/cc-runtime"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/libfdt/.git"
-	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/stbi-hardened"
-	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/pdgzip"
+	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/tinf"
+	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/common/lib/stb_image.h.nopatch"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/.git"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/.gitignore"
-	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/.github"
+	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/.forgejo"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/README.md"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/autom4te.cache"
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))'/"$(DIST_OUTPUT)/test"
@@ -327,11 +323,11 @@ dist:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf .cache compile_commands.json edk2-ovmf config.log config.status GNUmakefile config.h man/man1/limine.1
+	rm -rf edk2-ovmf config.log config.status GNUmakefile config.h man/man1/limine.1
 
 .PHONY: maintainer-clean
 maintainer-clean: distclean
-	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf flanterm stbi-hardened common/lib/stb_image.h pdgzip common/compress/pdgzip.c common/compress/pdgzip.h libfdt freestnd-c-hdrs cc-runtime common/cc-runtime.s2.c limine-protocol picoefi configure timestamps build-aux *'~' autom4te.cache aclocal.m4 *.tar*
+	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf flanterm common/lib/stb_image.h.nopatch common/lib/stb_image.h decompressor/tinf tinf libfdt freestnd-c-hdrs cc-runtime common/cc-runtime.s2.c decompressor/cc-runtime.c limine-protocol picoefi configure timestamps build-aux *'~' autom4te.cache aclocal.m4 *.tar*
 
 .PHONY: common-uefi-x86-64
 common-uefi-x86-64:
@@ -384,26 +380,22 @@ common-uefi-ia32-clean:
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))/common-uefi-ia32'
 
 .PHONY: common-bios
-common-bios: $(call MKESCAPE,$(BUILDDIR))/tools-build/limlzpack
+common-bios:
 	$(MAKE) -C '$(call SHESCAPE,$(SRCDIR))/common' -f common.mk \
 		TARGET=bios \
-		BUILDDIR='$(call SHESCAPE,$(BUILDDIR))/common-bios' \
-		LIMLZPACK='$(call SHESCAPE,$(BUILDDIR))/tools-build/limlzpack'
+		BUILDDIR='$(call SHESCAPE,$(BUILDDIR))/common-bios'
 
 .PHONY: common-bios-clean
 common-bios-clean:
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))/common-bios'
 
-$(call MKESCAPE,$(BUILDDIR))/tools-build/limlzpack: $(call MKESCAPE,$(SRCDIR))/tools/limlzpack.c
-	$(MKDIR_P) '$(call SHESCAPE,$(BUILDDIR))/tools-build'
-	$(CC_FOR_BUILD) $(CFLAGS_FOR_BUILD) -std=c99 -Wall -Wextra $(WERROR_FLAG) '$(call SHESCAPE,$<)' -o '$(call SHESCAPE,$@)'
+.PHONY: decompressor
+decompressor:
+	$(MAKE) -C '$(call SHESCAPE,$(SRCDIR))/decompressor' -f decompressor.mk \
+		BUILDDIR='$(call SHESCAPE,$(BUILDDIR))/decompressor-build'
 
 .PHONY: decompressor-clean
 decompressor-clean:
 	rm -rf '$(call SHESCAPE,$(BUILDDIR))/decompressor-build'
-
-.PHONY: tools-clean
-tools-clean:
-	rm -rf '$(call SHESCAPE,$(BUILDDIR))/tools-build'
 
 -include test.mk
