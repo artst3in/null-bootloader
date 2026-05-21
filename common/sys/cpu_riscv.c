@@ -131,6 +131,13 @@ static void init_riscv_acpi(void) {
             panic(false, "riscv: missing rhct node for hartid %U", (uint64_t)hartid);
         }
 
+        // Ensure the offsets[] array fits within the hart_info node as
+        // declared by the containing header.size.
+        uint64_t offsets_bytes = (uint64_t)hart_info->offsets_len * sizeof(uint32_t);
+        if (offsetof(struct rhct_hart_info, offsets) + offsets_bytes > hart_info->header.size) {
+            panic(false, "riscv: RHCT hart_info offsets_len exceeds node size");
+        }
+
         const char *isa_string = NULL;
         uint8_t mmu_type = 0;
         uint8_t flags = 0;
@@ -306,7 +313,7 @@ void init_riscv(const char *config) {
     if (!prioritise_dtb && acpi_get_rsdp()) {
         init_riscv_acpi();
     } else {
-        riscv_fdt = get_device_tree_blob(config, 0);
+        riscv_fdt = get_device_tree_blob(config, 0, false);
         if (riscv_fdt != NULL) {
             init_riscv_fdt(riscv_fdt);
         } else {

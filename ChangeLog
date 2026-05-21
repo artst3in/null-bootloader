@@ -1,3 +1,298 @@
+2026-05-07  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.2.0 ***
+
+    Noteworthy changes compared to the previous release, 12.1.0:
+
+    New features:
+        - Add a hotkey to launch the UEFI Shell from the boot menu.
+
+    Bug fixes:
+        - Free UEFI buffers with their original allocation size after
+          LocateHandle to avoid pool corruption on strict firmwares.
+        - Reallocate the UEFI memory map buffer if it grows during the
+          ExitBootServices retry loop.
+        - Drop a redundant IER write in the serial driver that clobbered DLM at
+          low baud rates.
+        - Limine boot protocol: Allow trimming reserved entries that overlap
+          framebuffer pages.
+        - Harden the ELF loader against crafted RELR tables that overflow the
+          relocation count on 32-bit builds (found via fuzzing).
+        - Reject PE images with `SectionAlignment` = 0 (found via fuzzing).
+        - Miscellaneous bug fixes.
+
+    Miscellaneous:
+        - Update pdgzip subproject. Improves performance by ~25%.
+
+2026-05-01  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.1.0 ***
+
+    Noteworthy changes compared to the previous release, 12.0.2:
+
+    New features:
+        - Implement Measured Boot support.
+        - Limine boot protocol: Expose the TCG2 event log to the kernel via a
+          new "TPM Event Log" feature.
+        - Linux boot protocol: Publish the TCG2 event log to the kernel via the
+          LINUX_EFI_TPM_EVENT_LOG configuration table.
+        - Linux boot protocol: Publish EFI RNG entropy to the kernel via the
+          LINUX_EFI_RANDOM_SEED configuration table.
+        - Linux boot protocol: Report UEFI Secure Boot state to the kernel on
+          x86.
+        - Re-introduce logic to enable WC on the framebuffer using x86 MTRRs
+          where the firmware leaves it as UC.
+        - Add support for the QOI image format for wallpapers and other image
+          resources.
+        - Add `IF_FW_TYPE` and `IF_ARCH` menu entry options to hide entries
+          based on firmware type (BIOS/UEFI) or processor architecture.
+
+    Bug fixes:
+        - Cap menu nesting depth to prevent stack exhaustion on crafted
+          configuration files.
+        - Validate user-supplied DTB before invoking libfdt to avoid
+          out-of-bounds accesses in the FDT helpers.
+        - Reject ELF images with no non-empty PT_LOAD segments in the Multiboot
+          elsewhere loader, avoiding bogus min/max range arithmetic.
+        - Reject Multiboot address-tag ranges whose address or file-offset
+          arithmetic overflows before the copy.
+        - Fix a TOCTOU on UEFI PXE/TFTP reads by enforcing the byte count
+          returned by the size query against the actual transfer size.
+        - Miscellaneous bug fixes.
+
+2026-04-26  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.0.2 ***
+
+    Noteworthy changes compared to the previous release, 12.0.1:
+
+    Bug fixes:
+        - Make centering bias consistently left and up across all UI elements.
+
+    Miscellaneous;
+        - Release binary tarballs without version suffixes.
+
+2026-04-25  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.0.1 ***
+
+    Same as 12.0.0, but re-released due to a botched binary release whose
+    fixed assets that cannot be amended into 12.0.0 afterwards due to release
+    immutability.
+
+2026-04-25  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 12.0.0 ***
+
+    Noteworthy changes compared to the previous release, 11.4.1:
+
+    Breaking changes:
+        - Re-introduce hash verification enforcement for files loaded under
+          UEFI Secure Boot (originally shipped in 11.2.0 and reverted in 11.2.1
+          pending the next major version bump). When Secure Boot is active and
+          a config checksum is enrolled, Limine now requires BLAKE2B hashes on
+          all loaded file paths (with EFI chainloads exempted, as they rely on
+          firmware-side Secure Boot verification, and wallpaper and font files
+          silently skipped on a missing hash), unconditionally disables the
+          config editor, and forces `hash_mismatch_panic` to `yes`. Enrolling
+          a config checksum is the explicit opt-in to this hardening; without
+          one, Secure Boot enforcement is not applied.
+        - The `interface_branding_colour` and `interface_help_colour` config
+          options now take an `RRGGBB` hexadecimal value instead of a 0-7
+          colour index. A new `interface_help_colour_bright` option has been
+          added to control the brighter accent colour used for the auto-boot
+          countdown digit.
+
+    New features:
+        - Re-introduce transparent gzip decompression for files, using a port
+          of embeddable pdgzip (CC0) by Kamila Szewczyk that provides
+          significantly better decode performance than the previous tinf-based
+          implementation.
+        - Major overhaul of the boot menu interface, including consistent
+          left-biased centering of all UI elements, ellipsis truncation of long
+          branding strings, shortened countdown text, and the removal of entry
+          name length limits.
+
+    Bug fixes:
+        - Fix NULL dereference in `gterm_init` cached path.
+        - Fix NULL dereference in the menu when `default_entry` is out of range
+          with `timeout=0`.
+        - Add a trailing fence after the `cbo.flush` loop in the RISC-V Zicbom
+          framebuffer flush path.
+        - Miscellaneous bug fixes.
+
+    Miscellaneous:
+        - Replace upstream `stb_image` with a hardened version.
+        - Bring back hand-written assembly versions of the x86-64 and IA-32
+          `mem*()` routines to mitigate performance regressions versus the C
+          implementations.
+        - Updated the Flanterm library to 3.1.1.
+        - Ship binary releases as tarballs in release assets, replacing the
+          previous separate git branch.
+
+2026-04-20  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.4.1 ***
+
+    Noteworthy changes compared to the previous release, 11.4.0:
+
+    Bug fixes:
+        - Fix an issue with the limlz compressor/decompressor that could cause
+          spurious failures ("limine integrity error") on the legacy x86 BIOS
+          port.
+        - Portability fixes for the `limlzpack` build-time tool (mainly fixing
+          it on big-endian build systems).
+        - Miscellaneous bug fixes.
+
+2026-04-19  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.4.0 ***
+
+    Noteworthy changes compared to the previous release, 11.3.1:
+
+    New features:
+        - Revamped BIOS early-stage decompressor, replacing gzip (tinf) with a
+          simpler, smaller, faster, and more auditable compressor/decompressor
+          using a fixed-width LZ77 encoding purpose-tailored for x86 code mixed
+          with data by Kamila Szewczyk.
+        - Implement timeout and entry control of the Boot Loader Interface
+          (BLI).
+        - Make `graphics: no` functional on UEFI ports as well.
+
+    Bug fixes:
+        - Revert the "Call Apple set_os protocol on UEFI" change from 11.3.1 as
+          that seems to have been causing issues relating to input devices on
+          certain other Apple systems, pending investigation and usefulness
+          assessment.
+        - Many assorted bug fixes and improvements.
+
+2026-04-09  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.3.1 ***
+
+    (Note: 11.3.0 was skipped due to GHA migration issues)
+
+    Noteworthy changes compared to the previous release, 11.2.1:
+
+    New features:
+        - Implement "TSC Frequency" feature of the Limine boot protocol.
+        - Add PIT-based TSC calibration for BIOS.
+        - Do not clear framebuffer in quiet mode.
+
+    Bug fixes:
+        - Make "Keep IOMMU" Limine boot protocol feature x86-64-only.
+        - Do not clear framebuffer on modeset as Flanterm immediately repaints
+          it, wasting time.
+        - Allow menu recovery on overflow panics in the multiboot protocols.
+        - Significantly improve TSC calibration accuracy.
+
+    Miscellaneous:
+        - Do not force-start uninitialised GOP outputs if a framebuffer is
+          already available, for compatibility with quirky firmwares (Apple
+          Macs).
+        - Call Apple set_os protocol on UEFI to try to keep iGPU alive on
+          dual-GPU Apple Macs.
+        - Migrated to GitHub alongside with several subprojects.
+        - Build limine.exe using i486 MinGW from osdev0/mingw-binary-builds
+          in binary builds for better compatibility.
+
+2026-04-04  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.2.1 ***
+
+    Noteworthy changes compared to the previous release, 11.2.0:
+
+    Bug fixes:
+        - Revert Secure Boot enforcement policy for configuration file hash
+          and other file hashes. This broke semantic versioning, so the fair
+          thing to do is to revert it and move on to 12.x afterwards.
+        - Add workaround for VMware optical drive detection on BIOS.
+
+2026-04-02  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.2.0 ***
+
+    Noteworthy changes compared to the previous release, 11.1.0:
+
+    New features:
+        - Enforce hash verification of loaded files when UEFI Secure Boot is
+          active. When Secure Boot is detected, Limine requires an enrolled
+          config checksum, BLAKE2B hashes on security-critical file paths,
+          disables the config editor, and forces hash_mismatch_panic to yes.
+        - Linux boot protocol: Load and concatenate all modules on non-x86, not
+          just the first.
+        - ISO 9660: Handle Rock Ridge NM continuation entries.
+
+    Bug fixes:
+        - Use -malign-double for IA-32 UEFI builds to match UEFI specification
+          struct alignment.
+        - Fix unique sector pool being clobbered by find_unique_sectors().
+        - Revert GOP workaround that called SetMode() on every handle to avoid
+          clearing the screen where unnecessary/ugly.
+        - Do not call ClearScreen() on EFI fallback terminal init for the same
+          reason.
+        - Miscellaneous fixes for low severity bugs found with static analysis.
+
+    Miscellaneous:
+        - Re-enable decompressor bounds checks, CRC32, and length validation.
+        - Mix hardware entropy on non-x86 via RNDR instruction and EFI RNG
+          protocol and add support for aarch64 hardware RNG.
+        - Prefer 64-bit rdrand/rdseed on x86-64 over 32-bit. Fixes potential
+          issues on certain unpatched Zen 5 systems.
+
+2026-03-25  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.1.0 ***
+
+    Noteworthy changes compared to the previous release, 11.0.0:
+
+    New features:
+        - Walk back previous breaking change where base revisions 0 through 3
+          were dropped on x86.
+        - Walk back previous breaking change where base revisions < 6 were
+          dropped on loongarch64 and riscv64 (it remains in effect on aarch64).
+
+    Miscellaneous:
+        - Improve Limine protocol page tables layout to better coalesce
+          contiguous 4KiB entries into 2MiB/1GiB pages.
+
+2026-03-23  Mintsuki  <mintsuki@protonmail.com>
+
+    *** Release 11.0.0 ***
+
+    Noteworthy changes compared to the previous release, 10.8.5:
+
+    Breaking changes:
+        - Dropped support for base revisions 0, 1, 2, and 3 of the Limine boot
+          protocol for x86.
+        - Dropped support for all base revisions except 6 of the Limine boot
+          protocol for aarch64, loongarch64, and riscv64.
+
+    New features:
+        - Implement support for base revision 6 of the Limine boot protocol
+          (see specification for details).
+        - Added support for multiprocessor startup for the loongarch64 version
+          of the Limine boot protocol.
+        - Add a new feature to the Limine boot protocol,
+          `flanterm_fb_init_params`, that passes information to the booted
+          executable about the text terminal, as used by the bootloader, in a
+          Flanterm-compatible format.
+        - Add a new boot protocol, "efi_boot_entry", which allows rebooting
+          into other EFI boot menu entries by name.
+        - Support using a formatted path as the value for the `default_entry`
+          configuration option.
+
+    Bug fixes:
+        - Miscellaneous fixes relating to the Linux boot protocol on non-x86
+          ports.
+        - Improve feature to remember last booted entry by internally using the
+          same path format as `default_entry`.
+
+    Miscellaneous:
+        - LoongArch64 is no longer in an "experimental" state, but rather fully
+          supported.
+        - Updated the Flanterm library to 3.0.2.
+
 2026-03-12  Mintsuki  <mintsuki@protonmail.com>
 
     *** Release 10.8.5 ***
@@ -5,7 +300,7 @@
     Noteworthy changes compared to the previous release, 10.8.4:
 
     Bug fixes:
-        - Update the Flanterm library to 3.0.2 to fix a regression introduced
+        - Update the Flanterm library for a hotfix to a regression introduced
           in Flanterm 3.0.1 that would also cause misrenderings of the boot
           menu's text colour for selected entries.
 

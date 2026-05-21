@@ -3,7 +3,6 @@
 !.editorconfig
 !.gitattributes
 !.gitignore
-!.typos.toml
 
 
 # Generated files
@@ -13,7 +12,7 @@
 *.exe
 *.EFI
 *.bin
-*.bin.gz
+*.bin.limlz
 *.tar*
 *.elf
 *.hdd
@@ -28,14 +27,14 @@
 /picoefi
 /freestnd-c-hdrs
 /flanterm
-/common/lib/stb_image.h.nopatch
+/stbi-hardened
 /common/lib/stb_image.h
 /common/cc-runtime.s2.c
 /cc-runtime
-/decompressor/tinf
-/decompressor/cc-runtime.c
+/common/compress/pdgzip.c
+/common/compress/pdgzip.h
+/pdgzip
 /libfdt
-/tinf
 /edk2-ovmf
 /bochsout.txt
 /bx_enh_dbg.ini
@@ -58,6 +57,7 @@
 /common-uefi-riscv64
 /common-uefi-loongarch64
 /decompressor-build
+/tools-build
 /stage1.stamp
 
 
