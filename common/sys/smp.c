@@ -17,7 +17,7 @@
 #if defined (__riscv)
 #include <sys/sbi.h>
 #endif
-#if defined (__aarch64__)
+#if defined (__aarch64__) || defined(__loongarch__)
 #include <libfdt.h>
 #endif
 
@@ -168,8 +168,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        // Prevent infinite loop on zero-length MADT entry
-        if (*(madt_ptr + 1) == 0) {
+        // Skip zero-length or out-of-bounds MADT entries
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -209,7 +210,7 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
         return NULL;
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
     *cpu_count = 0;
 
     // Try to start all APs
@@ -218,8 +219,9 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        // Prevent infinite loop on zero-length MADT entry
-        if (*(madt_ptr + 1) == 0) {
+        // Skip zero-length or out-of-bounds MADT entries
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -324,6 +326,8 @@ struct limine_mp_info *init_smp(size_t   *cpu_count,
 #elif defined (__aarch64__)
 
 struct trampoline_passed_info {
+    uint64_t smp_tpl_ap_el;
+
     uint64_t smp_tpl_booted_flag;
 
     uint64_t smp_tpl_hhdm_offset;
@@ -368,6 +372,7 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
 
     passed_info->smp_tpl_info_struct = (uint64_t)(uintptr_t)info_struct;
     passed_info->smp_tpl_booted_flag = 0;
+    passed_info->smp_tpl_ap_el       = 0;
     passed_info->smp_tpl_ttbr0       = ttbr0;
     passed_info->smp_tpl_ttbr1       = ttbr1;
     passed_info->smp_tpl_mair        = mair;
@@ -444,6 +449,12 @@ static bool try_start_ap(int boot_method, uint64_t method_ptr,
         // set this flag, it has enabled its caches
 
         if (locked_read(&passed_info->smp_tpl_booted_flag) == 1) {
+            uint64_t ap_el = locked_read(&passed_info->smp_tpl_ap_el);
+            uint64_t bsp_el = current_el();
+            if (ap_el != bsp_el) {
+                panic(false, "smp: AP started at EL%u but BSP is at EL%u",
+                      (uint32_t)ap_el, (uint32_t)bsp_el);
+            }
             return true;
         }
         stall(100);
@@ -503,7 +514,8 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0) {
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -523,14 +535,15 @@ static struct limine_mp_info *try_acpi_smp(size_t   *cpu_count,
         }
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
     *cpu_count = 0;
 
     // Try to start all APs
     for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
       (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
       madt_ptr += *(madt_ptr + 1)) {
-        if (*(madt_ptr + 1) == 0) {
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length) {
             break;
         }
         switch (*madt_ptr) {
@@ -653,7 +666,7 @@ static struct limine_mp_info *try_dtb_smp( void *dtb,
         max_cpus++;
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(max_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
 
     fdt_for_each_subnode(node, dtb, cpus) {
         const void *prop;
@@ -785,7 +798,7 @@ struct limine_mp_info *init_smp(const char *config,
         return info;
 
     // No RSDP means no ACPI, try device trees in that case.
-    void *dtb = get_device_tree_blob(config, 0);
+    void *dtb = get_device_tree_blob(config, 0, false);
     if (dtb) {
         info = try_dtb_smp(dtb,
                            cpu_count, bsp_mpidr, pagemap,
@@ -817,7 +830,7 @@ static bool smp_start_ap(size_t hartid, size_t satp, struct limine_mp_info *info
     passed_info.smp_tpl_info_struct = (uint64_t)info_struct;
     passed_info.smp_tpl_hhdm_offset = hhdm_offset;
 
-    asm volatile ("" ::: "memory");
+    asm volatile ("fence w,w" ::: "memory");
 
     struct sbiret ret = sbi_hart_start(hartid, (size_t)smp_trampoline_start, (size_t)&passed_info);
     if (ret.error != SBI_SUCCESS)
@@ -841,7 +854,7 @@ struct limine_mp_info *init_smp(size_t *cpu_count, pagemap_t pagemap, uint64_t h
         }
     }
 
-    struct limine_mp_info *ret = ext_mem_alloc(num_cpus * sizeof(struct limine_mp_info));
+    struct limine_mp_info *ret = ext_mem_alloc_counted(num_cpus, sizeof(struct limine_mp_info));
 
     *cpu_count = 0;
     for (struct riscv_hart *hart = hart_list; hart != NULL; hart = hart->next) {
@@ -876,6 +889,341 @@ struct limine_mp_info *init_smp(size_t *cpu_count, pagemap_t pagemap, uint64_t h
 }
 
 #elif defined (__loongarch64)
+
+enum {
+    LOONGARCH_CSR_CPUID = 0x20,
+
+    LOONGARCH_IOCSR_IPI_SEND = 0x1040,
+    LOONGARCH_IOCSR_MBUF_SEND = 0x1048,
+
+    IOCSR_IPI_SEND_BLOCKING_BIT = 31,
+    IOCSR_IPI_SEND_CPU_SHIFT    = 16,
+    IOCSR_IPI_SEND_IP_SHIFT     = 0,
+
+    IOCSR_MBUF_SEND_BLOCKING_BIT = 31,
+    IOCSR_MBUF_SEND_CPU_SHIFT    = 16,
+    IOCSR_MBUF_SEND_BOX_SHIFT    = 2,
+
+    SMP_BOOT_CPU = 0x1,
+
+    MADT_ENTRY_CORE_PIC = 17
+};
+
+struct trampoline_passed_info {
+    uint64_t smp_tpl_booted_flag;
+    uint64_t smp_tpl_info_struct;
+    uint64_t smp_tpl_pgd_low;
+    uint64_t smp_tpl_pgd_high;
+    uint64_t smp_tpl_hhdm_offset;
+    uint64_t smp_tpl_temp_stack;
+};
+
+struct trampoline_passed_info loongarch_smp_passed_info;
+
+static inline uint32_t loongarch_phys_id(void) {
+    return csr_read32(LOONGARCH_CSR_CPUID);
+}
+
+static inline bool core_pic_startable(uint32_t flags) {
+    return (flags & MADT_CORE_PIC_ENABLED)
+        || (flags & MADT_CORE_PIC_ONLINE_CAPABLE);
+}
+
+static void csr_mail_send(uint64_t data, int cpu, int mailbox) {
+	uint64_t val;
+
+    // High 32bit
+	val = ((uint64_t)1 << IOCSR_MBUF_SEND_BLOCKING_BIT);
+	val |= (((mailbox << 1) + 1) << IOCSR_MBUF_SEND_BOX_SHIFT);
+	val |= (cpu << IOCSR_MBUF_SEND_CPU_SHIFT);
+	val |= (data & 0xFFFFFFFF00000000);
+	iocsr_write64(val, LOONGARCH_IOCSR_MBUF_SEND);
+
+    // Low 32bit
+	val = ((uint64_t)1 << IOCSR_MBUF_SEND_BLOCKING_BIT);
+	val |= ((mailbox << 1) << IOCSR_MBUF_SEND_BOX_SHIFT);
+	val |= (cpu << IOCSR_MBUF_SEND_CPU_SHIFT);
+	val |= (data << 32);
+	iocsr_write64(val, LOONGARCH_IOCSR_MBUF_SEND);
+};
+
+static void smp_send_ipi(uint32_t phys_id, uint32_t action) {
+    uint32_t val = ((uint32_t)1 << IOCSR_IPI_SEND_BLOCKING_BIT)
+                 | (phys_id << IOCSR_IPI_SEND_CPU_SHIFT)
+                 | (action << IOCSR_IPI_SEND_IP_SHIFT);
+
+    iocsr_write32(val, LOONGARCH_IOCSR_IPI_SEND);
+}
+
+static bool smp_start_ap(uint32_t phys_id, struct limine_mp_info *info_struct,
+                         uint64_t pgd_low, uint64_t pgd_high,
+                         uint64_t hhdm_offset) {
+    static void *temp_stack =NULL;
+    if (temp_stack == NULL) {
+        temp_stack = ext_mem_alloc(8192);
+    }
+
+    loongarch_smp_passed_info.smp_tpl_booted_flag = 0;
+    loongarch_smp_passed_info.smp_tpl_info_struct = (uint64_t)(uintptr_t)info_struct;
+    loongarch_smp_passed_info.smp_tpl_pgd_low     = pgd_low;
+    loongarch_smp_passed_info.smp_tpl_pgd_high    = pgd_high;
+    loongarch_smp_passed_info.smp_tpl_hhdm_offset = hhdm_offset;
+    loongarch_smp_passed_info.smp_tpl_temp_stack  = (uint64_t)(uintptr_t)temp_stack + 8192;
+
+    asm volatile ("dbar 0" ::: "memory");
+
+    uint64_t trampoline_entry = (uint64_t)(uintptr_t)smp_trampoline_start;
+
+    // Mailbox 0 and 1 carry the low and high 32 bits of the AP entry point.
+    csr_mail_send(trampoline_entry, phys_id, 0);
+    smp_send_ipi(phys_id, SMP_BOOT_CPU);
+
+    for (int i = 0; i < 1000000; i++) {
+        if (locked_read(&loongarch_smp_passed_info.smp_tpl_booted_flag) == 1)
+            return true;
+        stall(100);
+    }
+
+    return false;
+}
+
+static struct limine_mp_info *try_acpi_smp(size_t *cpu_count, uint32_t *bsp_phys_id,
+                                           pagemap_t pagemap, uint64_t hhdm_offset) {
+    struct madt *madt = acpi_get_table("APIC", 0);
+    if (madt == NULL)
+        return NULL;
+
+    *bsp_phys_id = loongarch_phys_id();
+    *cpu_count = 0;
+
+    size_t max_cpus = 0;
+
+    for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
+         (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
+         madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length)
+            break;
+
+        if (*madt_ptr != MADT_ENTRY_CORE_PIC)
+            continue;
+
+        if (*(madt_ptr + 1) < sizeof(struct madt_core_pic))
+            continue;
+
+        struct madt_core_pic *core_pic = (void *)madt_ptr;
+
+        if (core_pic_startable(core_pic->flags))
+            max_cpus++;
+    }
+
+    if (max_cpus == 0)
+        return NULL;
+
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
+
+    for (uint8_t *madt_ptr = (uint8_t *)madt->madt_entries_begin;
+         (uintptr_t)madt_ptr + 1 < (uintptr_t)madt + madt->header.length;
+         madt_ptr += *(madt_ptr + 1)) {
+        if (*(madt_ptr + 1) == 0
+         || (uintptr_t)madt_ptr + *(madt_ptr + 1) > (uintptr_t)madt + madt->header.length)
+            break;
+
+        if (*madt_ptr != MADT_ENTRY_CORE_PIC)
+            continue;
+
+        if (*(madt_ptr + 1) < sizeof(struct madt_core_pic))
+            continue;
+
+        struct madt_core_pic *core_pic = (void *)madt_ptr;
+
+        if (!core_pic_startable(core_pic->flags))
+            continue;
+
+        struct limine_mp_info *info_struct = &ret[*cpu_count];
+        info_struct->processor_id = core_pic->acpi_processor_uid;
+        info_struct->phys_id = core_pic->core_id;
+
+        // Do not try to restart the BSP.
+        if (core_pic->core_id == *bsp_phys_id) {
+            (*cpu_count)++;
+            continue;
+        }
+
+        printv("smp: Found candidate AP for bring-up. Core ID: %u\n", core_pic->core_id);
+
+        if (!smp_start_ap(core_pic->core_id, info_struct,
+                          (uint64_t)(uintptr_t)pagemap.pgd[0],
+                          (uint64_t)(uintptr_t)pagemap.pgd[1],
+                          hhdm_offset)) {
+            print("smp: FAILED to bring-up AP\n");
+            continue;
+        }
+
+        printv("smp: Successfully brought up AP\n");
+        (*cpu_count)++;
+    }
+
+    if (*cpu_count == 0) {
+        pmm_free(ret, max_cpus * sizeof(struct limine_mp_info));
+        return NULL;
+    }
+
+    return ret;
+}
+
+static struct limine_mp_info *try_dtb_smp(void *dtb, size_t *cpu_count,
+                                          uint32_t *bsp_phys_id,
+                                          pagemap_t pagemap,
+                                          uint64_t hhdm_offset) {
+    int cpus = fdt_path_offset(dtb, "/cpus");
+    if (cpus < 0) {
+        printv("smp: failed to find /cpus node: %s\n", fdt_strerror(cpus));
+        return NULL;
+    }
+
+    int address_cells = fdt_address_cells(dtb, cpus);
+    if (address_cells < 1) {
+        printv("smp: fdt_address_cells failed: %s\n", fdt_strerror(address_cells));
+        return NULL;
+    }
+    if (address_cells > 2) {
+        printv("smp: illegal #address-cells value: %d\n", address_cells);
+        return NULL;
+    }
+
+    *bsp_phys_id = loongarch_phys_id();
+    *cpu_count = 0;
+
+    size_t max_cpus = 0;
+    int node;
+    fdt_for_each_subnode(node, dtb, cpus) {
+        const void *prop;
+        int prop_len;
+
+        if (!(prop = fdt_getprop(dtb, node, "device_type", NULL)) || strcmp(prop, "cpu"))
+            continue;
+
+        if (!(prop = fdt_getprop(dtb, node, "reg", &prop_len)) || prop_len < address_cells * 4)
+            continue;
+
+        uint64_t phys_id = 0;
+        const uint8_t *bytes = prop;
+
+        if (address_cells == 1) {
+            phys_id = ((uint64_t)bytes[0] << 24)
+                    | ((uint64_t)bytes[1] << 16)
+                    | ((uint64_t)bytes[2] << 8)
+                    | ((uint64_t)bytes[3] << 0);
+        } else {
+            phys_id = ((uint64_t)bytes[0] << 56)
+                    | ((uint64_t)bytes[1] << 48)
+                    | ((uint64_t)bytes[2] << 40)
+                    | ((uint64_t)bytes[3] << 32)
+                    | ((uint64_t)bytes[4] << 24)
+                    | ((uint64_t)bytes[5] << 16)
+                    | ((uint64_t)bytes[6] << 8)
+                    | ((uint64_t)bytes[7] << 0);
+        }
+
+        if (phys_id > UINT32_MAX) {
+            printv("smp: core id %U does not fit in 32 bits, skipping\n", phys_id);
+            continue;
+        }
+
+        max_cpus++;
+    }
+
+    if (max_cpus == 0)
+        return NULL;
+
+    struct limine_mp_info *ret = ext_mem_alloc_counted(max_cpus, sizeof(struct limine_mp_info));
+
+    fdt_for_each_subnode(node, dtb, cpus) {
+        const void *prop;
+        int prop_len;
+
+        if (!(prop = fdt_getprop(dtb, node, "device_type", NULL)) || strcmp(prop, "cpu"))
+            continue;
+
+        if (!(prop = fdt_getprop(dtb, node, "reg", &prop_len)) || prop_len < address_cells * 4)
+            continue;
+
+        uint64_t phys_id = 0;
+        const uint8_t *bytes = prop;
+
+        if (address_cells == 1) {
+            phys_id = ((uint64_t)bytes[0] << 24)
+                    | ((uint64_t)bytes[1] << 16)
+                    | ((uint64_t)bytes[2] << 8)
+                    | ((uint64_t)bytes[3] << 0);
+        } else {
+            phys_id = ((uint64_t)bytes[0] << 56)
+                    | ((uint64_t)bytes[1] << 48)
+                    | ((uint64_t)bytes[2] << 40)
+                    | ((uint64_t)bytes[3] << 32)
+                    | ((uint64_t)bytes[4] << 24)
+                    | ((uint64_t)bytes[5] << 16)
+                    | ((uint64_t)bytes[6] << 8)
+                    | ((uint64_t)bytes[7] << 0);
+        }
+
+        if (phys_id > UINT32_MAX) {
+            printv("smp: core id %U does not fit in 32 bits, skipping\n", phys_id);
+            continue;
+        }
+
+        struct limine_mp_info *info_struct = &ret[*cpu_count];
+        info_struct->processor_id = 0;
+        info_struct->phys_id = phys_id;
+
+        // Do not try to restart the BSP.
+        if (phys_id == *bsp_phys_id) {
+            (*cpu_count)++;
+            continue;
+        }
+
+        printv("smp: Found candidate AP for bring-up. Core ID: %U\n", phys_id);
+
+        if (!smp_start_ap((uint32_t)phys_id, info_struct,
+                          (uint64_t)(uintptr_t)pagemap.pgd[0],
+                          (uint64_t)(uintptr_t)pagemap.pgd[1],
+                          hhdm_offset)) {
+            print("smp: FAILED to bring-up AP\n");
+            continue;
+        }
+
+        printv("smp: Successfully brought up AP\n");
+        (*cpu_count)++;
+    }
+
+    if (*cpu_count == 0) {
+        pmm_free(ret, max_cpus * sizeof(struct limine_mp_info));
+        return NULL;
+    }
+
+    return ret;
+}
+
+struct limine_mp_info *init_smp(size_t *cpu_count, uint32_t *bsp_phys_id,
+                                pagemap_t pagemap, uint64_t hhdm_offset) {
+    struct limine_mp_info *info = NULL;
+
+    if (acpi_get_rsdp() && (info = try_acpi_smp(cpu_count, bsp_phys_id, pagemap, hhdm_offset)))
+        return info;
+
+    void *dtb = get_device_tree_blob(NULL, 0, false);
+    if (dtb) {
+        info = try_dtb_smp(dtb, cpu_count, bsp_phys_id, pagemap, hhdm_offset);
+        pmm_free(dtb, fdt_totalsize(dtb));
+        return info;
+    }
+
+    printv("Failed to figure out how to start APs.");
+
+    return NULL;
+}
+
 #else
 #error Unknown architecture
 #endif

@@ -9,6 +9,8 @@
 #include <lib/config.h>
 #include <lib/uri.h>
 #include <lib/bli.h>
+#include <lib/rng_seed.h>
+#include <lib/tpm.h>
 #include <fs/file.h>
 #include <mm/pmm.h>
 #include <libfdt.h>
@@ -25,6 +27,7 @@ UINT32 efi_desc_ver = 0;
 
 bool editor_enabled = true;
 bool help_hidden = false;
+bool secure_boot_active = false;
 
 uint64_t usec_at_bootloader_entry;
 
@@ -115,7 +118,8 @@ size_t get_trailing_zeros(uint64_t val) {
     return 64;
 }
 
-void *get_device_tree_blob(const char *config, size_t extra_size) {
+void *get_device_tree_blob(const char *config, size_t extra_size,
+                           bool measure) {
     int ret;
 
     size_t size = 0;
@@ -134,12 +138,30 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
         }
         if (dtb_path != NULL) {
             struct file_handle *dtb_file;
-            if ((dtb_file = uri_open(dtb_path)) == NULL)
+            if ((dtb_file = uri_open(dtb_path, MEMMAP_BOOTLOADER_RECLAIMABLE, false
+#if defined (__i386__)
+                , NULL, NULL
+#endif
+            )) == NULL)
                 panic(soft_panic, "dtb: Failed to open device tree blob with path `%#`. Is the path correct?", dtb_path);
 
-            dtb = freadall(dtb_file, MEMMAP_BOOTLOADER_RECLAIMABLE);
+            dtb = dtb_file->fd;
             size = dtb_file->size;
             fclose(dtb_file);
+
+            ret = fdt_check_full(dtb, size);
+            if (ret != 0) {
+                panic(soft_panic, "dtb: Invalid device tree blob at `%#`: '%s'", dtb_path, fdt_strerror(ret));
+            }
+
+#if defined (UEFI)
+            if (measure) {
+                tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "dtb_path: ", dtb_path);
+                tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                            dtb, size, "dtb_path: ", dtb_path);
+            }
+#endif
+
             printv("dtb: loaded dtb at %p from file `%#`\n", dtb, dtb_path);
         }
     }
@@ -152,6 +174,10 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             if (memcmp(&cur_table->VendorGuid, &dtb_guid, sizeof(EFI_GUID)))
                 continue;
             size = fdt_totalsize(cur_table->VendorTable);
+            if (measure) {
+                tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                            cur_table->VendorTable, size, "efi_dtb", NULL);
+            }
             dtb = ext_mem_alloc(size);
             ret = fdt_open_into(cur_table->VendorTable, dtb, size);
             if (ret < 0) {
@@ -161,6 +187,8 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
             break;
         }
     }
+#else
+    (void)measure;
 #endif
 
     if (extra_size == 0) {
@@ -170,9 +198,11 @@ void *get_device_tree_blob(const char *config, size_t extra_size) {
     if (dtb) {
         printv("dtb: dtb has size %X\n", (uint64_t)size);
 
-        void *new_tab = ext_mem_alloc(size + extra_size);
+        size_t new_size = CHECKED_ADD(size, extra_size,
+            panic(true, "dtb: size overflow"));
+        void *new_tab = ext_mem_alloc(new_size);
 
-        ret = fdt_open_into(dtb, new_tab, size + extra_size);
+        ret = fdt_open_into(dtb, new_tab, new_size);
         if (ret < 0) {
             panic(true, "dtb: failed to resize new DTB");
         }
@@ -220,7 +250,8 @@ RISCV_EFI_BOOT_PROTOCOL *get_riscv_boot_protocol(void) {
     if (gBS->LocateHandle(ByProtocol, &boot_proto_guid, NULL, &bufsz, NULL) != EFI_BUFFER_TOO_SMALL)
         return NULL;
 
-    EFI_HANDLE *handles_buf = ext_mem_alloc(bufsz);
+    UINTN handles_alloc = bufsz;
+    EFI_HANDLE *handles_buf = ext_mem_alloc(handles_alloc);
     if (handles_buf == NULL)
         return NULL;
 
@@ -233,11 +264,11 @@ RISCV_EFI_BOOT_PROTOCOL *get_riscv_boot_protocol(void) {
     if (gBS->HandleProtocol(handles_buf[0], &boot_proto_guid, (void **)&proto) != EFI_SUCCESS)
         goto error;
 
-    pmm_free(handles_buf, bufsz);
+    pmm_free(handles_buf, handles_alloc);
     return proto;
 
 error:
-    pmm_free(handles_buf, bufsz);
+    pmm_free(handles_buf, handles_alloc);
     return NULL;
 }
 
@@ -248,50 +279,71 @@ no_unwind bool efi_boot_services_exited = false;
 bool efi_exit_boot_services(void) {
     EFI_STATUS status;
 
-    EFI_MEMORY_DESCRIPTOR tmp_mmap[1];
-    efi_mmap_size = sizeof(tmp_mmap);
+    // Pull entropy from EFI_RNG_PROTOCOL while it's still callable and
+    // publish it for the kernel to mix into its early RNG state.
+    rng_seed_install();
 
-    gBS->GetMemoryMap(&efi_mmap_size, tmp_mmap, &efi_mmap_key, &efi_desc_size, &efi_desc_ver);
-
-    efi_mmap_size += 4096;
-
+    // Free the buffer init_memmap left us; the loop below manages
+    // allocation lifetime itself.
     status = gBS->FreePool(efi_mmap);
     if (status) {
         goto fail;
     }
+    efi_mmap = NULL;
 
-    status = gBS->AllocatePool(EfiLoaderData, efi_mmap_size, (void **)&efi_mmap);
-    if (status) {
-        goto fail;
-    }
-
-    EFI_MEMORY_DESCRIPTOR *efi_copy;
-    status = gBS->AllocatePool(EfiLoaderData, efi_mmap_size * 2, (void **)&efi_copy);
-    if (status) {
-        goto fail;
-    }
+    EFI_MEMORY_DESCRIPTOR *efi_copy = NULL;
+    UINTN efi_mmap_alloc = 0;
+    UINTN efi_copy_alloc = 0;
 
     bli_on_boot();
 
-    const size_t EFI_COPY_MAX_ENTRIES = (efi_mmap_size * 2) / efi_desc_size;
-
-    size_t retries = 0;
-
-retry:
-    status = gBS->GetMemoryMap(&efi_mmap_size, efi_mmap, &efi_mmap_key, &efi_desc_size, &efi_desc_ver);
-    if (retries == 0 && status) {
-        goto fail;
-    }
-
-    // Be gone, UEFI!
-    status = gBS->ExitBootServices(efi_image_handle, efi_mmap_key);
-    if (status) {
+    for (size_t retries = 0; ; retries++) {
         if (retries == 128) {
             goto fail;
         }
-        retries++;
-        goto retry;
+
+        efi_mmap_size = efi_mmap_alloc;
+        status = gBS->GetMemoryMap(&efi_mmap_size, efi_mmap, &efi_mmap_key,
+                                   &efi_desc_size, &efi_desc_ver);
+        if (status == EFI_BUFFER_TOO_SMALL) {
+            // Map grew (or first iteration). Free both buffers and
+            // reallocate, with slack for the descriptors AllocatePool
+            // itself may add.
+            if (efi_mmap != NULL) {
+                gBS->FreePool(efi_mmap);
+                efi_mmap = NULL;
+            }
+            if (efi_copy != NULL) {
+                gBS->FreePool(efi_copy);
+                efi_copy = NULL;
+            }
+            efi_mmap_alloc = efi_mmap_size + 4096;
+            status = gBS->AllocatePool(EfiLoaderData, efi_mmap_alloc,
+                                       (void **)&efi_mmap);
+            if (status) {
+                goto fail;
+            }
+            efi_copy_alloc = CHECKED_MUL(efi_mmap_alloc, (UINTN)2, goto fail);
+            status = gBS->AllocatePool(EfiLoaderData, efi_copy_alloc,
+                                       (void **)&efi_copy);
+            if (status) {
+                goto fail;
+            }
+            continue;
+        }
+        if (status) {
+            goto fail;
+        }
+
+        // Be gone, UEFI!
+        status = gBS->ExitBootServices(efi_image_handle, efi_mmap_key);
+        if (status == EFI_SUCCESS) {
+            break;
+        }
+        // Map key invalidated by an allocation - retry.
     }
+
+    const size_t EFI_COPY_MAX_ENTRIES = efi_copy_alloc / efi_desc_size;
 
 #if defined(__x86_64__) || defined(__i386__)
     asm volatile ("cli" ::: "memory");

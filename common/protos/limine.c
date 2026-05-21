@@ -16,6 +16,7 @@
 #include <lib/fdt.h>
 #include <libfdt.h>
 #include <lib/uri.h>
+#include <lib/tpm.h>
 #include <sys/smp.h>
 #include <sys/cpu.h>
 #include <sys/gdt.h>
@@ -29,7 +30,6 @@
 #include <fs/file.h>
 #include <mm/pmm.h>
 #include <pxe/tftp.h>
-#include <crypt/kernel_verify.h>
 #include <drivers/edid.h>
 #include <drivers/vga_textmode.h>
 #include <lib/rand.h>
@@ -43,7 +43,7 @@ enum executable_format {
 };
 
 static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kernel_size) {
-    if (elf_bits(kernel) != -1) {
+    if (elf_bits(kernel, kernel_size) != -1) {
         return EXECUTABLE_FORMAT_ELF;
     } else if (pe_bits(kernel, kernel_size) != -1) {
         return EXECUTABLE_FORMAT_PE;
@@ -52,7 +52,7 @@ static enum executable_format detect_kernel_format(uint8_t *kernel, size_t kerne
     }
 }
 
-#define SUPPORTED_BASE_REVISION 5
+#define SUPPORTED_BASE_REVISION 6
 
 #define MAX_REQUESTS 128
 
@@ -80,7 +80,7 @@ static uint64_t get_hhdm_span_top(int base_revision) {
 
         uint64_t base = memmap[i].base;
         uint64_t length = memmap[i].length;
-        uint64_t top = base + length;
+        uint64_t top = CHECKED_ADD(base, length, continue);
 
         if (base_revision < 3 && base < 0x100000000) {
             base = 0x100000000;
@@ -90,7 +90,7 @@ static uint64_t get_hhdm_span_top(int base_revision) {
             continue;
         }
 
-        uint64_t aligned_top = ALIGN_UP(top, 0x40000000);
+        uint64_t aligned_top = ALIGN_UP(top, 0x40000000, continue);
 
         if (aligned_top > ret) {
             ret = aligned_top;
@@ -108,7 +108,7 @@ static pagemap_t build_identity_map(void) {
 
     size_t _memmap_entries = memmap_entries;
     struct memmap_entry *_memmap =
-        ext_mem_alloc(_memmap_entries * sizeof(struct memmap_entry));
+        ext_mem_alloc_counted(_memmap_entries, sizeof(struct memmap_entry));
     for (size_t i = 0; i < _memmap_entries; i++) {
         _memmap[i] = memmap[i];
     }
@@ -124,7 +124,7 @@ static pagemap_t build_identity_map(void) {
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
-        uint64_t top    = base + length;
+        uint64_t top    = CHECKED_ADD(base, length, continue);
 
         if (base < 0x100000000) {
             base = 0x100000000;
@@ -135,7 +135,7 @@ static pagemap_t build_identity_map(void) {
         }
 
         uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
-        uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
+        uint64_t aligned_top    = ALIGN_UP(top, 0x1000, continue);
         uint64_t aligned_length = aligned_top - aligned_base;
 
         map_pages(pagemap, aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
@@ -144,9 +144,9 @@ static pagemap_t build_identity_map(void) {
     return pagemap;
 }
 
-void limine_memcpy_to_64_asm(int paging_mode, void *pagemap, uint64_t dst, void *src, size_t count);
+void limine_memcpy_64_asm(int paging_mode, void *pagemap, uint64_t dst, uint64_t src, size_t count);
 
-static void limine_memcpy_to_64(uint64_t dst, void *src, size_t count) {
+static void limine_ensure_identity_map(pagemap_t *out) {
     static bool identity_map_ready = false;
     static pagemap_t identity_map;
 
@@ -154,8 +154,19 @@ static void limine_memcpy_to_64(uint64_t dst, void *src, size_t count) {
         identity_map = build_identity_map();
         identity_map_ready = true;
     }
+    *out = identity_map;
+}
 
-    limine_memcpy_to_64_asm(paging_mode, identity_map.top_level, dst, src, count);
+static void limine_memcpy_to_64(uint64_t dst, void *src, size_t count) {
+    pagemap_t identity_map;
+    limine_ensure_identity_map(&identity_map);
+    limine_memcpy_64_asm(paging_mode, identity_map.top_level, dst, (uint64_t)(uintptr_t)src, count);
+}
+
+static void limine_memcpy_from_64(void *dst, uint64_t src, size_t count) {
+    pagemap_t identity_map;
+    limine_ensure_identity_map(&identity_map);
+    limine_memcpy_64_asm(paging_mode, identity_map.top_level, (uint64_t)(uintptr_t)dst, src, count);
 }
 #endif
 
@@ -198,16 +209,22 @@ static pagemap_t build_pagemap(int base_revision,
 
     size_t _memmap_entries = memmap_entries;
     struct memmap_entry *_memmap =
-        ext_mem_alloc(_memmap_entries * sizeof(struct memmap_entry));
+        ext_mem_alloc_counted(_memmap_entries, sizeof(struct memmap_entry));
     for (size_t i = 0; i < _memmap_entries; i++)
         _memmap[i] = memmap[i];
 
-    // Map all free memory regions to the higher half direct map offset
+    // Map all free memory regions to the higher half direct map offset.
+    // Coalesce contiguous entries into single map_pages calls to maximise
+    // the use of large pages (2MiB/1GiB).
+    uint64_t pending_base = 0, pending_top = 0;
+
     for (size_t i = 0; i < _memmap_entries; i++) {
+        uint64_t aligned_base = 0, aligned_top = 0;
+
         if (((base_revision >= 1 && base_revision < 3) || base_revision >= 4) && (
             _memmap[i].type == MEMMAP_RESERVED
          || _memmap[i].type == MEMMAP_BAD_MEMORY)) {
-            continue;
+            goto flush;
         }
 
         if (base_revision == 3 && (
@@ -216,29 +233,47 @@ static pagemap_t build_pagemap(int base_revision,
          && _memmap[i].type != MEMMAP_KERNEL_AND_MODULES
          && _memmap[i].type != MEMMAP_FRAMEBUFFER
          && _memmap[i].type != MEMMAP_EFI_RECLAIMABLE)) {
-            continue;
+            goto flush;
         }
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
-        uint64_t top    = base + length;
+        uint64_t top    = CHECKED_ADD(base, length, goto flush);
 
         if (base_revision < 3 && base < 0x100000000) {
             base = 0x100000000;
         }
 
         if (base >= top) {
+            goto flush;
+        }
+
+        aligned_base = ALIGN_DOWN(base, 0x1000);
+        aligned_top  = ALIGN_UP(top, 0x1000, continue);
+
+        if (aligned_base == pending_top && pending_top != 0) {
+            pending_top = aligned_top;
             continue;
         }
 
-        uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
-        uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
-        uint64_t aligned_length = aligned_top - aligned_base;
-
-        if (base_revision == 0) {
-            map_pages(pagemap, aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
+flush:
+        if (pending_top > pending_base) {
+            uint64_t len = pending_top - pending_base;
+            if (base_revision == 0) {
+                map_pages(pagemap, pending_base, pending_base, VMM_FLAG_WRITE, len);
+            }
+            map_pages(pagemap, direct_map_offset + pending_base, pending_base, VMM_FLAG_WRITE, len);
         }
-        map_pages(pagemap, direct_map_offset + aligned_base, aligned_base, VMM_FLAG_WRITE, aligned_length);
+        pending_base = aligned_base;
+        pending_top = aligned_top;
+    }
+
+    if (pending_top > pending_base) {
+        uint64_t len = pending_top - pending_base;
+        if (base_revision == 0) {
+            map_pages(pagemap, pending_base, pending_base, VMM_FLAG_WRITE, len);
+        }
+        map_pages(pagemap, direct_map_offset + pending_base, pending_base, VMM_FLAG_WRITE, len);
     }
 
     // Map the framebuffer with appropriate permissions
@@ -249,10 +284,10 @@ static pagemap_t build_pagemap(int base_revision,
 
         uint64_t base   = _memmap[i].base;
         uint64_t length = _memmap[i].length;
-        uint64_t top    = base + length;
+        uint64_t top    = CHECKED_ADD(base, length, continue);
 
         uint64_t aligned_base   = ALIGN_DOWN(base, 0x1000);
-        uint64_t aligned_top    = ALIGN_UP(top, 0x1000);
+        uint64_t aligned_top    = ALIGN_UP(top, 0x1000, continue);
         uint64_t aligned_length = aligned_top - aligned_base;
 
         if (base_revision == 0) {
@@ -294,12 +329,12 @@ extern symbol limine_spinup_32;
 
 #define LIMINE_TCR(tsz, pa) ( ((uint64_t)(pa) << 32)         /* Intermediate address size */  \
                             | ((uint64_t)2 << 30)            /* TTBR1 4K granule */           \
-                            | ((uint64_t)2 << 28)            /* TTBR1 Outer shareable */      \
+                            | ((uint64_t)3 << 28)            /* TTBR1 Inner shareable */      \
                             | ((uint64_t)1 << 26)            /* TTBR1 Outer WB RW-Allocate */ \
                             | ((uint64_t)1 << 24)            /* TTBR1 Inner WB RW-Allocate */ \
                             | ((uint64_t)(tsz) << 16)        /* Address bits in TTBR1 */      \
                                                              /* TTBR0 4K granule */           \
-                            | ((uint64_t)2 << 12)            /* TTBR0 Outer shareable */      \
+                            | ((uint64_t)3 << 12)            /* TTBR0 Inner shareable */      \
                             | ((uint64_t)1 << 10)            /* TTBR0 Outer WB RW-Allocate */ \
                             | ((uint64_t)1 << 8)             /* TTBR0 Inner WB RW-Allocate */ \
                             | ((uint64_t)(tsz) << 0))        /* Address bits in TTBR0 */
@@ -344,7 +379,7 @@ static uint64_t reported_addr_64(uint64_t addr) {
     get_phys_addr__r; \
 })
 
-static struct limine_file get_file(struct file_handle *file, char *cmdline, bool kernel) {
+static struct limine_file get_file(struct file_handle *file, char *cmdline) {
     struct limine_file ret = {0};
 
     if (file->pxe) {
@@ -382,15 +417,14 @@ static struct limine_file get_file(struct file_handle *file, char *cmdline, bool
 
     ret.path = reported_addr(path);
 
-    void *freadall_ret = freadall_mode(file, MEMMAP_KERNEL_AND_MODULES, !kernel
 #if defined (__i386__)
-        , limine_memcpy_to_64
-#endif
-    );
-#if defined (__i386__)
-    ret.address = kernel ? reported_addr(freadall_ret) : reported_addr_64(*(uint64_t *)freadall_ret);
+    if (file->is_high_mem) {
+        ret.address = reported_addr_64(file->load_addr_64);
+    } else {
+        ret.address = reported_addr(file->fd);
+    }
 #else
-    ret.address = reported_addr(freadall_ret);
+    ret.address = reported_addr(file->fd);
 #endif
 
     ret.size = file->size;
@@ -423,8 +457,26 @@ static void *_get_request(uint64_t id[4]) {
 #define FEAT_END } while (0);
 
 noreturn void limine_load(char *config, char *cmdline) {
+#if defined (UEFI)
+    if (cmdline != NULL) {
+        tpm_measure(TPM_PCR_BOOT_AUTH, TPM_EV_IPL,
+                    cmdline, strlen(cmdline), "cmdline: ", cmdline);
+    }
+#endif
+
 #if defined (__x86_64__) || defined (__i386__)
     uint32_t eax, ebx, ecx, edx;
+#endif
+
+#if defined (__aarch64__)
+    // Booting at EL2 without VHE is not supported.
+    if (current_el() == 2) {
+        uint64_t mmfr1;
+        asm volatile ("mrs %0, id_aa64mmfr1_el1" : "=r"(mmfr1));
+        if (!((mmfr1 >> 8) & 0xF)) {
+            panic(true, "limine: Booting at EL2 without VHE support is not supported");
+        }
+    }
 #endif
 
     char *kernel_path = config_get_value(config, 0, "PATH");
@@ -438,13 +490,21 @@ noreturn void limine_load(char *config, char *cmdline) {
     print("limine: Loading executable `%#`...\n", kernel_path);
 
     struct file_handle *kernel_file;
-    if ((kernel_file = uri_open(kernel_path)) == NULL)
+    if ((kernel_file = uri_open(kernel_path, MEMMAP_BOOTLOADER_RECLAIMABLE, false
+#if defined (__i386__)
+        , NULL, NULL
+#endif
+    )) == NULL)
         panic(true, "limine: Failed to open executable with path `%#`. Is the path correct?", kernel_path);
 
     char *k_path_copy = ext_mem_alloc(strlen(kernel_path) + 1);
     strcpy(k_path_copy, kernel_path);
     char *k_resource = NULL, *k_root = NULL, *k_path = NULL, *k_hash = NULL;
     uri_resolve(k_path_copy, &k_resource, &k_root, &k_path, &k_hash);
+    // Strip the gzip `$` marker so reuse for module paths doesn't double-prefix.
+    if (k_resource[0] == '$') {
+        k_resource++;
+    }
     // Copy k_resource and k_root since uri_resolve returns pointers to a static
     // buffer that gets overwritten by subsequent uri_open/uri_resolve calls
     k_resource = strdup(k_resource);
@@ -461,14 +521,13 @@ noreturn void limine_load(char *config, char *cmdline) {
         k_path[i] = 0;
     }
 
-    uint8_t *kernel = freadall(kernel_file, MEMMAP_BOOTLOADER_RECLAIMABLE);
-    size_t kernel_size = kernel_file->size;
+    uint8_t *kernel = kernel_file->fd;
 
-    // Post-quantum signature verification
-    kernel_verify_init();
-    if (!kernel_verify_and_decrypt(&kernel, &kernel_size, config)) {
-        panic(true, "limine: Kernel signature verification failed!");
-    }
+#if defined (UEFI)
+    tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "path: ", kernel_path);
+    tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                kernel, kernel_file->size, "path: ", kernel_path);
+#endif
 
     char *kaslr_s = config_get_value(config, 0, "KASLR");
     bool kaslr = false;
@@ -519,7 +578,7 @@ noreturn void limine_load(char *config, char *cmdline) {
     bool base_revision_found = false;
     uint64_t *base_rev_p1_ptr = NULL;
     uint64_t *base_rev_p2_ptr = NULL;
-    for (size_t i = 0; i < ALIGN_DOWN(image_size_before_bss, 8); i += 8) {
+    for (size_t i = 0; i + 32 <= image_size_before_bss; i += 8) {
         uint64_t *p = (void *)(uintptr_t)physical_base + i;
 
         // Check if start marker hit
@@ -559,9 +618,15 @@ noreturn void limine_load(char *config, char *cmdline) {
         *base_rev_p2_ptr = 0;
     }
 
+#if defined (__aarch64__)
+    if (base_revision < 6) {
+        panic(true, "limine: Base revision %u is no longer supported for aarch64 (minimum: 6)", base_revision);
+    }
+#endif
+
     // Load requests
     uint64_t *limine_reqs = NULL;
-    requests = ext_mem_alloc(MAX_REQUESTS * sizeof(void *));
+    requests = ext_mem_alloc_counted(MAX_REQUESTS, sizeof(void *));
     requests_count = 0;
     if (base_revision == 0 && kernel_format == EXECUTABLE_FORMAT_ELF && elf64_load_section(kernel, kernel_file->size, &limine_reqs, ".limine_reqs", 0, slide)) {
         for (size_t i = 0; ; i++) {
@@ -571,12 +636,16 @@ noreturn void limine_load(char *config, char *cmdline) {
             if (limine_reqs[i] == 0) {
                 break;
             }
+            if (limine_reqs[i] < virtual_base
+             || limine_reqs[i] - virtual_base >= image_size_before_bss) {
+                panic(true, "limine: .limine_reqs entry outside kernel image");
+            }
             requests[i] = (void *)(uintptr_t)((limine_reqs[i] - virtual_base) + physical_base);
             requests_count++;
         }
     } else {
         uint64_t common_magic[2] = { LIMINE_COMMON_MAGIC };
-        for (size_t i = 0; i < ALIGN_DOWN(image_size_before_bss, 8); i += 8) {
+        for (size_t i = 0; i + 32 <= image_size_before_bss; i += 8) {
             uint64_t *p = (void *)(uintptr_t)physical_base + i;
 
             // Check if start marker hit
@@ -892,7 +961,7 @@ FEAT_END
 #endif
 
     struct limine_file *kf = ext_mem_alloc(sizeof(struct limine_file));
-    *kf = get_file(kernel_file, cmdline, true);
+    *kf = get_file(kernel_file, cmdline);
     fclose(kernel_file);
 
     // Entry point feature
@@ -1080,42 +1149,6 @@ FEAT_START
 FEAT_END
 #endif
 
-    // Device tree blob feature
-FEAT_START
-    struct limine_dtb_request *dtb_request = get_request(LIMINE_DTB_REQUEST_ID);
-    if (dtb_request == NULL) {
-        break; // next feature
-    }
-
-    void *dtb = get_device_tree_blob(config, 0);
-
-    if (dtb) {
-        // Delete all /memory@... nodes.
-        // The executable must use the given UEFI memory map instead.
-        while (true) {
-            int offset = fdt_subnode_offset_namelen(dtb, 0, "memory@", 7);
-
-            if (offset == -FDT_ERR_NOTFOUND) {
-                break;
-            }
-
-            if (offset < 0) {
-                panic(true, "limine: failed to find node: '%s'", fdt_strerror(offset));
-            }
-
-            int ret = fdt_del_node(dtb, offset);
-            if (ret < 0) {
-                panic(true, "limine: failed to delete memory node: '%s'", fdt_strerror(ret));
-            }
-        }
-
-        struct limine_dtb_response *dtb_response =
-            ext_mem_alloc(sizeof(struct limine_dtb_response));
-        dtb_response->dtb_ptr = reported_addr(dtb);
-        dtb_request->response = reported_addr(dtb_response);
-    }
-FEAT_END
-
     // Stack size
     uint64_t stack_size = 65536;
 FEAT_START
@@ -1176,7 +1209,7 @@ FEAT_START
 
     module_response->revision = 2;
 
-    struct limine_file *modules = ext_mem_alloc(module_count * sizeof(struct limine_file));
+    struct limine_file *modules = ext_mem_alloc_counted(module_count, sizeof(struct limine_file));
 
     size_t final_module_count = 0;
     for (size_t i = 0; i < module_count; i++) {
@@ -1192,23 +1225,24 @@ FEAT_START
             module_path = (char *)get_phys_addr(internal_module->path);
             module_cmdline = (char *)get_phys_addr(internal_module->string);
 
-            if (internal_module->flags & LIMINE_INTERNAL_MODULE_COMPRESSED) {
-                panic(true, "limine: Compressed internal modules no longer supported");
-            }
-
+            bool module_compressed = internal_module->flags & LIMINE_INTERNAL_MODULE_COMPRESSED;
+            
             // Validate path length to prevent buffer overflow
             size_t k_resource_len = strlen(k_resource);
             size_t k_root_len = strlen(k_root);
             size_t module_path_len = strlen(module_path);
             size_t k_path_len = strlen(k_path);
-            // Format: k_resource + "(" + k_root + "):" + k_path + "/" + module_path + null
-            size_t total_len = k_resource_len + 1 + k_root_len + 2 + k_path_len + 1 + module_path_len + 1;
+            // Format: ["$"] + k_resource + "(" + k_root + "):" + k_path + "/" + module_path + null
+            size_t total_len = (module_compressed ? 1 : 0) + k_resource_len + 1 + k_root_len + 2 + k_path_len + 1 + module_path_len + 1;
             if (total_len > 1024) {
                 panic(true, "limine: Internal module path too long");
             }
 
             char *module_path_abs = ext_mem_alloc(1024);
             char *module_path_abs_p = module_path_abs;
+            if (module_compressed) {
+                *module_path_abs_p++ = '$';
+            }
             memcpy(module_path_abs_p, k_resource, k_resource_len);
             module_path_abs_p += k_resource_len;
             *module_path_abs_p++ = '(';
@@ -1247,7 +1281,17 @@ FEAT_START
         print("limine: Loading module `%#`...\n", module_path);
 
         struct file_handle *f;
-        if ((f = uri_open(module_path)) == NULL) {
+        // On IA-32 under measured boot, refuse >4 GiB allocations: firmware's
+        // HashLogExtendEvent can't reach them, so we'd be unable to measure
+        // the module. Elsewhere, the firmware can address all of physical
+        // memory and high allocations remain measurable.
+        if ((f = uri_open(module_path, MEMMAP_KERNEL_AND_MODULES,
+#if defined (__i386__)
+            !measured_boot, limine_memcpy_to_64, limine_memcpy_from_64
+#else
+            true
+#endif
+        )) == NULL) {
             if (module_required) {
                 panic(true, "limine: Failed to open module with path `%#`. Is the path correct?", module_path);
             }
@@ -1257,17 +1301,23 @@ FEAT_START
             }
             continue;
         }
+        struct limine_file *l = &modules[final_module_count++];
+        *l = get_file(f, module_cmdline);
+
+#if defined (UEFI)
+        tpm_measure_path(TPM_PCR_BOOT_AUTH, TPM_EV_IPL, "module_path: ", module_path);
+        tpm_measure(TPM_PCR_LOADED_IMAGES, TPM_EV_IPL,
+                    f->fd, f->size, "module_path: ", module_path);
+#endif
+
         if (module_path_allocated) {
             pmm_free(module_path, 1024);
         }
 
-        struct limine_file *l = &modules[final_module_count++];
-        *l = get_file(f, module_cmdline, false);
-
         fclose(f);
     }
 
-    uint64_t *modules_list = ext_mem_alloc(final_module_count * sizeof(uint64_t));
+    uint64_t *modules_list = ext_mem_alloc_counted(final_module_count, sizeof(uint64_t));
     for (size_t i = 0; i < final_module_count; i++) {
         modules_list[i] = reported_addr(&modules[i]);
     }
@@ -1276,6 +1326,42 @@ FEAT_START
     module_response->modules = reported_addr(modules_list);
 
     module_request->response = reported_addr(module_response);
+FEAT_END
+
+    // Device tree blob feature
+FEAT_START
+    struct limine_dtb_request *dtb_request = get_request(LIMINE_DTB_REQUEST_ID);
+    if (dtb_request == NULL) {
+        break; // next feature
+    }
+
+    void *dtb = get_device_tree_blob(config, 0, true);
+
+    if (dtb) {
+        // Delete all /memory@... nodes.
+        // The executable must use the given UEFI memory map instead.
+        while (true) {
+            int offset = fdt_subnode_offset_namelen(dtb, 0, "memory@", 7);
+
+            if (offset == -FDT_ERR_NOTFOUND) {
+                break;
+            }
+
+            if (offset < 0) {
+                panic(true, "limine: failed to find node: '%s'", fdt_strerror(offset));
+            }
+
+            int ret = fdt_del_node(dtb, offset);
+            if (ret < 0) {
+                panic(true, "limine: failed to delete memory node: '%s'", fdt_strerror(ret));
+            }
+        }
+
+        struct limine_dtb_response *dtb_response =
+            ext_mem_alloc(sizeof(struct limine_dtb_response));
+        dtb_response->dtb_ptr = reported_addr(dtb);
+        dtb_request->response = reported_addr(dtb_response);
+    }
 FEAT_END
 
     size_t req_width = 0, req_height = 0, req_bpp = 0;
@@ -1290,16 +1376,77 @@ FEAT_END
 
     term_notready();
 
-    fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp);
+    bool preserve_screen = get_request(LIMINE_FLANTERM_FB_INIT_PARAMS_REQUEST_ID) != NULL;
+    fb_init(&fbs, &fbs_count, req_width, req_height, req_bpp, preserve_screen);
     if (fbs_count == 0) {
         goto no_fb;
     }
 
     for (size_t i = 0; i < fbs_count; i++) {
-        memmap_alloc_range(fbs[i].framebuffer_addr,
+        if (!memmap_alloc_range(fbs[i].framebuffer_addr,
                            (uint64_t)fbs[i].framebuffer_pitch * fbs[i].framebuffer_height,
-                           MEMMAP_FRAMEBUFFER, 0, false, false, true);
+                           MEMMAP_FRAMEBUFFER, 0, false, false, true)) {
+            panic(true, "limine: Failed to register framebuffer in memory map");
+        }
     }
+
+    // Check for page-level overlaps between framebuffer and other memory regions.
+    // The framebuffer is mapped with a different caching type, so overlapping pages
+    // must be resolved.
+    for (size_t i = 0; i < memmap_entries; i++) {
+        if (memmap[i].type != MEMMAP_FRAMEBUFFER) {
+            continue;
+        }
+
+        uint64_t fb_base = memmap[i].base;
+        uint64_t fb_top = CHECKED_ADD(fb_base, memmap[i].length, continue);
+        uint64_t fb_aligned_base = ALIGN_DOWN(fb_base, 4096);
+        uint64_t fb_aligned_top = ALIGN_UP(fb_top, 4096, continue);
+
+        // No overshoot means no possible overlap.
+        if (fb_aligned_base == fb_base && fb_aligned_top == fb_top) {
+            continue;
+        }
+
+        for (size_t j = 0; j < memmap_entries; j++) {
+            if (j == i || memmap[j].length == 0
+             || memmap[j].type == MEMMAP_FRAMEBUFFER) {
+                continue;
+            }
+
+            uint64_t region_base = memmap[j].base;
+            uint64_t region_top = CHECKED_ADD(region_base, memmap[j].length, continue);
+
+            // Check if this region overlaps with the framebuffer's page-aligned extent.
+            if (region_top <= fb_aligned_base || region_base >= fb_aligned_top) {
+                continue;
+            }
+
+            // There is a page-level overlap. Only USABLE and RESERVED regions
+            // can be trimmed; everything else describes firmware- or
+            // kernel-asserted content that we must not silently shrink.
+            if (memmap[j].type != MEMMAP_USABLE
+             && memmap[j].type != MEMMAP_RESERVED) {
+                panic(false, "limine: Framebuffer page-level overlap with non-trimmable memory type %x", memmap[j].type);
+            }
+
+            // Trim the region to not overlap with the framebuffer's
+            // page-aligned extent.
+            if (region_base < fb_aligned_base && region_top > fb_aligned_base) {
+                // Region extends before the framebuffer - trim end.
+                memmap[j].length = fb_aligned_base - region_base;
+            } else if (region_base < fb_aligned_top && region_top > fb_aligned_top) {
+                // Region extends after the framebuffer - trim start.
+                memmap[j].length = region_top - fb_aligned_top;
+                memmap[j].base = fb_aligned_top;
+            } else {
+                // Region is entirely within the framebuffer's page-aligned extent - zero it.
+                memmap[j].length = 0;
+            }
+        }
+    }
+
+    struct limine_framebuffer *fbp = NULL;
 
     // Framebuffer feature
 FEAT_START
@@ -1312,17 +1459,17 @@ FEAT_START
         break;
     }
 
-    struct limine_framebuffer *fbp = ext_mem_alloc(fbs_count * sizeof(struct limine_framebuffer));
+    fbp = ext_mem_alloc_counted(fbs_count, sizeof(struct limine_framebuffer));
 
     struct limine_framebuffer_response *framebuffer_response =
         ext_mem_alloc(sizeof(struct limine_framebuffer_response));
 
     framebuffer_response->revision = 1;
 
-    uint64_t *fb_list = ext_mem_alloc(fbs_count * sizeof(uint64_t));
+    uint64_t *fb_list = ext_mem_alloc_counted(fbs_count, sizeof(uint64_t));
 
     for (size_t i = 0; i < fbs_count; i++) {
-        uint64_t *modes_list = ext_mem_alloc(fbs[i].mode_count * sizeof(uint64_t));
+        uint64_t *modes_list = ext_mem_alloc_counted(fbs[i].mode_count, sizeof(uint64_t));
         for (size_t j = 0; j < fbs[i].mode_count; j++) {
             fbs[i].mode_list[j].memory_model = LIMINE_FRAMEBUFFER_RGB;
             modes_list[j] = reported_addr(&fbs[i].mode_list[j]);
@@ -1355,6 +1502,63 @@ FEAT_START
     framebuffer_response->framebuffers = reported_addr(fb_list);
 
     framebuffer_request->response = reported_addr(framebuffer_response);
+FEAT_END
+
+    // Flanterm FB init params feature
+FEAT_START
+    struct limine_flanterm_fb_init_params_request *fip_request = get_request(LIMINE_FLANTERM_FB_INIT_PARAMS_REQUEST_ID);
+    if (fip_request == NULL) {
+        break;
+    }
+
+    if (fbp == NULL || fbs_count == 0) {
+        break;
+    }
+
+    struct flanterm_params *fip_raw = ext_mem_alloc_counted(fbs_count, sizeof(struct flanterm_params));
+    size_t fip_count = gterm_prepare_flanterm_params(fbs, fbs_count, fip_raw, fbs_count);
+
+    struct limine_flanterm_fb_init_params *fip_entries =
+        ext_mem_alloc_counted(fbs_count, sizeof(struct limine_flanterm_fb_init_params));
+    uint64_t *fip_list = ext_mem_alloc_counted(fbs_count, sizeof(uint64_t));
+
+    size_t fip_idx = 0;
+    for (size_t i = 0; i < fbs_count; i++) {
+        struct limine_flanterm_fb_init_params *entry = &fip_entries[i];
+
+        if (fbs[i].framebuffer_bpp == 32 && fip_idx < fip_count) {
+            struct flanterm_params *raw = &fip_raw[fip_idx];
+
+            entry->canvas = raw->canvas != NULL ? reported_addr(raw->canvas) : 0;
+            entry->canvas_size = raw->canvas_size;
+            memcpy(entry->ansi_colours, raw->ansi_colours, sizeof(raw->ansi_colours));
+            memcpy(entry->ansi_bright_colours, raw->ansi_bright_colours, sizeof(raw->ansi_bright_colours));
+            entry->default_bg = raw->default_bg;
+            entry->default_fg = raw->default_fg;
+            entry->default_bg_bright = raw->default_bg_bright;
+            entry->default_fg_bright = raw->default_fg_bright;
+            entry->font = reported_addr(raw->font);
+            entry->font_width = raw->font_width;
+            entry->font_height = raw->font_height;
+            entry->font_spacing = raw->font_spacing;
+            entry->font_scale_x = raw->font_scale_x;
+            entry->font_scale_y = raw->font_scale_y;
+            entry->margin = raw->margin;
+            entry->rotation = raw->rotation;
+
+            fip_idx++;
+        }
+
+        fip_list[i] = reported_addr(entry);
+    }
+
+    struct limine_flanterm_fb_init_params_response *fip_response =
+        ext_mem_alloc(sizeof(struct limine_flanterm_fb_init_params_response));
+
+    fip_response->entry_count = fbs_count;
+    fip_response->entries = reported_addr(fip_list);
+
+    fip_request->response = reported_addr(fip_response);
 FEAT_END
 
 no_fb:
@@ -1449,8 +1653,26 @@ FEAT_END
     }
 #endif
 
+    // TSC Frequency
+FEAT_START
+    if (tsc_freq == 0) {
+        break;
+    }
+
+    struct limine_tsc_frequency_request *tsc_freq_request = get_request(LIMINE_TSC_FREQUENCY_REQUEST_ID);
+    if (tsc_freq_request == NULL) {
+        break;
+    }
+
+    struct limine_tsc_frequency_response *tsc_freq_response =
+        ext_mem_alloc(sizeof(struct limine_tsc_frequency_response));
+
+    tsc_freq_response->frequency = tsc_freq;
+
+    tsc_freq_request->response = reported_addr(tsc_freq_response);
+FEAT_END
+
     // Bootloader Performance
-    // rdtsc_usec depends on EFI boot services
 FEAT_START
     if (usec_at_bootloader_entry == 0) {
         break;
@@ -1471,6 +1693,33 @@ FEAT_START
 FEAT_END
 
 #if defined (UEFI)
+    // TPM event log feature. Processed last so GetEventLog snapshots a log
+    // containing all of Limine's extends; later extends would land in the
+    // final-events table instead.
+FEAT_START
+    struct limine_tpm_event_log_request *tpm_event_log_request = get_request(LIMINE_TPM_EVENT_LOG_REQUEST_ID);
+    if (tpm_event_log_request == NULL) {
+        break; // next feature
+    }
+
+    uint32_t tpm_event_log_format;
+    void *tpm_event_log_addr;
+    size_t tpm_event_log_size;
+    if (!tpm_get_event_log(&tpm_event_log_format, &tpm_event_log_addr, &tpm_event_log_size)) {
+        break; // no TPM or capture failed
+    }
+
+    struct limine_tpm_event_log_response *tpm_event_log_response =
+        ext_mem_alloc(sizeof(struct limine_tpm_event_log_response));
+
+    tpm_event_log_response->format = tpm_event_log_format;
+    tpm_event_log_response->size = tpm_event_log_size;
+    tpm_event_log_response->address = tpm_event_log_size > 0
+        ? reported_addr(tpm_event_log_addr) : 0;
+
+    tpm_event_log_request->response = reported_addr(tpm_event_log_response);
+FEAT_END
+
     efi_exit_boot_services();
 #endif
 
@@ -1514,6 +1763,11 @@ FEAT_END
     pagemap = build_pagemap(base_revision, nx_available, ranges, ranges_count,
                             physical_base, virtual_base, direct_map_offset);
 
+#if defined (__aarch64__)
+    // Enter at EL2 with VHE if we are at EL2 (VHE check done at function entry)
+    bool want_el2 = (current_el() == 2);
+#endif
+
     // MP
 FEAT_START
     struct limine_mp_request *mp_request = get_request(LIMINE_MP_REQUEST_ID);
@@ -1539,8 +1793,8 @@ FEAT_START
 #elif defined (__riscv)
     mp_info = init_smp(&cpu_count, pagemap, direct_map_offset);
 #elif defined (__loongarch64)
-    cpu_count = 0;
-    mp_info = NULL; // TODO: LoongArch MP
+    uint32_t bsp_phys_id;
+    mp_info = init_smp(&cpu_count, &bsp_phys_id, pagemap, direct_map_offset);
 #else
 #error Unknown architecture
 #endif
@@ -1563,6 +1817,9 @@ FEAT_START
             continue;
         }
 #elif defined (__loongarch64)
+        if (mp_info[i].phys_id == bsp_phys_id) {
+            continue;
+        }
 #else
 #error Unknown architecture
 #endif
@@ -1583,11 +1840,12 @@ FEAT_START
 #elif defined (__riscv)
     mp_response->bsp_hartid = bsp_hartid;
 #elif defined (__loongarch64)
+    mp_response->bsp_phys_id = bsp_phys_id;
 #else
 #error Unknown architecture
 #endif
 
-    uint64_t *mp_list = ext_mem_alloc(cpu_count * sizeof(uint64_t));
+    uint64_t *mp_list = ext_mem_alloc_counted(cpu_count, sizeof(uint64_t));
     for (size_t i = 0; i < cpu_count; i++) {
         mp_list[i] = reported_addr(&mp_info[i]);
     }
@@ -1635,7 +1893,7 @@ FEAT_START
     if (memmap_request != NULL) {
         memmap_response = ext_mem_alloc(sizeof(struct limine_memmap_response));
         _memmap = ext_mem_alloc(sizeof(struct limine_memmap_entry) * MEMMAP_MAX);
-        memmap_list = ext_mem_alloc(MEMMAP_MAX * sizeof(uint64_t));
+        memmap_list = ext_mem_alloc_counted(MEMMAP_MAX, sizeof(uint64_t));
     }
 
     size_t mmap_entries;
@@ -1734,10 +1992,17 @@ FEAT_END
 
     uint64_t reported_stack = reported_addr(stack);
 
-    enter_in_el1(entry_point, reported_stack, LIMINE_SCTLR, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa),
-                 (uint64_t)pagemap.top_level[0],
-                 (uint64_t)pagemap.top_level[1],
-                 direct_map_offset);
+    if (want_el2) {
+        enter_in_el2(entry_point, reported_stack, LIMINE_SCTLR, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa),
+                     (uint64_t)pagemap.top_level[0],
+                     (uint64_t)pagemap.top_level[1],
+                     direct_map_offset);
+    } else {
+        enter_in_el1(entry_point, reported_stack, LIMINE_SCTLR, LIMINE_MAIR(fb_attr), LIMINE_TCR(tsz, pa),
+                     (uint64_t)pagemap.top_level[0],
+                     (uint64_t)pagemap.top_level[1],
+                     direct_map_offset);
+    }
 #elif defined (__riscv)
     uint64_t reported_stack = reported_addr(stack);
     uint64_t satp = make_satp(pagemap.paging_mode, pagemap.top_level);

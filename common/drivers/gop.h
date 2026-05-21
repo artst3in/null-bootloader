@@ -9,7 +9,8 @@
 #include <lib/fb.h>
 
 void init_gop(struct fb_info **ret, size_t *_fbs_count,
-              uint64_t target_width, uint64_t target_height, uint16_t target_bpp);
+              uint64_t target_width, uint64_t target_height, uint16_t target_bpp,
+              bool preserve_screen);
 
 extern bool gop_force_16;
 
