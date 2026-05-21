@@ -186,6 +186,17 @@ struct madt_riscv_intc {
 #define MADT_RISCV_INTC_ENABLED        ((uint32_t)1 << 0)
 #define MADT_RISCV_INTC_ONLINE_CAPABLE ((uint32_t)1 << 1)
 
+struct madt_core_pic {
+    struct madt_header header;
+    uint8_t  version;
+    uint32_t acpi_processor_uid;
+    uint32_t core_id;
+    uint32_t flags;
+} __attribute__((packed));
+
+#define MADT_CORE_PIC_ENABLED        ((uint32_t)1 << 0)
+#define MADT_CORE_PIC_ONLINE_CAPABLE ((uint32_t)1 << 1)
+
 uint8_t acpi_checksum(void *ptr, size_t size);
 void   *acpi_get_rsdp(void);
 

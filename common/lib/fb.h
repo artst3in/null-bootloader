@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <drivers/edid.h>
 
 struct resolution {
@@ -36,8 +37,11 @@ extern struct fb_info *fb_fbs;
 extern size_t fb_fbs_count;
 
 void fb_init(struct fb_info **ret, size_t *_fbs_count,
-             uint64_t target_width, uint64_t target_height, uint16_t target_bpp);
+             uint64_t target_width, uint64_t target_height, uint16_t target_bpp,
+             bool preserve_screen);
 
 void fb_clear(struct fb_info *fb);
+
+void fb_flush(volatile void *base, size_t length);
 
 #endif

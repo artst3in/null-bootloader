@@ -9,6 +9,7 @@
 #include <lib/config.h>
 #include <lib/trace.h>
 #include <lib/bli.h>
+#include <lib/tpm.h>
 #include <sys/e820.h>
 #include <sys/a20.h>
 #include <sys/idt.h>
@@ -46,8 +47,8 @@ noreturn void uefi_entry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) 
 
 #if defined (__x86_64__)
     if ((uintptr_t)__slide >= 0x100000000) {
-        size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096);
-        size_t image_size_pages = ALIGN_UP((size_t)image_size, 4096) / 4096;
+        size_t image_size = ALIGN_UP((uintptr_t)__image_end - (uintptr_t)__image_base, 4096, panic(false, "Alignment overflow"));
+        size_t image_size_pages = ALIGN_UP((size_t)image_size, 4096, panic(false, "Alignment overflow")) / 4096;
         size_t new_base;
         for (new_base = 0x1000; new_base + (size_t)image_size < 0x100000000; new_base += 0x1000) {
             EFI_PHYSICAL_ADDRESS _new_base = (EFI_PHYSICAL_ADDRESS)new_base;
@@ -90,6 +91,24 @@ defer_error:
 #endif
 
     disk_create_index();
+
+    // Detect UEFI Secure Boot
+    {
+        EFI_GUID global_variable = EFI_GLOBAL_VARIABLE;
+        UINT8 secure_boot = 0;
+        UINTN sb_size = sizeof(secure_boot);
+        EFI_STATUS sb_status = gRT->GetVariable(L"SecureBoot", &global_variable, NULL, &sb_size, &secure_boot);
+        if (sb_status == EFI_SUCCESS && secure_boot == 1) {
+            UINT8 setup_mode = 0;
+            UINTN sm_size = sizeof(setup_mode);
+            EFI_STATUS sm_status = gRT->GetVariable(L"SetupMode", &global_variable, NULL, &sm_size, &setup_mode);
+            if (sm_status != EFI_SUCCESS || setup_mode == 0) {
+                secure_boot_active = true;
+            }
+        }
+    }
+
+    tpm_init();
 
     boot_volume = NULL;
 

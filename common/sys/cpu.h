@@ -170,24 +170,28 @@ static inline uint64_t tsc_freq_arch(void) {
 }
 
 #define rdrand(type) ({ \
-    type rdrand__ret; \
-    asm volatile ( \
-        "1: " \
-        "rdrand %0;" \
-        "jnc 1b;" \
-        : "=r" (rdrand__ret) \
-    ); \
+    type rdrand__ret = 0; \
+    for (int rdrand__i = 0; rdrand__i < 10; rdrand__i++) { \
+        bool rdrand__ok; \
+        asm volatile ( \
+            "rdrand %0; setc %1" \
+            : "=r" (rdrand__ret), "=qm" (rdrand__ok) \
+        ); \
+        if (rdrand__ok) break; \
+    } \
     rdrand__ret; \
 })
 
 #define rdseed(type) ({ \
-    type rdseed__ret; \
-    asm volatile ( \
-        "1: " \
-        "rdseed %0;" \
-        "jnc 1b;" \
-        : "=r" (rdseed__ret) \
-    ); \
+    type rdseed__ret = 0; \
+    for (int rdseed__i = 0; rdseed__i < 10; rdseed__i++) { \
+        bool rdseed__ok; \
+        asm volatile ( \
+            "rdseed %0; setc %1" \
+            : "=r" (rdseed__ret), "=qm" (rdseed__ok) \
+        ); \
+        if (rdseed__ok) break; \
+    } \
     rdseed__ret; \
 })
 
@@ -205,9 +209,8 @@ static inline uint64_t tsc_freq_arch(void) {
     typeof(*var) locked_read__ret = 0; \
     asm volatile ( \
         "lock xadd %0, %1" \
-        : "+r" (locked_read__ret) \
-        : "m" (*(var)) \
-        : "memory" \
+        : "+r" (locked_read__ret), "+m" (*(var)) \
+        :: "memory" \
     ); \
     locked_read__ret; \
 })
@@ -216,9 +219,8 @@ static inline uint64_t tsc_freq_arch(void) {
     __auto_type locked_write__ret = val; \
     asm volatile ( \
         "lock xchg %0, %1" \
-        : "+r" ((locked_write__ret)) \
-        : "m" (*(var)) \
-        : "memory" \
+        : "+r" ((locked_write__ret)), "+m" (*(var)) \
+        :: "memory" \
     ); \
 } while (0)
 
@@ -241,7 +243,7 @@ static inline uint64_t tsc_freq_arch(void) {
     asm volatile ( \
         "ldar %0, %1" \
         : "=r" (locked_read__ret) \
-        : "m" (*(var)) \
+        : "Q" (*(var)) \
         : "memory" \
     ); \
     locked_read__ret; \
@@ -375,6 +377,96 @@ void init_riscv(const char *config);
 
 #elif defined (__loongarch64)
 
+#define csr_read64(reg) ({ \
+    uint64_t csr_read64__ret; \
+    asm volatile ( \
+        "csrrd %0, %1" \
+        : "=r"(csr_read64__ret) \
+        : "i"(reg) \
+    ); \
+    csr_read64__ret; \
+})
+
+#define csr_write64(val, reg) do { \
+    __auto_type csr_write64__val = (val); \
+    asm volatile ( \
+        "csrwr %0, %1" \
+        : \
+        : "r"(csr_write64__val), "i"(reg) \
+        : "memory" \
+    ); \
+} while (0)
+
+#define csr_read32(reg) ((uint32_t)csr_read64(reg))
+
+#define csr_write32(val, reg) do { \
+    csr_write64((uint64_t)(val), reg); \
+} while (0)
+
+#define csr_xchg64(val, mask, reg) ({ \
+    uint64_t csr_xchg64__ret = (uint64_t)(val); \
+    uint64_t csr_xchg64__mask = (uint64_t)(mask); \
+    asm volatile ( \
+        "csrxchg %0, %1, %2" \
+        : "+r"(csr_xchg64__ret) \
+        : "r"(csr_xchg64__mask), "i"(reg) \
+        : "memory" \
+    ); \
+    csr_xchg64__ret; \
+})
+
+#define locked_read(var) ({ \
+    typeof(*var) locked_read__ret; \
+    asm volatile ( \
+        "ld.d %0, %1\n\t" \
+        "dbar 0" \
+        : "=r"(locked_read__ret) \
+        : "m"(*(var)) \
+        : "memory" \
+    ); \
+    locked_read__ret; \
+})
+
+static inline uint32_t iocsr_read32(uint64_t reg) {
+    uint32_t val;
+    asm volatile (
+        "iocsrrd.w %0, %1"
+        : "=r"(val)
+        : "r"(reg)
+        : "memory"
+    );
+    return val;
+}
+
+static inline void iocsr_write32(uint32_t val, uint64_t reg) {
+    asm volatile (
+        "iocsrwr.w %0, %1"
+        :
+        : "r"(val), "r"(reg)
+        : "memory"
+    );
+}
+
+static inline uint64_t iocsr_read64(uint64_t reg) {
+    uint64_t val;
+    asm volatile (
+        "iocsrrd.d %0, %1"
+        : "=r"(val)
+        : "r"(reg)
+        : "memory"
+    );
+    return val;
+}
+
+static inline void iocsr_write64(uint64_t val, uint64_t reg) {
+    asm volatile (
+        "iocsrwr.d %0, %1"
+        :
+        : "r"(val), "r"(reg)
+        : "memory"
+    );
+}
+
 static inline uint64_t rdtsc(void) {
     uint64_t v;
     asm volatile ("rdtime.d %0, $zero" : "=r" (v));
@@ -415,18 +507,30 @@ static inline uint64_t rdtsc_usec(void) {
 }
 
 static inline void stall(uint64_t us) {
-#if defined(BIOS)
-    if (tsc_freq == 0) {
-        // ~1 us per inb on ISA/LPC bus
-        for (uint64_t i = 0; i < us; i++) {
-            inb(0x80);
-        }
-        return;
-    }
-#endif
     uint64_t ticks = (tsc_freq * us + 999999) / 1000000;
     uint64_t next_stop = rdtsc() + ticks;
     while (rdtsc() < next_stop);
+}
+
+static inline const char *current_arch(void) {
+#if defined (__x86_64__)
+    return "x86-64";
+#elif defined (__i386__)
+    uint32_t eax, ebx, ecx, edx;
+    if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
+        return "ia-32";
+    } else {
+        return "x86-64";
+    }
+#elif defined (__aarch64__)
+    return "aarch64";
+#elif defined (__riscv)
+    return "riscv64";
+#elif defined (__loongarch64)
+    return "loongarch64";
+#else
+#error "Unspecified architecture"
+#endif
 }
 
 #endif

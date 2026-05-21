@@ -9,25 +9,16 @@
 #include <fs/file.h>
 #include <lib/print.h>
 #include <pxe/tftp.h>
-#include <crypt/sha512.h>
-
-// Config hash length (use first 32 bytes of SHA-512)
-#define CONFIG_HASH_LEN 32
-
-// Helper to compute truncated SHA-512 (first 32 bytes)
-static void sha512_truncated(uint8_t *out, size_t outlen, const uint8_t *data, size_t len) {
-    uint8_t full[SHA512_DIGEST_SIZE];
-    sha512(full, data, len);
-    memcpy(out, full, outlen < SHA512_DIGEST_SIZE ? outlen : SHA512_DIGEST_SIZE);
-}
+#include <crypt/blake2b.h>
+#include <lib/tpm.h>
 #include <sys/cpu.h>
 
-#define CONFIG_B3SUM_SIGNATURE "++CONFIG_B3SUM_SIGNATURE++"
-#define CONFIG_B3SUM_EMPTY "0000000000000000000000000000000000000000000000000000000000000000"
+#define CONFIG_B2SUM_SIGNATURE "++CONFIG_B2SUM_SIGNATURE++"
+#define CONFIG_B2SUM_EMPTY "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
-const char *config_b3sum = CONFIG_B3SUM_SIGNATURE CONFIG_B3SUM_EMPTY;
+const char *config_b2sum = CONFIG_B2SUM_SIGNATURE CONFIG_B2SUM_EMPTY;
 
-static bool config_get_entry_name(char *ret, size_t index, size_t limit);
+static char *config_get_entry_name(size_t index);
 static char *config_get_entry(size_t *size, size_t index);
 
 #define SEPARATOR '\n'
@@ -36,6 +27,18 @@ bool config_ready = false;
 no_unwind bool bad_config = false;
 
 static char *config_addr;
+
+#if defined (UEFI)
+// Snapshot of the on-disk config bytes, kept across the in-place mutations
+// in init_config so the menu can measure them once measured_boot is known.
+static char *config_raw_addr;
+static size_t config_raw_size;
+
+const char *config_get_raw(size_t *size_out) {
+    *size_out = config_raw_size;
+    return config_raw_addr;
+}
+#endif
 
 #if defined (UEFI)
 
@@ -149,6 +152,9 @@ int init_config_disk(struct volume *part) {
 opened:
     case_insensitive_fopen = old_cif;
 
+    if (f->size > SIZE_MAX - 2) {
+        panic(false, "Config file too large");
+    }
     size_t config_size = f->size + 2;
     config_addr = ext_mem_alloc(config_size);
 
@@ -259,23 +265,30 @@ bool init_config_smbios(void) {
 #define DIRECT_CHILD   0
 #define INDIRECT_CHILD 1
 
-static int is_child(char *buf, size_t limit,
-                    size_t current_depth, size_t index) {
-    if (!config_get_entry_name(buf, index, limit))
+static int is_child(size_t current_depth, size_t index) {
+    char *buf = config_get_entry_name(index);
+    if (buf == NULL)
         return NOT_CHILD;
-    if (strlen(buf) < current_depth + 1)
-        return NOT_CHILD;
-    for (size_t j = 0; j < current_depth; j++)
-        if (buf[j] != '/')
-            return NOT_CHILD;
-    if (buf[current_depth] == '/')
-        return INDIRECT_CHILD;
-    return DIRECT_CHILD;
+    int ret;
+    if (strlen(buf) < current_depth + 1) {
+        ret = NOT_CHILD;
+    } else {
+        ret = DIRECT_CHILD;
+        for (size_t j = 0; j < current_depth; j++) {
+            if (buf[j] != '/') {
+                ret = NOT_CHILD;
+                break;
+            }
+        }
+        if (ret == DIRECT_CHILD && buf[current_depth] == '/')
+            ret = INDIRECT_CHILD;
+    }
+    pmm_free(buf, strlen(buf) + 1);
+    return ret;
 }
 
-static bool is_directory(char *buf, size_t limit,
-                         size_t current_depth, size_t index) {
-    switch (is_child(buf, limit, current_depth + 1, index + 1)) {
+static bool is_directory(size_t current_depth, size_t index) {
+    switch (is_child(current_depth + 1, index + 1)) {
         default:
         case NOT_CHILD:
             return false;
@@ -287,14 +300,19 @@ static bool is_directory(char *buf, size_t limit,
     }
 }
 
+#define MAX_MENU_NESTING 64
+
 static struct menu_entry *create_menu_tree(struct menu_entry *parent,
                                            size_t current_depth, size_t index) {
+    if (current_depth > MAX_MENU_NESTING) {
+        bad_config = true;
+        panic(true, "config: Menu nesting too deep (max %u)", MAX_MENU_NESTING);
+    }
+
     struct menu_entry *root = NULL, *prev = NULL;
 
     for (size_t i = index; ; i++) {
-        static char name[64];
-
-        switch (is_child(name, 64, current_depth, i)) {
+        switch (is_child(current_depth, i)) {
             case NOT_CHILD:
                 return root;
             case INDIRECT_CHILD:
@@ -308,7 +326,7 @@ static struct menu_entry *create_menu_tree(struct menu_entry *parent,
         if (root == NULL)
             root = entry;
 
-        config_get_entry_name(name, i, 64);
+        char *name = config_get_entry_name(i);
 
         bool default_expanded = name[current_depth] == '+';
 
@@ -317,12 +335,8 @@ static struct menu_entry *create_menu_tree(struct menu_entry *parent,
             n++;
         }
 
-        size_t n_len = strlen(n);
-        if (n_len >= sizeof(entry->name)) {
-            n_len = sizeof(entry->name) - 1;
-        }
-        memcpy(entry->name, n, n_len);
-        entry->name[n_len] = 0;
+        entry->name = strdup(n);
+        pmm_free(name, strlen(name) + 1);
         entry->parent = parent;
 
         size_t entry_size;
@@ -331,7 +345,7 @@ static struct menu_entry *create_menu_tree(struct menu_entry *parent,
         memcpy(entry->body, config_entry, entry_size);
         entry->body[entry_size] = 0;
 
-        if (is_directory(name, 64, current_depth, i)) {
+        if (is_directory(current_depth, i)) {
             entry->sub = create_menu_tree(entry, current_depth + 1, i + 1);
             entry->expanded = default_expanded;
         }
@@ -358,23 +372,38 @@ struct macro {
 static struct macro *macros = NULL;
 
 int init_config(size_t config_size) {
-    config_b3sum += sizeof(CONFIG_B3SUM_SIGNATURE) - 1;
+    config_b2sum += sizeof(CONFIG_B2SUM_SIGNATURE) - 1;
 
-    if (memcmp((void *)config_b3sum, CONFIG_B3SUM_EMPTY, 64) != 0) {
+    if (memcmp((void *)config_b2sum, CONFIG_B2SUM_EMPTY, 128) == 0) {
+        secure_boot_active = false;
+    } else {
         editor_enabled = false;
 
-        uint8_t out_buf[CONFIG_HASH_LEN];
-        sha512_truncated(out_buf, CONFIG_HASH_LEN, config_addr, config_size - 2);
-        uint8_t hash_buf[CONFIG_HASH_LEN];
+        uint8_t out_buf[BLAKE2B_OUT_BYTES];
+        blake2b(out_buf, config_addr, config_size - 2);
+        uint8_t hash_buf[BLAKE2B_OUT_BYTES];
 
-        for (size_t i = 0; i < CONFIG_HASH_LEN; i++) {
-            hash_buf[i] = digit_to_int(config_b3sum[i * 2]) << 4 | digit_to_int(config_b3sum[i * 2 + 1]);
+        for (size_t i = 0; i < BLAKE2B_OUT_BYTES; i++) {
+            int hi = digit_to_int(config_b2sum[i * 2]);
+            int lo = digit_to_int(config_b2sum[i * 2 + 1]);
+            if (hi == -1 || lo == -1) {
+                panic(false, "!!! INVALID CHARACTER IN CONFIG CHECKSUM !!!");
+            }
+            hash_buf[i] = hi << 4 | lo;
         }
 
-        if (memcmp(hash_buf, out_buf, CONFIG_HASH_LEN) != 0) {
+        if (memcmp(hash_buf, out_buf, BLAKE2B_OUT_BYTES) != 0) {
             panic(false, "!!! CHECKSUM MISMATCH FOR CONFIG FILE !!!");
         }
     }
+
+#if defined (UEFI)
+    // Snapshot the raw bytes; the menu measures them once measured_boot
+    // is final.
+    config_raw_size = config_size - 2;
+    config_raw_addr = ext_mem_alloc(config_raw_size);
+    memcpy(config_raw_addr, config_addr, config_raw_size);
+#endif
 
     // add trailing newline if not present
     config_addr[config_size - 2] = '\n';
@@ -404,42 +433,20 @@ skip_loop:
             for (size_t j = i; j < config_size - skip; j++)
                 config_addr[j] = config_addr[j + skip];
             config_size -= skip;
+            i--; // re-examine character shifted into position i
         }
     }
 
     // Load macros
     struct macro *arch_macro = ext_mem_alloc(sizeof(struct macro));
     strcpy(arch_macro->name, "ARCH");
-#if defined (__x86_64__)
-    strcpy(arch_macro->value, "x86-64");
-#elif defined (__i386__)
-    {
-    uint32_t eax, ebx, ecx, edx;
-    if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-        strcpy(arch_macro->value, "ia-32");
-    } else {
-        strcpy(arch_macro->value, "x86-64");
-    }
-    }
-#elif defined (__aarch64__)
-    strcpy(arch_macro->value, "aarch64");
-#elif defined (__riscv)
-    strcpy(arch_macro->value, "riscv64");
-#elif defined (__loongarch64)
-    strcpy(arch_macro->value, "loongarch64");
-#else
-#error "Unspecified architecture"
-#endif
+    strcpy(arch_macro->value, current_arch());
     arch_macro->next = macros;
     macros = arch_macro;
 
     struct macro *fw_type_macro = ext_mem_alloc(sizeof(struct macro));
     strcpy(fw_type_macro->name, "FW_TYPE");
-#if defined (UEFI)
-    strcpy(fw_type_macro->value, "UEFI");
-#else
-    strcpy(fw_type_macro->value, "BIOS");
-#endif
+    strcpy(fw_type_macro->value, current_firmware());
     fw_type_macro->next = macros;
     macros = fw_type_macro;
 
@@ -602,16 +609,16 @@ overflow:
     return 0;
 }
 
-static bool config_get_entry_name(char *ret, size_t index, size_t limit) {
+static char *config_get_entry_name(size_t index) {
     if (!config_ready)
-        return false;
+        return NULL;
 
     char *p = config_addr;
 
     for (size_t i = 0; i <= index; i++) {
         while (*p != '/') {
             if (!*p)
-                return false;
+                return NULL;
             p++;
         }
         p++;
@@ -621,15 +628,15 @@ static bool config_get_entry_name(char *ret, size_t index, size_t limit) {
 
     p--;
 
-    size_t i;
-    for (i = 0; i < (limit - 1); i++) {
-        if (p[i] == SEPARATOR)
-            break;
-        ret[i] = p[i];
+    size_t len = 0;
+    while (p[len] != SEPARATOR) {
+        len++;
     }
 
-    ret[i] = 0;
-    return true;
+    char *ret = ext_mem_alloc(len + 1);
+    memcpy(ret, p, len);
+    ret[len] = 0;
+    return ret;
 }
 
 static char *config_get_entry(size_t *size, size_t index) {
