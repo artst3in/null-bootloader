@@ -1,4 +1,4 @@
-name: Build Null Bootloader
+name: Build LuLo
 
 on:
   push:
@@ -81,9 +81,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: Null ${{ steps.version.outputs.version }}
+          name: LuLo ${{ steps.version.outputs.version }}
           body: |
-            ## Null Bootloader ${{ steps.version.outputs.version }}
+            ## LuLo ${{ steps.version.outputs.version }}
 
             Minimal bootloader for LunaOS - a stripped-down Limine fork.
 

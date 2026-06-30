@@ -79,7 +79,7 @@ The `VERSION` file contains the current version:
 ### Information Channels
 
 ```
-User sees:     "Null 2026.02"               (clean, fresh)
+User sees:     "LuLo 2026.02"               (clean, fresh)
 Build uses:    "2026.02.100"                (compatible)
 Debug shows:   "2026-02-11T21:00:00.000000000Z"  (exact build moment)
 ```

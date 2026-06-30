@@ -1,19 +1,19 @@
-# Null configuration file
+# LuLo configuration file
 
-> **NOTE:** Null only supports the Limine protocol. Multiboot, Linux boot,
+> **NOTE:** LuLo only supports the Limine protocol. Multiboot, Linux boot,
 > and chainload protocols have been removed.
 
 ## Location of the config file
 
-For EFI-booted Null, `<EFI app path>/limine.conf` is taken into account
-first. On BIOS, or on EFI if that file is not found, Null scans for the
+For EFI-booted LuLo, `<EFI app path>/limine.conf` is taken into account
+first. On BIOS, or on EFI if that file is not found, LuLo scans for the
 config file on *the boot drive*. Every partition of the boot drive is scanned
 sequentially - first partition first (or, on EFI, the partition containing the
-EFI executable of the booted Null is scanned first), last partition last -
+EFI executable of the booted LuLo is scanned first), last partition last -
 for the presence of either a `/boot/limine/limine.conf`, `/boot/limine.conf`,
 `/limine/limine.conf`, or a `/limine.conf` file, in that order.
 
-Once the file is located, Null will use it as its config file. Other possible
+Once the file is located, LuLo will use it as its config file. Other possible
 candidates in subsequent partitions or directories are ignored.
 
 It is thus imperative that the intended config file is placed in a location
@@ -21,17 +21,17 @@ that will not be shadowed by another candidate config file.
 
 ### Config via SMBIOS
 
-Alternatively, if present, Null considers first and foremost configurations
+Alternatively, if present, LuLo considers first and foremost configurations
 supplied to it as SMBIOS OEM String entries (Type 11). Such configurations are
 accepted if the first string of such an entry starts with the prefix of
 `limine:config:`. The rest of the string is taken as the config file. If such a
 configuration is found, no further scanning for config files is done. As such,
 in this SMBIOS-provided config file scenario, the `boot():` drive is undefined
-on BIOS, and set to the boot device of Null on UEFI.
+on BIOS, and set to the boot device of LuLo on UEFI.
 
 ## Structure of the config file
 
-The Null configuration file is comprised of *menu entries* and *options*.
+The LuLo configuration file is comprised of *menu entries* and *options*.
 Comments begin in '#' and can only be on their own lines.
 
 ### Menu entries and sub-entries
@@ -86,17 +86,17 @@ Miscellaneous:
   the menu and disable quiet mode.
 * `serial` - If set to `yes`, enable serial I/O for the bootloader.
 * `serial_baudrate` - If `serial` is set to `yes`, this specifies the baudrate
-  to use for serial I/O. Defaults to `115200`. BIOS only, ignored with Null
+  to use for serial I/O. Defaults to `115200`. BIOS only, ignored with LuLo
   UEFI.
 * `global_dtb` - If set, use this DTB instead of the firmware-provided DTB for
-  Null itself, as well as for any booted entry whose protocol supports DTBs
+  LuLo itself, as well as for any booted entry whose protocol supports DTBs
   and the DTB is not locally overridden with `dtb_path`.
 * `default_entry` - 1-based entry index of the entry which will be
   automatically selected at startup. If unspecified, it is `1`.
 * `remember_last_entry` - If set to `yes`, remember last booted entry.
   (UEFI only).
 * `graphics` - If set to `no`, force CGA text mode for the boot menu, else use
-  a video mode. Ignored with Null UEFI.
+  a video mode. Ignored with LuLo UEFI.
 * `wallpaper` - Path to a file to use as a wallpaper. BMP, PNG, and JPEG
   formats are supported. There can be multiple of this option, in which case
   the wallpaper will be randomly selected from the provided options.
@@ -110,22 +110,22 @@ Miscellaneous:
 * `randomise_memory` - If set to `yes`, randomise the contents of RAM at bootup
   in order to find bugs related to non zeroed memory or for security reasons.
   This option will slow down boot time significantly. For the BIOS port of
-  Null, this will only randomise memory below 4GiB.
+  LuLo, this will only randomise memory below 4GiB.
 * `randomize_memory` - Alias of `randomise_memory`.
 * `hash_mismatch_panic` - If set to `no`, do not panic if there is a hash
   mismatch for a file, but print a warning instead.
 
-Null interface control options:
+LuLo interface control options:
 
-* `interface_resolution` - Specify screen resolution to be used by the Null
+* `interface_resolution` - Specify screen resolution to be used by the LuLo
   interface (menu, editor, console...) in the form `<width>x<height>`. This
-  will *only* affect the Null interface, not any booted OS. If not specified,
-  Null will pick a resolution automatically. If the resolution is not
-  available, Null will pick another one automatically. Ignored if using text
+  will *only* affect the LuLo interface, not any booted OS. If not specified,
+  LuLo will pick a resolution automatically. If the resolution is not
+  available, LuLo will pick another one automatically. Ignored if using text
   mode.
-* `interface_rotation` - Specifies the rotation of the Null interface.
+* `interface_rotation` - Specifies the rotation of the LuLo interface.
   It can be any of the following values: `0`, `90`, `180`, `270`. Default is `0`.
-* `interface_branding` - A string that will be displayed on top of the Null
+* `interface_branding` - A string that will be displayed on top of the LuLo
   interface.
 * `interface_branding_colour` - A value between 0 and 7 specifying the colour
   of the branding string. See below for a table of colours. Default is `6`.
@@ -147,7 +147,7 @@ Null interface control options:
  | 6    | Cyan    |
  | 7    | Gray    |
 
-Null graphical terminal control options:
+LuLo graphical terminal control options:
 
 These are ignored if using text mode.
 
@@ -172,7 +172,7 @@ These are ignored if using text mode.
   resolution display. Values over 8 are disallowed. Default is no scaling,
   i.e. `1x1`.
 * `term_font_spacing` - Horizontal spacing, in pixels, between glyphs on
-  screen. Also applies to the built-in Null font. Defaults to 1. 0 is
+  screen. Also applies to the built-in LuLo font. Defaults to 1. 0 is
   allowed.
 * `term_palette` - Specifies the colour palette used by the terminal (RRGGBB).
   It is a `;` separated array of 8 colours: black, red, green, brown, blue,
@@ -204,7 +204,7 @@ Editor control options:
 * `comment` - An optional comment string that will be displayed by the
   bootloader on the menu when an entry is selected.
 * `protocol` - The boot protocol that will be used to boot the
-  kernel/executable. **Null only supports `limine`.**
+  kernel/executable. **LuLo only supports `limine`.**
 * `cmdline` - The command line string to be passed to the kernel/executable.
   Can be omitted.
 * `kernel_cmdline` - Alias of `cmdline`.
@@ -220,7 +220,7 @@ Editor control options:
   last module option specified.
 * `module_cmdline` - Alias of `module_string`.
 * `resolution` - The resolution to be used. This setting takes the form of
-  `<width>x<height>x<bpp>`. If the resolution is not available, Null will
+  `<width>x<height>x<bpp>`. If the resolution is not available, LuLo will
   pick another one automatically. Omitting `<bpp>` will default to 32.
 * `kaslr` - For relocatable executables, if set to `yes`, enable kernel
   address space layout randomisation. KASLR is disabled by default.
@@ -240,7 +240,7 @@ Editor control options:
 
 ## Paths
 
-A Null path is used to locate files in the whole system. It is comprised of
+A LuLo path is used to locate files in the whole system. It is comprised of
 a *resource*, a *resource argument*, and a *path*. It takes the form of:
 ```
 resource(argument):/path
@@ -271,7 +271,7 @@ A resource can be one of the following:
   partition.
 * `tftp` - The `argument` is the IP address of the tftp server to load the file
   from. If the argument is left empty (`tftp():/...`) the file will be loaded
-  from the server Null booted from. This resource is only available when
+  from the server LuLo booted from. This resource is only available when
   booting off PXE.
 
 A path can optionally be suffixed with a BLAKE3 hash for the referenced file,
@@ -297,7 +297,7 @@ name.
 
 ### Built-in macros
 
-Null automatically defines these macros:
+LuLo automatically defines these macros:
 
 * `ARCH` - This built-in macro expands to the architecture of the machine.
   Possible values are: `x86-64`, `ia-32`, `aarch64`, `riscv64`, `loongarch64`.

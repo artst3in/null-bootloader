@@ -2,7 +2,7 @@
 
 ### Why not support filesystem X or feature Y? (eg: LUKS, LVM)
 
-The idea with Null is to remove the responsibility of parsing filesystems and
+The idea with LuLo is to remove the responsibility of parsing filesystems and
 formats, aside from the bare minimum necessities (eg: FAT32), from the
 bootloader itself. It is a needless duplication of efforts to have bootloaders
 support all possible filesystems and formats, and it leads to massive, bloated
@@ -15,14 +15,14 @@ The kernel should be responsible for parsing everything else as it sees fit.
 ### What about LUKS? What about security? Encrypt the kernel!
 
 Simply put, this is unnecessary. Putting the kernel/modules in a readable FAT32
-partition and letting Null know about their BLAKE3 checksums in the config
+partition and letting LuLo know about their BLAKE3 checksums in the config
 file provides as much security as encrypting the kernel does.
 
 ### What if a malicious actor modifies the config file?
 
 While this is a pointless effort on legacy x86 BIOS, it is a reasonable
 expectation to secure the boot sequence on UEFI systems with Secure Boot.
-Null provides a way to modify its own EFI executable to bake in the BLAKE3
+LuLo provides a way to modify its own EFI executable to bake in the BLAKE3
 checksum of the config file itself. The EFI executable can then get signed with
 a key added to the firmware's keychain. This prevents modifications to the
 config file (and in turn the checksums contained there) from going unnoticed.
@@ -36,7 +36,7 @@ and store kernels, initramfses, and any other files needed for boot there.
 
 ### Why only Limine protocol? What about Multiboot?
 
-Null is specifically designed for LunaOS, which only uses the Limine protocol.
+LuLo is specifically designed for LunaOS, which only uses the Limine protocol.
 Supporting multiple protocols adds complexity and attack surface with no
 benefit for our use case. If you need Multiboot or Linux boot support, use
 the upstream [Limine](https://github.com/limine-bootloader/limine) bootloader.

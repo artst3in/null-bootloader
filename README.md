@@ -1,7 +1,7 @@
 <div align="center">
 
-# 🌙 Null
-### **The Minimal Bootloader**
+# 🌙 LuLo
+### **Luna Loader — The Minimal Bootloader**
 
 *A Stripped-Down Limine Fork for LunaOS*
 
@@ -20,13 +20,13 @@
 </div>
 
 > **Part of [Project Aether](https://github.com/artst3in/LunaOS) — the unified consciousness ecosystem.**
-> LunaOS (brain) · Aegis (shield) · LCPFS (storage) · Null (boot)
+> LunaOS (brain) · Aegis (shield) · LCPFS (storage) · LuLo (boot)
 
 ---
 
-## 🎯 What is Null?
+## 🎯 What is LuLo?
 
-**Null** is a **minimal bootloader** for LunaOS - a stripped-down fork of [Limine](https://github.com/limine-bootloader/limine) with ~4,300 lines of dead code removed. It does exactly one thing: boot LunaOS kernels via the Limine protocol.
+**LuLo** is a **minimal bootloader** for LunaOS - a stripped-down fork of [Limine](https://github.com/limine-bootloader/limine) with ~4,300 lines of dead code removed. It does exactly one thing: boot LunaOS kernels via the Limine protocol.
 
 **The numbers:**
 
@@ -41,7 +41,7 @@
 
 ## ✨ Features
 
-### 🚀 What Null Does
+### 🚀 What LuLo Does
 
 <table>
 <tr>
@@ -66,7 +66,7 @@
 </tr>
 </table>
 
-### 🚫 What Null Doesn't Do
+### 🚫 What LuLo Doesn't Do
 
 <table>
 <tr>
@@ -155,7 +155,7 @@ We tried everything else:
 
 ## 🔐 Classical Cryptography
 
-Null includes a classical cryptographic stack for secure boot. Post-quantum cryptography
+LuLo includes a classical cryptographic stack for secure boot. Post-quantum cryptography
 (Dilithium/Kyber) has been removed based on MLE (Multiversal Law of Existence) theoretical
 analysis demonstrating that quantum computing as theorized cannot exist.
 
@@ -267,7 +267,7 @@ See [INSTALL.md](INSTALL.md) for full build instructions.
 
 ## 🏷️ Versioning
 
-Null follows the LunaOS unified versioning scheme:
+LuLo follows the LunaOS unified versioning scheme:
 
 - **Version**: `2026.02.100` (YYYY.MM.BBB)
 - **Increment**: Bump BBB (100 → 101 → 102) per release
@@ -289,7 +289,7 @@ See [COPYING](COPYING) for full details.
 
 ## 🙏 Acknowledgments
 
-Null is a minimal fork of the legendary **[Limine](https://github.com/limine-bootloader/limine)** bootloader. We're deeply grateful to mintsuki and the Limine community for creating such a robust foundation.
+LuLo is a minimal fork of the legendary **[Limine](https://github.com/limine-bootloader/limine)** bootloader. We're deeply grateful to mintsuki and the Limine community for creating such a robust foundation.
 
 **What we took:**
 - 🔧 Proven boot process (memory, SMP, paging)
@@ -304,11 +304,11 @@ Null is a minimal fork of the legendary **[Limine](https://github.com/limine-boo
 
 ## 🌙 Part of LunaOS
 
-Null is a core component of **[LunaOS](https://github.com/artst3in/LunaOS)** - the first operating system built on the **Coherence Paradigm**.
+LuLo is a core component of **[LunaOS](https://github.com/artst3in/LunaOS)** - the first operating system built on the **Coherence Paradigm**.
 
 ### The Coherence Paradigm
 
-Null embodies the **First Law of Computational Physics** (LCP):
+LuLo embodies the **First Law of Computational Physics** (LCP):
 
 - 🎯 **Minimum viable code** - Only what's needed to boot LunaOS
 - 🛡️ **Proven foundations** - Use Limine's battle-tested boot process
@@ -326,7 +326,7 @@ Null embodies the **First Law of Computational Physics** (LCP):
 ./configure --enable-uefi-x86-64 && make
 ```
 
-**[📖 Build Instructions](INSTALL.md)** • **[⚙️ Configuration](CONFIG.md)** • **[🐛 Issues](https://github.com/artst3in/null-bootloader/issues)**
+**[📖 Build Instructions](INSTALL.md)** • **[⚙️ Configuration](CONFIG.md)** • **[🐛 Issues](https://github.com/artst3in/LuLo/issues)**
 
 ---
 

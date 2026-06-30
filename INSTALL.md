@@ -1,11 +1,11 @@
 # Build and Install Instructions
 
-> **NOTE:** This document is about building and installing Null.
+> **NOTE:** This document is about building and installing LuLo.
 > For information about deployment for usage, see [USAGE.md](USAGE.md).
 
 ## Prerequisites
 
-In order to build Null, the following programs have to be installed:
+In order to build LuLo, the following programs have to be installed:
 common UNIX tools (also known as `coreutils`),
 `GNU make`, `grep`, `sed`, `find`, `awk`, `gzip`, `nasm`, `mtools`
 (optional, necessary to build `limine-uefi-cd.bin`).
@@ -23,27 +23,27 @@ script (`GNU autoconf` required).
 `./configure` takes arguments and environment variables; for more information
 on these, run `./configure --help`.
 
-> **NOTE:** `./configure` by default does not build any Null port. Make sure
+> **NOTE:** `./configure` by default does not build any LuLo port. Make sure
 > to read the output of `./configure --help` and enable any or all ports!
 
-Null supports both in-tree and out-of-tree builds. Simply run the `configure`
+LuLo supports both in-tree and out-of-tree builds. Simply run the `configure`
 script from the directory you wish to execute the build in. The following
 `make` commands are supposed to be run inside the build directory.
 
 ## Building
 
-To build Null, run:
+To build LuLo, run:
 ```bash
 make    # (or gmake where applicable)
 ```
 
 ## Installing
 
-This step will install Null files to `share`, `include`, and `bin`
+This step will install LuLo files to `share`, `include`, and `bin`
 directories in the specified prefix (default is `/usr/local`, see
 `./configure --help`.
 
-To install Null, run:
+To install LuLo, run:
 ```bash
 make install    # (or gmake where applicable)
 ```
