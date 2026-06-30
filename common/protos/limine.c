@@ -1009,7 +1009,7 @@ FEAT_START
     struct limine_bootloader_info_response *bootloader_info_response =
         ext_mem_alloc(sizeof(struct limine_bootloader_info_response));
 
-    bootloader_info_response->name = reported_addr("Limine");
+    bootloader_info_response->name = reported_addr("LuLo");
     bootloader_info_response->version = reported_addr(LIMINE_VERSION);
 
     bootloader_info_request->response = reported_addr(bootloader_info_response);

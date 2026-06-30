@@ -10,7 +10,7 @@
 #include <lib/misc.h>
 #include <menu.h>
 
-#define LIMINE_BRAND L"Limine " LIMINE_VERSION
+#define LIMINE_BRAND L"LuLo " LIMINE_VERSION
 
 static EFI_GUID bli_vendor_guid = { 0x4a67b082, 0x0a4c, 0x41cf, { 0xb6, 0xc7, 0x44, 0x0b, 0x29, 0xbb, 0x8c, 0x4f } };
 

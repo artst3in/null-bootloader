@@ -1404,9 +1404,9 @@ noreturn void _menu(bool first_run) {
         {
             uint32_t eax, ebx, ecx, edx;
             if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (ia-32, BIOS)");
+                menu_branding = strdup("LuLo " LIMINE_VERSION " (ia-32, BIOS)");
             } else {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (x86-64, BIOS)");
+                menu_branding = strdup("LuLo " LIMINE_VERSION " (x86-64, BIOS)");
             }
         }
 #elif defined (UEFI)
@@ -1414,13 +1414,13 @@ noreturn void _menu(bool first_run) {
         {
             uint32_t eax, ebx, ecx, edx;
             if (!cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx) || !(edx & (1 << 29))) {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (ia-32, UEFI32)");
+                menu_branding = strdup("LuLo " LIMINE_VERSION " (ia-32, UEFI32)");
             } else {
-                menu_branding = strdup("Limine " LIMINE_VERSION " (x86-64, UEFI32)");
+                menu_branding = strdup("LuLo " LIMINE_VERSION " (x86-64, UEFI32)");
             }
         }
 #else
-        menu_branding = strdup("Limine " LIMINE_VERSION " ("
+        menu_branding = strdup("LuLo " LIMINE_VERSION " ("
 #if defined (__x86_64__)
             "x86-64"
 #elif defined (__riscv)
