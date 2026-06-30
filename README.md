@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🌙 LuLo
-### **Luna Loader — The Minimal Bootloader**
+### **LunaLoader — The Minimal Bootloader**
 
 *A Stripped-Down Limine Fork for LunaOS*
 
